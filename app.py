@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #selected_empreendimento_baseline
+from dateutil.relativedelta import relativedelta #process_context_menu_actions
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -1061,63 +1061,65 @@ def send_to_aws(empreendimento, version_name):
         st.error(f"Erro ao enviar para AWS: {e}")
         return False
 
-def process_context_menu_actions():
+def process_context_menu_actions(df_current=None):
     """
-    Processa ações vindas do Menu de Contexto via URL.
-    Salva no banco, atualiza o estado e limpa a URL.
+    Intercepta a ação vinda do JavaScript via URL, salva a baseline na AWS
+    e recarrega a página limpa.
     """
-    # 1. Ler parâmetros da URL
-    query_params = st.query_params
+    import urllib.parse
     
-    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
-        # Pegar o empreendimento da URL
-        raw_emp = query_params.get('empreendimento')
-        if isinstance(raw_emp, list):
+    # 1. Verificar se há uma ação na URL
+    if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
+        
+        # 2. Identificar o empreendimento alvo
+        raw_emp = st.query_params.get('empreendimento')
+        # O Streamlit às vezes retorna lista, às vezes string, dependendo da versão
+        if isinstance(raw_emp, list): 
             raw_emp = raw_emp[0]
         
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        
-        if empreendimento:
+        if raw_emp:
+            # Decodifica caracteres especiais da URL (ex: "Viana%20e%20Moura" -> "Viana e Moura")
+            empreendimento = urllib.parse.unquote(raw_emp)
             print(f"🚀 AÇÃO DE CONTEXTO DETECTADA: Criar Baseline para {empreendimento}")
+
+            # 3. Garantir que temos dados para trabalhar
+            # Se a sessão estiver vazia (fresh reload), precisamos carregar os dados
+            if df_current is None or df_current.empty:
+                with st.spinner("🔄 Carregando dados para processar solicitação..."):
+                    df_current = load_data()
             
-            # 2. Garantir que temos dados para trabalhar
-            df_atual = st.session_state.get('df_data')
-            if df_atual is None or df_atual.empty:
-                df_atual = load_data() # Recarrega se a sessão estiver vazia
-            
-            if df_atual is not None and not df_atual.empty:
+            if df_current is not None and not df_current.empty:
                 try:
-                    # 3. EXECUTAR A CRIAÇÃO DA BASELINE (Mesma função do botão lateral)
-                    # Isso salva no MySQL/AWS
-                    version_name = take_gantt_baseline(df_atual, empreendimento)
+                    # --- 4. EXECUÇÃO CRÍTICA: Salvar na AWS ---
+                    # Chama a mesma função que o botão da sidebar usa
+                    version_name = take_gantt_baseline(df_current, empreendimento)
                     
-                    # 4. Feedback para o usuário (usando Session State para persistir após o rerun)
+                    # 5. Sucesso: Armazena mensagem na Sessão para exibir APÓS o recarregamento
                     st.session_state['toast_message'] = {
-                        'msg': f"✅ Baseline '{version_name}' criada com sucesso para {empreendimento}!",
-                        'icon': "🎉"
+                        'msg': f"✅ Baseline '{version_name}' salva com sucesso na AWS para {empreendimento}!",
+                        'icon': "☁️"
                     }
-                    
-                    # Adicionar à lista de 'Não enviados' para AWS (se necessário para sua lógica de sync)
-                    if 'unsent_baselines' not in st.session_state:
-                        st.session_state.unsent_baselines = {}
-                    if empreendimento not in st.session_state.unsent_baselines:
-                        st.session_state.unsent_baselines[empreendimento] = []
-                    if version_name not in st.session_state.unsent_baselines[empreendimento]:
-                        st.session_state.unsent_baselines[empreendimento].append(version_name)
+                    print(f"✅ Sucesso ao salvar: {version_name}")
 
                 except Exception as e:
+                    # Erro: Armazena mensagem de erro
                     st.session_state['toast_message'] = {
-                        'msg': f"❌ Erro ao criar baseline: {str(e)}",
+                        'msg': f"❌ Erro ao salvar baseline: {str(e)}",
                         'icon': "⚠️"
                     }
-                    print(f"❌ ERRO NO CONTEXT MENU: {e}")
-            
-            # 5. LIMPEZA CRÍTICA: Limpar a URL para não executar novamente ao recarregar
+                    print(f"❌ Erro Crítico no Context Menu: {e}")
+            else:
+                st.session_state['toast_message'] = {
+                    'msg': "❌ Erro: Não foi possível carregar os dados para salvar a baseline.",
+                    'icon': "⚠️"
+                }
+
+            # 6. LIMPEZA CRÍTICA: Limpar a URL para não entrar em loop infinito
             st.query_params.clear()
             
-            # 6. Forçar recarregamento para atualizar a UI
+            # 7. RELOAD: Forçar recarregamento para limpar a URL visualmente e atualizar a UI
             st.rerun()
-
+            
 def get_next_baseline_version(empreendimento):
     """Calcula o próximo número de versão da baseline."""
     existing_baselines = load_baselines()
@@ -1140,50 +1142,52 @@ def get_next_baseline_version(empreendimento):
 
 def create_gantt_context_menu_component(selected_empreendimento):
     """
-    Cria o menu de contexto invisível que intercepta o clique direito
-    e envia o comando para o Python via URL.
+    Cria um menu invisível que intercepta o clique direito e recarrega a página
+    passando parâmetros para o Python processar.
     """
     import urllib.parse
+    import time
+    import streamlit.components.v1 as components
     
-    # Codifica o nome para URL (ex: "Viana e Moura" vira "Viana%20e%20Moura")
+    # Codifica o nome para URL (segurança para nomes com espaços e acentos)
     emp_encoded = urllib.parse.quote(selected_empreendimento)
+    timestamp = int(time.time()) # Evita cache do navegador
     
-    # Timestamp para evitar cache do navegador
-    timestamp = int(time.time())
-    
-    component_html = f"""
+    html_code = f"""
     <style>
-        /* Área de Contexto */
+        /* Área de Gatilho Visual (opcional, pode deixar transparente se preferir) */
         #gantt-context-trigger {{
-            padding: 15px;
+            padding: 12px;
             margin: 10px 0;
-            border: 2px dashed #27ae60;
+            border: 2px dashed #cbd5e1;
             border-radius: 8px;
-            background-color: #f0fdf4;
+            background-color: #f8fafc;
             text-align: center;
-            color: #15803d;
-            font-family: 'Segoe UI', sans-serif;
-            font-size: 14px;
-            cursor: context-menu;
-            transition: all 0.3s ease;
+            color: #64748b;
+            font-family: sans-serif;
+            font-size: 13px;
+            cursor: context-menu; /* Ícone do mouse muda */
+            transition: all 0.2s;
         }}
         #gantt-context-trigger:hover {{
-            background-color: #dcfce7;
-            border-color: #16a34a;
+            background-color: #e2e8f0;
+            border-color: #94a3b8;
+            color: #334155;
         }}
         
         /* O Menu Flutuante Personalizado */
         #custom-context-menu {{
             display: none;
             position: fixed;
-            z-index: 10000;
-            width: 200px;
+            z-index: 99999;
+            width: 220px;
             background: white;
             border-radius: 6px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
             border: 1px solid #e2e8f0;
             overflow: hidden;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', sans-serif;
+            animation: fadeIn 0.1s ease-out;
         }}
         
         .menu-item {{
@@ -1191,10 +1195,10 @@ def create_gantt_context_menu_component(selected_empreendimento):
             cursor: pointer;
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 13px;
+            gap: 12px;
+            font-size: 14px;
             color: #334155;
-            transition: background 0.2s;
+            transition: background 0.1s;
         }}
         
         .menu-item:hover {{
@@ -1202,21 +1206,33 @@ def create_gantt_context_menu_component(selected_empreendimento):
             color: #0f172a;
         }}
         
-        .menu-icon {{ font-size: 16px; }}
+        .menu-header {{
+            padding: 8px 16px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 11px;
+            font-weight: bold;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }}
+        
+        @keyframes fadeIn {{ from {{ opacity: 0; transform: scale(0.95); }} to {{ opacity: 1; transform: scale(1); }} }}
     </style>
 
     <div id="gantt-context-trigger">
-        🖱️ <b>Clique com Botão Direito aqui</b> para opções de: <strong>{selected_empreendimento}</strong>
+        🖱️ <b>Clique com o Botão Direito aqui</b> para opções de: <strong>{selected_empreendimento}</strong>
     </div>
 
     <div id="custom-context-menu">
+        <div class="menu-header">Ações do Projeto</div>
         <div class="menu-item" onclick="triggerBaseline()">
-            <span class="menu-icon">📸</span>
-            <span>Criar Baseline Agora</span>
+            <span>📸</span>
+            <span>Criar Nova Baseline</span>
         </div>
-        <div class="menu-item" style="border-top: 1px solid #eee; color: #94a3b8; cursor: default;">
-            <span class="menu-icon">🚫</span>
-            <span>Outras ações (Em breve)</span>
+        <div class="menu-item" style="border-top: 1px solid #f1f5f9; color: #cbd5e1; cursor: default;">
+            <span>🚫</span>
+            <span>Deletar (Em breve)</span>
         </div>
     </div>
 
@@ -1224,7 +1240,7 @@ def create_gantt_context_menu_component(selected_empreendimento):
         const triggerArea = document.getElementById('gantt-context-trigger');
         const menu = document.getElementById('custom-context-menu');
 
-        // 1. Detectar Botão Direito
+        // 1. Detectar Botão Direito para abrir o menu
         triggerArea.addEventListener('contextmenu', function(e) {{
             e.preventDefault(); // Bloqueia o menu padrão do navegador
             
@@ -1241,26 +1257,32 @@ def create_gantt_context_menu_component(selected_empreendimento):
             }}
         }});
 
-        // 3. AÇÃO PRINCIPAL: Envia comando para o Python
+        // 3. AÇÃO PRINCIPAL: Envia comando para o Python via URL
         function triggerBaseline() {{
             console.log("Disparando criação de baseline...");
             
-            // Pega a URL atual do navegador (topo)
+            // Feedback visual imediato para o usuário saber que clicou
+            triggerArea.innerHTML = '⏳ Processando solicitação... A página irá recarregar...';
+            triggerArea.style.backgroundColor = '#fff3cd';
+            triggerArea.style.borderColor = '#ffeeba';
+            triggerArea.style.color = '#856404';
+            
+            // Pega a URL da janela PRINCIPAL (window.top), não do iframe
             const currentUrl = new URL(window.top.location.href);
             
-            // Adiciona os parâmetros que o Python vai ler
+            // Define os parâmetros que o Python vai ler na função process_context_menu_actions
             currentUrl.searchParams.set('context_action', 'take_baseline');
             currentUrl.searchParams.set('empreendimento', decodeURIComponent('{emp_encoded}'));
-            currentUrl.searchParams.set('t', '{timestamp}'); // Força atualização
+            currentUrl.searchParams.set('t', '{timestamp}'); // Timestamp força o navegador a não usar cache
             
-            // Redireciona a página (Reload com parâmetros)
+            // Força o recarregamento da página principal com os novos parâmetros
             window.top.location.href = currentUrl.toString();
         }}
     </script>
     """
     
-    # Renderiza o componente HTML com altura suficiente para a área de clique
-    components.html(component_html, height=100)
+    # Renderiza o HTML com altura suficiente para o trigger
+    components.html(html_code, height=160)
     
 # --- Funções Utilitárias ---
 def abreviar_nome(nome):
@@ -5643,40 +5665,63 @@ def executar_logica_baseline(df, empreendimento):
         st.error(f"Erro ao criar baseline: {e}")
         return False
 
-# --- BLOCO PRINCIPAL COMPLETO ---
+# --- BLOCO PRINCIPAL (Main Execution Flow) ---
 if __name__ == "__main__":
-    # 1. Verificar implementação (Opcional, pode remover em produção)
+    
+    # ==============================================================================
+    # 1. INTERCEPTADOR DE AÇÕES (Prioridade Máxima)
+    # ==============================================================================
+    # Verifica imediatamente se a URL contém um comando de ação vindo do menu de contexto.
+    # Se sim, processa e recarrega a página antes de desenhar qualquer coisa pesada.
     if 'context_action' in st.query_params:
-        process_context_menu_actions()
+        
+        # Tenta obter os dados da sessão, se não existirem, carrega do banco/CSV
+        if 'df_data' not in st.session_state or st.session_state.df_data is None:
+             st.session_state.df_data = load_data()
+        
+        # Executa a ação, salva no banco e dá st.rerun()
+        # Isso impede que o código abaixo seja executado nesta passada
+        process_context_menu_actions(st.session_state.df_data)
 
-    # --- PASSO B: EXIBIR MENSAGENS TOAST (Memória do Navegador Simulada) ---
-    # Se processamos algo no passo anterior e demos rerun, a mensagem estará aqui
+    # ==============================================================================
+    # 2. EXIBIÇÃO DE MENSAGENS (Pós-Reload)
+    # ==============================================================================
+    # Se o passo 1 ocorreu e deu st.rerun(), a página recarrega limpa.
+    # Aqui verificamos se há uma mensagem de sucesso/erro deixada pelo passo 1.
     if 'toast_message' in st.session_state:
         toast = st.session_state.pop('toast_message') # Pega e remove da sessão
         st.toast(toast['msg'], icon=toast['icon'])
-
-    # --- PASSO C: CARREGAMENTO NORMAL DO APP ---
-    with st.spinner("Carregando sistema..."):
-        df_data = load_data()
-    
-    if df_data is not None and not df_data.empty:
-        st.session_state.df_data = df_data
-
-        # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
-        # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
-        if 'context_action' in st.query_params:
+        
+        # Efeito sonoro/visual extra se for sucesso (opcional)
+        if "sucesso" in toast['msg'].lower():
             try:
-                action = st.query_params['context_action']
-                if action == 'take_baseline':
-                    raw_emp = st.query_params.get('empreendimento')
-                    # Normaliza se vier como lista
-                    if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-                    
-                    if raw_emp:
-                        # Executa EXATAMENTE a mesma lógica do botão
-                        executar_logica_baseline(df_data, raw_emp)
-            except Exception as e:
-                st.error(f"Erro ao processar ação de contexto: {e}")
+                st.balloons() 
+            except: 
+                pass
+
+    # ==============================================================================
+    # 3. CARREGAMENTO NORMAL DO APP (Fluxo Padrão)
+    # ==============================================================================
+    with st.spinner("Carregando sistema..."):
+        # Carrega dados se ainda não estiverem na sessão
+        if 'df_data' not in st.session_state:
+             st.session_state.df_data = load_data()
+        
+        df_data = st.session_state.df_data
+
+    # Se temos dados, desenha a interface
+    if df_data is not None and not df_data.empty:
+        
+        # ... (Seu código existente de Sidebar, Filtros e Tabs continua aqui) ...
+        # ... (Certifique-se de que suas chamadas de gerar_gantt e Sidebar estão indentadas aqui) ...
+        
+        # EXEMPLO DE ONDE CHAMAR O COMPONENTE DO MENU:
+        # Deve ser chamado apenas se um empreendimento estiver selecionado na lógica do seu app
+        if 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
+             st.markdown("### Menu de Ações Rápidas")
+             create_gantt_context_menu_component(selected_empreendimento_baseline)
+             
+        # ... (Resto do seu código de renderização das tabelas e gráficos) ...
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
