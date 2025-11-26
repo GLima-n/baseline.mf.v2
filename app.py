@@ -2187,7 +2187,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // 5. AÇÃO DO BOTÃO (A CORREÇÃO PRINCIPAL ESTÁ AQUI)
+                    // 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX DO STREAMLIT)
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
@@ -2207,25 +2207,24 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         menu.style.display = 'none';
                         toast.style.display = 'block';
                         toast.style.backgroundColor = "#2980b9";
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>A página será recarregada.</span>`;
+                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>Redirecionando...</span>`;
 
-                        // Prepara os parâmetros da URL
+                        // Prepara os parâmetros
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
-                        
-                        // Constrói a URL com os parâmetros de ação
-                        // Usamos '?' para adicionar query params à URL atual
-                        const params = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+                        const targetUrl = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
 
-                        console.log("🔄 Redirecionando janela principal para:", params);
-                        
-                        // 🚀 A MÁGICA: Força a janela principal a navegar para a URL com parâmetros.
-                        // Isso faz o Streamlit rodar o Python novamente, capturar 'take_baseline',
-                        // salvar no banco e mostrar o botão na sidebar.
-                        window.top.location.href = params;
+                        console.log("🔄 Tentando navegação via link _top para:", targetUrl);
+
+                        // 🚀 TRUQUE DO LINK OCULTO (Bypassa o bloqueio de Sandbox)
+                        const link = document.createElement('a');
+                        link.href = targetUrl;
+                        link.target = "_top"; // Isso diz ao navegador para abrir na janela pai
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click(); // Simula o clique humano
+                        document.body.removeChild(link); // Limpeza
                     }});
-
-                }})();
         
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
