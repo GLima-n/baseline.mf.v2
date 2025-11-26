@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #df_data
+from dateutil.relativedelta import relativedelta #st.spinner
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -222,94 +222,63 @@ def create_baselines_table():
             conn.close()
     
 def process_context_menu_actions(df=None):
-    """Processa ações do menu de contexto via query parameters - VERSÃO CORRIGIDA"""
+    """Processa ações do menu de contexto - VERSÃO SIMPLIFICADA"""
     
-    # 1. Coleta as duas fontes possíveis de dados
-    params_url = dict(st.query_params)
-    params_snap = st.session_state.get('_url_snapshot', {})
+    # Verifica se há ação de contexto na URL
+    query_params = dict(st.query_params)
     
-    # Log para vermos o que está disponível na memória
-    log_debug(f"🔍 DIAGNÓSTICO ESTADO: URL={params_url} | SNAPSHOT={params_snap}")
-
-    # 2. Decide qual usar (Prioridade: URL Atual > Snapshot)
-    params = {}
-    origem = "NENHUMA"
-
-    # Se a URL atual tem o comando, usa ela
-    if params_url.get('context_action') == 'take_baseline':
-        params = params_url
-        origem = "URL_VIVA"
-    # Se não, mas o snapshot tem o comando, usa ele
-    elif params_snap.get('context_action') == 'take_baseline':
-        params = params_snap
-        origem = "SNAPSHOT_SALVO"
-    
-    log_debug(f"🚀 Iniciando com fonte: {origem}")
-
-    # 3. Se não encontrou comando válido em lugar nenhum, sai
-    if not params:
-        log_debug("💤 Nenhuma ação encontrada nas fontes.")
-        return
-
-    # --- INÍCIO DA EXECUÇÃO ---
-    if params.get('context_action') == 'take_baseline':
-        log_debug("🔔 COMANDO VALIDADO! Processando...")
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        print("⚡⚡⚡ ACTION DETECTADA NO PROCESS_CONTEXT_MENU_ACTIONS ⚡⚡⚡")
         
-        # Recupera o empreendimento (trata lista ou string)
-        raw_emp = params.get('empreendimento')
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+        # Recupera o empreendimento
+        raw_emp = query_params.get('empreendimento')
+        if isinstance(raw_emp, list): 
+            raw_emp = raw_emp[0]
         
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        log_debug(f"🎯 Alvo: {empreendimento}")
-
-        # 4. Garantia de Dados
-        if df is None or df.empty:
-            # Tenta carregar do session_state, que deve ser o df principal
-            if 'df_data' in st.session_state and not st.session_state.df_data.empty:
-                df = st.session_state.df_data
-                log_debug("📚 Dados carregados do session_state.")
-            else:
-                log_debug("⚠️ Carregando dados (Sessão Iframe/Nova)...")
-                try:
-                    # Assumindo que load_data() existe e carrega o DataFrame
-                    df = load_data()
-                    log_debug(f"📚 Dados carregados: {len(df)} linhas.")
-                except Exception as e:
-                    log_debug(f"❌ Erro fatal no load_data: {e}")
-                    return
-
-        # 5. Execução e Salvamento
-        if empreendimento and df is not None:
+        print(f"🎯 Empreendimento: {empreendimento}")
+        
+        # Limpa os parâmetros IMEDIATAMENTE para evitar loop
+        st.query_params.clear()
+        
+        if empreendimento:
             try:
-                log_debug("💾 Chamando take_gantt_baseline...")
+                # Usa os dados da sessão se disponíveis, senão carrega
+                if df is None or df.empty:
+                    if 'df_data' in st.session_state and not st.session_state.df_data.empty:
+                        df = st.session_state.df_data
+                        print("📊 Dados carregados do session_state")
+                    else:
+                        print("🔄 Carregando dados fresh...")
+                        df = load_data()
                 
-                # ✅ CHAMADA CORRIGIDA: Apenas 2 argumentos
-                version_name = take_gantt_baseline(df, empreendimento)
-                
-                log_debug(f"✅ SUCESSO FINAL: {version_name} salvo no banco!")
-                
-                # Limpeza Completa e Rerun
-                if '_url_snapshot' in st.session_state:
-                    del st.session_state['_url_snapshot']
-                
-                st.query_params.clear()
-                st.cache_data.clear()
-                
-                # Feedback Visual na Sessão
-                st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
-                st.session_state.show_context_success = True
-                
-                # Forçar atualização da interface
-                st.rerun()
-                
+                if df is not None and not df.empty:
+                    print(f"💾 Salvando baseline para {empreendimento}...")
+                    version_name = take_gantt_baseline(df, empreendimento)
+                    print(f"✅ Baseline {version_name} criada com sucesso!")
+                    
+                    # Feedback
+                    st.success(f"✅ Baseline {version_name} criada!")
+                    
+                    # Atualiza a interface
+                    st.rerun()
+                else:
+                    st.error("❌ Não foi possível carregar dados para criar baseline")
+                    
             except Exception as e:
-                log_debug(f"❌ Erro no save: {e}")
+                print(f"❌ ERRO: {e}")
                 import traceback
-                log_debug(traceback.format_exc())
-                
-                # Feedback de erro
-                st.session_state.context_menu_error = f"❌ Erro ao criar baseline: {e}"
-                st.session_state.show_context_error = True
+                print(traceback.format_exc())
+                st.error(f"❌ Erro ao criar baseline: {e}")
+# --- BLOCO DE DIAGNÓSTICO IMEDIATO ---
+print("=== DIAGNÓSTICO CONTEXT MENU ===")
+print(f"Query params: {dict(st.query_params)}")
+print(f"Session state keys: {list(st.session_state.keys())}")
+
+# Executa o processador IMEDIATAMENTE se houver ação
+if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
+    print("🚨🚨🚨 AÇÃO DETECTADA - EXECUTANDO PROCESSOR 🚨🚨🚨")
+    process_context_menu_actions(st.session_state.get('df_data'))
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -4727,20 +4696,25 @@ except Exception as e:
 create_baselines_table()
 
 # --- Bloco Principal ---
-with st.spinner("Carregando e processando dados..."):
-        # Só agora carregamos os dados para a visualização normal
-        df_data = load_data()
-        if df_data is not None:
-            st.session_state.df_data = df_data
-            process_context_menu_actions(df_data)
+with st.spinner("Carregando dados..."):
+    df_data = load_data()
+    
+    if df_data is not None:
+        st.session_state.df_data = df_data
         
-        # Inicializa variáveis de controle visual (prevenção de erro de chave)
-        if 'show_context_success' not in st.session_state:
-            st.session_state.show_context_success = False
-        if 'show_context_error' not in st.session_state:
-            st.session_state.show_context_error = False
-        if 'context_menu_trigger' not in st.session_state:
-            st.session_state.context_menu_trigger = False
+        # ✅ CHAMADA ÚNICA E DIRETA
+        if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
+            print("🔄 Processando ação de contexto...")
+            process_context_menu_actions(df_data)
+            # Código temporário para debug - adicione no final do arquivo
+        if st.button("🧪 TESTAR BASELINE MANUALMENTE"):
+            if 'df_data' in st.session_state:
+                test_emp = st.session_state.df_data['Empreendimento'].iloc[0] if not st.session_state.df_data.empty else "TESTE"
+                try:
+                    version = take_gantt_baseline(st.session_state.df_data, test_emp)
+                    st.success(f"✅ Baseline {version} criada via botão!")
+                except Exception as e:
+                    st.error(f"❌ Erro: {e}")
         # --------------------------------------
 
         with st.sidebar:
@@ -5844,53 +5818,12 @@ def verificar_implementacao_baseline():
     return True
 
 # --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
+# --- BLOCO EXECUTIVO FINAL (SALVAMENTO EM BACKGROUND) ---
 if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
-    print("⚡ BLOCO EXECUTIVO ACIONADO PELO IFRAME")
+    print("🎯🎯🎯 BLOCO EXECUTIVO ACIONADO 🎯🎯🎯")
     
-    try:
-        # 1. Decodifica
-        qp = st.query_params
-        raw_emp = qp.get('empreendimento')
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        
-        print(f"🎯 Alvo: {empreendimento}")
-
-        # 2. Carrega Dados (Sessão nova)
-        df_exec = load_data()
-        
-        # 3. Executa Salvamento
-        if df_exec is not None and not df_exec.empty:
-            if empreendimento in df_exec['Empreendimento'].unique():
-                print("💾 Salvando baseline no MySQL...")
-                
-                # ✅ CHAMADA CORRETA: apenas 2 argumentos
-                v_name = take_gantt_baseline(df_exec, empreendimento)
-                
-                print(f"✅ SUCESSO ABSOLUTO: {v_name} salvo!")
-                
-                # Limpa para evitar reprocessamento
-                st.query_params.clear()
-                
-                # Feedback visual
-                st.success(f"✅ Baseline {v_name} criada com sucesso!")
-                
-                # Forçar atualização da página após 2 segundos
-                time.sleep(2)
-                st.rerun()
-                
-            else:
-                print(f"❌ Erro: Projeto {empreendimento} não encontrado nos dados.")
-                st.error(f"❌ Projeto {empreendimento} não encontrado nos dados.")
-        else:
-            print("❌ Erro: Dados vazios no background.")
-            st.error("❌ Dados vazios no background.")
-            
-    except Exception as e:
-        print(f"❌ CRASH NO BACKGROUND: {e}")
-        import traceback
-        traceback.print_exc()
-        st.error(f"❌ Erro ao criar baseline: {e}")
+    # Processa IMEDIATAMENTE sem complicação
+    process_context_menu_actions(st.session_state.get('df_data'))
 
 # ------------------------------------------------------------------
 
