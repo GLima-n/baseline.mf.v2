@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_context_menu_actions(None)
+from dateutil.relativedelta import relativedelta #executar_logica_baseline
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -5064,28 +5064,12 @@ with st.spinner("Carregando dados..."):
 
             # --- Menu de Contexto para Gantt ---
             def create_gantt_context_menu_component(selected_empreendimento):
-                """Cria o componente do menu de contexto COM IFRAME INVISÍVEL"""
+                # Codifica o nome para URL (para lidar com espaços e acentos)
+                import urllib.parse
+                emp_encoded = urllib.parse.quote(selected_empreendimento)
                 
-                # Mostrar mensagens de sucesso/erro do menu de contexto
-                if st.session_state.get('show_context_success'):
-                    success_container = st.empty()
-                    success_container.success(st.session_state.context_menu_success)
-                    st.session_state.show_context_success = False
-                    
-                    # Remover a mensagem após 3 segundos
-                    import time
-                    time.sleep(3)
-                    success_container.empty()
-                
-                if st.session_state.get('show_context_error'):
-                    error_container = st.empty()
-                    error_container.error(st.session_state.context_menu_error)
-                    st.session_state.show_context_error = False
-                    
-                    import time
-                    time.sleep(3)
-                    error_container.empty()
-                
+                # Javascript Puro: Redireciona a página principal (window.top) adicionando os parâmetros
+                # Isso força o Streamlit a rodar o script Python novamente, detectando a ação.
                 context_menu_html = f"""
                 <style>
                     #context-menu {{
@@ -5097,222 +5081,76 @@ with st.spinner("Carregando dados..."):
                         z-index: 10000;
                         display: none;
                         font-family: Arial, sans-serif;
+                        min-width: 150px;
                     }}
                     .context-menu-item {{
                         padding: 12px 20px;
                         cursor: pointer;
                         border-bottom: 1px solid #eee;
                         font-size: 14px;
-                        transition: background-color 0.2s;
+                        color: #333;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
                     }}
                     .context-menu-item:hover {{
                         background: #f0f0f0;
                     }}
-                    .context-menu-item:last-child {{
-                        border-bottom: none;
-                    }}
                     .gantt-context-area {{
-                        height: 120px;
-                        border: 2px dashed #4CAF50;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        background-color: #f9f9f9;
-                        cursor: pointer;
-                        margin: 15px 0;
-                        user-select: none;
-                        border-radius: 8px;
-                        text-align: center;
-                    }}
-                    #baseline-status {{
-                        margin-top: 10px;
                         padding: 10px;
+                        margin: 10px 0;
+                        border: 2px dashed #ddd;
                         border-radius: 5px;
+                        background: #f9f9f9;
                         text-align: center;
-                        font-weight: bold;
-                        display: none;
-                    }}
-                    .status-creating {{
-                        background-color: #fff3cd;
-                        border: 1px solid #ffeaa7;
-                        color: #856404;
-                    }}
-                    .status-success {{
-                        background-color: #d1ecf1;
-                        border: 1px solid #bee5eb;
-                        color: #0c5460;
-                    }}
-                    .status-error {{
-                        background-color: #f8d7da;
-                        border: 1px solid #f5c6cb;
-                        color: #721c24;
-                    }}
-                    #hidden-iframe {{
-                        position: absolute;
-                        width: 1px;
-                        height: 1px;
-                        border: none;
-                        opacity: 0;
-                        pointer-events: none;
-                    }}
-                    .loading-overlay {{
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        background: rgba(255, 255, 255, 0.8);
-                        display: none;
-                        justify-content: center;
-                        align-items: center;
-                        z-index: 10001;
-                        font-family: Arial, sans-serif;
-                    }}
-                    .loading-spinner {{
-                        background: white;
-                        padding: 20px;
-                        border-radius: 10px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-                        text-align: center;
+                        font-size: 13px;
+                        color: #666;
                     }}
                 </style>
 
-                <div class="gantt-context-area" id="gantt-context-area">
-                    <div style="text-align: center;">
-                        <h3>📊 Área do Gráfico de Gantt</h3>
-                        <p>Clique com o botão direito para abrir o menu de linha de base</p>
-                        <p style="font-size: 12px; color: #666;">Empreendimento: {selected_empreendimento}</p>
-                    </div>
+                <div id="gantt-context-area" class="gantt-context-area">
+                    🖱️ <b>Área Ativa:</b> Clique com botão direito aqui para opções de <b>{selected_empreendimento}</b>
                 </div>
-
-                <div id="baseline-status"></div>
-
-                <!-- Overlay de loading -->
-                <div id="loading-overlay" class="loading-overlay">
-                    <div class="loading-spinner">
-                        <h3>🔄 Criando Linha de Base</h3>
-                        <p>Por favor, aguarde...</p>
-                    </div>
-                </div>
-
-                <!-- Iframe invisível para carregamentos -->
-                <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
 
                 <div id="context-menu">
-                    <div class="context-menu-item" id="take-baseline">📸 Criar Linha de Base</div>
-                    <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
+                    <div class="context-menu-item" id="btn-take-baseline">
+                        <span>📸</span> Criar Linha de Base
+                    </div>
                 </div>
 
                 <script>
-                    // Elementos
-                    const ganttArea = document.getElementById('gantt-context-area');
-                    const contextMenu = document.getElementById('context-menu');
-                    const statusDiv = document.getElementById('baseline-status');
-                    const takeBaselineBtn = document.getElementById('take-baseline');
-                    const loadingOverlay = document.getElementById('loading-overlay');
-                    const hiddenIframe = document.getElementById('hidden-iframe');
-                    
-                    // Função para mostrar o menu
-                    function showContextMenu(x, y) {{
-                        contextMenu.style.left = x + 'px';
-                        contextMenu.style.top = y + 'px';
-                        contextMenu.style.display = 'block';
-                    }}
-                    
-                    // Função para esconder o menu
-                    function hideContextMenu() {{
-                        contextMenu.style.display = 'none';
-                    }}
-                    
-                    // Função para mostrar/ocultar loading
-                    function showLoading() {{
-                        loadingOverlay.style.display = 'flex';
-                    }}
-                    
-                    function hideLoading() {{
-                        loadingOverlay.style.display = 'none';
-                    }}
-                    
-                    // Função para mostrar status
-                    function showStatus(message, type) {{
-                        statusDiv.textContent = message;
-                        statusDiv.className = '';
-                        statusDiv.classList.add(type);
-                        statusDiv.style.display = 'block';
-                        
-                        // Auto-esconder após 3 segundos
-                        setTimeout(() => {{
-                            statusDiv.style.display = 'none';
-                        }}, 3000);
-                    }}
-                    
-                    // 🎯🎯🎯 FUNÇÃO PRINCIPAL CORRIGIDA: usa IFRAME invisível 🎯🎯🎯
-                    function executeTakeBaseline() {{
-                        console.log("🎯 Iniciando criação de baseline via iframe...");
-                        showStatus('🔄 Criando linha de base...', 'status-creating');
-                        showLoading();
-                        
-                        // Criar URL com parâmetros para o Streamlit processar
-                        const timestamp = new Date().getTime();
-                        const encodedEmp = encodeURIComponent("{selected_empreendimento}");
-                        const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
-                        
-                        console.log("🔗 URL para iframe:", url);
-                        
-                        // 🚨🚨🚨 MÉTODO CORRETO: usar iframe invisível em vez de recarregar a página 🚨🚨🚨
-                        hiddenIframe.src = url;
-                        
-                        // Quando o iframe terminar de carregar
-                        hiddenIframe.onload = function() {{
-                            console.log("✅ Iframe carregado - baseline deve ter sido criada");
-                            hideLoading();
-                            showStatus('✅ Linha de base criada! Verifique a barra lateral.', 'status-success');
-                            
-                            // Forçar uma atualização suave após 1 segundo
-                            setTimeout(() => {{
-                                // Disparar um evento customizado se necessário
-                                const event = new Event('baselineCreated');
-                                document.dispatchEvent(event);
-                            }}, 1000);
-                        }};
-                        
-                        hideContextMenu();
-                    }}
-                    
-                    // Event Listeners
-                    if (ganttArea) {{
-                        ganttArea.addEventListener('contextmenu', function(e) {{
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showContextMenu(e.pageX, e.pageY);
-                        }});
-                    }}
-                    
-                    // Event listener para o botão de criar linha de base
-                    if (takeBaselineBtn) {{
-                        takeBaselineBtn.addEventListener('click', function() {{
-                            executeTakeBaseline();
-                        }});
-                    }}
-                    
-                    // Fechar menu ao clicar fora
+                    const area = document.getElementById('gantt-context-area');
+                    const menu = document.getElementById('context-menu');
+                    const btn = document.getElementById('btn-take-baseline');
+
+                    // Mostrar Menu
+                    area.addEventListener('contextmenu', function(e) {{
+                        e.preventDefault();
+                        menu.style.left = e.pageX + 'px';
+                        menu.style.top = e.pageY + 'px';
+                        menu.style.display = 'block';
+                    }});
+
+                    // Fechar Menu ao clicar fora
                     document.addEventListener('click', function(e) {{
-                        if (contextMenu && !contextMenu.contains(e.target) && e.target !== ganttArea) {{
-                            hideContextMenu();
+                        if (menu.style.display === 'block') {{
+                            menu.style.display = 'none';
                         }}
                     }});
-                    
-                    // Prevenir menu de contexto padrão na área do Gantt
-                    document.addEventListener('contextmenu', function(e) {{
-                        if (e.target.id === 'gantt-context-area' || e.target.closest('#gantt-context-area')) {{
-                            e.preventDefault();
-                        }}
-                    }}, true);
+
+                    // AÇÃO: Navegar na janela principal (simula o comportamento do botão nativo)
+                    btn.addEventListener('click', function() {{
+                        // Adiciona parâmetros na URL atual e recarrega
+                        const currentUrl = new URL(window.top.location.href);
+                        currentUrl.searchParams.set('context_action', 'take_baseline');
+                        currentUrl.searchParams.set('empreendimento', '{selected_empreendimento}');
+                        
+                        // Força o navegador a ir para a URL (Recarrega o Streamlit)
+                        window.top.location.href = currentUrl.toString();
+                    }});
                 </script>
                 """
-                
-                # Usar html() para injetar o componente completo
-                html(context_menu_html, height=200)
+                components.html(context_menu_html, height=100)
 
         # --- FIM DO NOVO LAYOUT ---
         # Mantemos a chamada a filter_dataframe, mas com os valores padrão para EMP, GRUPO e SETOR
@@ -5860,64 +5698,58 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
     process_context_menu_actions(st.session_state.get('df_data'))
 
 # ------------------------------------------------------------------
+def executar_logica_baseline(df, empreendimento):
+    """
+    Executa a criação da baseline.
+    Usada tanto pelo botão da Sidebar quanto pelo Menu de Contexto.
+    """
+    try:
+        # 1. Cria a baseline
+        version = take_gantt_baseline(df, empreendimento)
+        
+        # 2. Feedback Visual (Exatamente igual ao botão nativo)
+        st.toast(f"✅ Baseline {version} criada com sucesso!", icon="🎉")
+        st.success(f"Linha de base **{version}** salva para o empreendimento **{empreendimento}**.")
+        
+        # 3. Se foi acionado via URL (Menu de Contexto), limpa a URL para evitar loop
+        if 'context_action' in st.query_params:
+            st.query_params.clear()
+            
+        return True
+    except Exception as e:
+        st.error(f"Erro ao criar baseline: {e}")
+        return False
 
+# --- BLOCO PRINCIPAL COMPLETO ---
 if __name__ == "__main__":
-    # 1. Carrega os dados PRIMEIRO (Essencial para o Iframe não travar)
-    with st.spinner("Carregando sistema..."):
-        df_data = load_data()
-    
-    # Verifica implementação opcional
+    # 1. Verificar implementação (Opcional, pode remover em produção)
     if 'df_data' in globals() and not df_data.empty:
         # verificar_implementacao_baseline() 
         pass
 
+    # 2. Carregar Dados
+    with st.spinner("Carregando sistema..."):
+        df_data = load_data()
+    
     if df_data is not None and not df_data.empty:
         # Salva na sessão
         st.session_state.df_data = df_data
-        
-        # --- BLOCO CRÍTICO: Executa a ação do Iframe AQUI ---
-        # Só executamos isso agora que df_data EXISTE na memória
+
+        # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
+        # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
         if 'context_action' in st.query_params:
             try:
                 action = st.query_params['context_action']
-                # Pega o parâmetro, tratando lista ou string
-                raw_emp = st.query_params.get('empreendimento')
-                if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-                
-                if action == 'take_baseline' and raw_emp:
-                    import urllib.parse
-                    emp_decoded = urllib.parse.unquote(raw_emp)
+                if action == 'take_baseline':
+                    raw_emp = st.query_params.get('empreendimento')
+                    # Normaliza se vier como lista
+                    if isinstance(raw_emp, list): raw_emp = raw_emp[0]
                     
-                    print(f"🚀 [IFRAME] Iniciando Baseline para: {emp_decoded}")
-                    
-                    # Chama a função passando o DF que acabamos de carregar
-                    version = take_gantt_baseline(df_data, emp_decoded)
-                    
-                    # Mensagem de sucesso para o Iframe
-                    st.success(f"BASELINE CRIADA: {version}")
-                    
-                    # Opcional: Para a execução aqui para economizar recursos no Iframe
-                    st.stop()
-                    
+                    if raw_emp:
+                        # Executa EXATAMENTE a mesma lógica do botão
+                        executar_logica_baseline(df_data, raw_emp)
             except Exception as e:
-                print(f"❌ Erro no Iframe: {e}")
-                st.error(f"Erro: {e}")
-    
-    # --- 2. RESTO DO APP (Visualização) ---
-    # Se não caiu no st.stop() acima, continua carregando a interface normal
-    
-    if df_data is not None:
-        with st.sidebar:
-            st.markdown("<br>", unsafe_allow_html=True)
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                try:
-                    st.image("logoNova.png", width=200)
-                except:
-                    pass
-        
-            st.markdown("---")
-            # ... (O restante do seu código da sidebar continua aqui normalmente)
+                st.error(f"Erro ao processar ação de contexto: {e}")
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
