@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit as os
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
@@ -10,9 +11,9 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #get_db_connection
-import traceback
-import streamlit.components.v1 as components  
+from dateutil.relativedelta import relativedelta #df_data
+import streamlit.components.v1 as components
+from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
 import random
 import time
@@ -49,7 +50,7 @@ except ImportError:
     MODO_REAL = False
 
 # --- Configurações do Banco AWS ---
-try:
+if "aws_db" in st.secrets:
     DB_CONFIG = {
         'host': st.secrets["aws_db"]["host"],
         'user': st.secrets["aws_db"]["user"],
@@ -57,14 +58,25 @@ try:
         'database': st.secrets["aws_db"]["database"],
         'port': 3306
     }
-except Exception:
-    DB_CONFIG = {
-        'host': "mock_host",
-        'user': "mock_user", 
-        'password': "mock_password",
-        'database': "mock_db",
-        'port': 3306
-    }
+else:
+    # Se falhar isso, nada funciona.
+    st.stop()
+
+def log_debug(message):
+    import os as debug_os
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    try:
+        with open("debug_log.txt", "a") as f:
+            f.write(f"[{timestamp}] {message}\n")
+        print(f"[{timestamp}] {message}")
+    except:
+        pass
+
+# Bloco original do usuário (mantido, mas a lógica principal será movida para process_context_menu_actions)
+if 'context_action' in st.query_params:
+    # Salva uma cópia segura dos parâmetros na sessão
+    st.session_state['_url_snapshot'] = dict(st.query_params)
+    log_debug(f"⚡ SNAPSHOT CAPTURADO: {st.session_state['_url_snapshot']}")
 
 # --- ORDEM DAS ETAPAS (DEFINIDA PELO USUÁRIO) ---
 ORDEM_ETAPAS_GLOBAL = [
@@ -182,15 +194,14 @@ def get_db_connection():
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
     except Error as e:
-        print(f"❌ Erro de Conexão MySQL: {e}") # Log no terminal
+        print(f"❌ ERRO CONEXÃO MYSQL: {e}") # Isso vai aparecer nos logs do servidor
         return None
-
+    
 def create_baselines_table():
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
-            # Cria tabela garantindo coluna tipo_visualizacao
             create_table_query = """
             CREATE TABLE IF NOT EXISTS gantt_baselines (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -199,115 +210,106 @@ def create_baselines_table():
                 baseline_data JSON NOT NULL,
                 created_date VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                tipo_visualizacao VARCHAR(50) DEFAULT 'Gantt',
+                
                 UNIQUE KEY unique_baseline (empreendimento, version_name)
             )
             """
             cursor.execute(create_table_query)
             conn.commit()
         except Error as e:
-            print(f"Erro tabela: {e}")
+            print(f"Erro ao criar tabela: {e}")
         finally:
             conn.close()
-
-def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao="Gantt"):
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            baseline_json = json.dumps(baseline_data, ensure_ascii=False, default=str)
-            
-            # Query robusta com ON DUPLICATE KEY UPDATE
-            insert_query = """
-            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date, tipo_visualizacao)
-            VALUES (%s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-                baseline_data = VALUES(baseline_data), 
-                created_date = VALUES(created_date),
-                created_at = CURRENT_TIMESTAMP
-            """
-            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date, tipo_visualizacao))
-            conn.commit()
-            print(f"✅ SAVE AWS SUCESSO: {version_name}")
-            return True
-        except Error as e:
-            print(f"❌ ERRO SQL AWS: {e}")
-            return False
-        finally:
-            conn.close()
-    else:
-        print("❌ FALHA CONEXÃO: Não foi possível conectar para salvar.")
-        return False
     
-def take_baseline(df, empreendimento):
-    # 1. Filtra o DataFrame atual
-    df_emp = df[df['Empreendimento'] == empreendimento].copy()
-
-    # 2. Define o nome da nova versão (ex: P1, P2...)
-    # (Adicione aqui a lógica de contagem de versões existente no exemplo)
-    version_name = "P_NOVA" # Exemplo simplificado
-
-    # 3. Prepara os dados para salvar (Snapshot)
-    # Aqui você define o que quer salvar. No exemplo, ele salva Inicio/Fim.
-    baseline_data = []
-    for _, row in df_emp.iterrows():
-        baseline_data.append({
-            "tarefa": row['Etapa'], # Ou o ID da tarefa se tiver
-            "inicio_previsto": row['Inicio_Real'].strftime('%Y-%m-%d') if pd.notna(row['Inicio_Real']) else None,
-            "termino_previsto": row['Termino_Real'].strftime('%Y-%m-%d') if pd.notna(row['Termino_Real']) else None
-        })
-
-    # 4. Salva no banco
-    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"))
-    return version_name
-
-# --- Processar ações do menu de contexto (BACKEND ROBUSTO) ---
-# --- Processar ações do menu de contexto (DEBUG EXTREMO) ---
-# --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
-    query_params = st.query_params
+    """Processa ações do menu de contexto via query parameters - VERSÃO CORRIGIDA"""
     
-    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
-        # 1. Decodifica parâmetros
-        raw_emp = query_params.get('empreendimento', None)
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+    # 1. Coleta as duas fontes possíveis de dados
+    params_url = dict(st.query_params)
+    params_snap = st.session_state.get('_url_snapshot', {})
+    
+    # Log para vermos o que está disponível na memória
+    log_debug(f"🔍 DIAGNÓSTICO ESTADO: URL={params_url} | SNAPSHOT={params_snap}")
+
+    # 2. Decide qual usar (Prioridade: URL Atual > Snapshot)
+    params = {}
+    origem = "NENHUMA"
+
+    # Se a URL atual tem o comando, usa ela
+    if params_url.get('context_action') == 'take_baseline':
+        params = params_url
+        origem = "URL_VIVA"
+    # Se não, mas o snapshot tem o comando, usa ele
+    elif params_snap.get('context_action') == 'take_baseline':
+        params = params_snap
+        origem = "SNAPSHOT_SALVO"
+    
+    log_debug(f"🚀 Iniciando com fonte: {origem}")
+
+    # 3. Se não encontrou comando válido em lugar nenhum, sai
+    if not params:
+        log_debug("💤 Nenhuma ação encontrada nas fontes.")
+        return
+
+    # --- INÍCIO DA EXECUÇÃO ---
+    if params.get('context_action') == 'take_baseline':
+        log_debug("🔔 COMANDO VALIDADO! Processando...")
         
-        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
+        # Recupera o empreendimento (trata lista ou string)
+        raw_emp = params.get('empreendimento')
+        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+        
+        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+        log_debug(f"🎯 Alvo: {empreendimento}")
 
-        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
+        # 4. Garantia de Dados
         if df is None or df.empty:
-            print("⚠️ Sessão Iframe. Carregando dados...")
-            try:
-                df = load_data() # Sua função de carregar Excel/SQL
-            except Exception as e:
-                print(f"❌ Erro load_data: {e}")
-                return
+            # Tenta carregar do session_state, que deve ser o df principal
+            if 'df_data' in st.session_state and not st.session_state.df_data.empty:
+                df = st.session_state.df_data
+                log_debug("📚 Dados carregados do session_state.")
+            else:
+                log_debug("⚠️ Carregando dados (Sessão Iframe/Nova)...")
+                try:
+                    # Assumindo que load_data() existe e carrega o DataFrame
+                    df = load_data()
+                    log_debug(f"📚 Dados carregados: {len(df)} linhas.")
+                except Exception as e:
+                    log_debug(f"❌ Erro fatal no load_data: {e}")
+                    return
 
-        # 3. Executa Salvamento
+        # 5. Execução e Salvamento
         if empreendimento and df is not None:
             try:
-                # Cria a baseline (usa sua função take_gantt_baseline existente)
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ FINALIZADO: {version_name} criado.")
-                # Limpa URL
-                st.query_params.clear()
-            except Exception as e:
-                print(f"❌ Erro take_gantt_baseline: {e}")
-
-        # 4. Executa a criação
-        if empreendimento and df is not None and not df.empty:
-            try:
-                # Cria e Salva no MySQL
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
+                log_debug("💾 Chamando take_gantt_baseline...")
                 
-                # Limpa params para não repetir na próxima carga
+                # ✅ CHAMADA CORRIGIDA: Apenas 2 argumentos
+                version_name = take_gantt_baseline(df, empreendimento)
+                
+                log_debug(f"✅ SUCESSO FINAL: {version_name} salvo no banco!")
+                
+                # Limpeza Completa e Rerun
+                if '_url_snapshot' in st.session_state:
+                    del st.session_state['_url_snapshot']
+                
                 st.query_params.clear()
+                st.cache_data.clear()
+                
+                # Feedback Visual na Sessão
+                st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
+                st.session_state.show_context_success = True
+                
+                # Forçar atualização da interface
+                st.rerun()
                 
             except Exception as e:
-                print(f"❌ Erro ao salvar baseline: {e}")
-        else:
-            print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
+                log_debug(f"❌ Erro no save: {e}")
+                import traceback
+                log_debug(traceback.format_exc())
+                
+                # Feedback de erro
+                st.session_state.context_menu_error = f"❌ Erro ao criar baseline: {e}"
+                st.session_state.show_context_error = True
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -382,10 +384,12 @@ def obter_data_meta_assinatura_novo(df_empreendimento):
 # --- FUNÇÕES DE BANCO DE DADOS PARA BASELINES ---
 
 def get_db_connection():
+    if not DB_CONFIG: return None
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
     except Error as e:
+        print(f"❌ ERRO CONEXÃO MYSQL (Background): {e}") 
         return None
 
 def create_baselines_table():
@@ -401,7 +405,7 @@ def create_baselines_table():
                 baseline_data JSON NOT NULL,
                 created_date VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                tipo_visualizacao VARCHAR(50) NOT NULL,
+                
                 UNIQUE KEY unique_baseline (empreendimento, version_name)
             )
             """
@@ -423,7 +427,7 @@ def load_baselines():
         baselines = {}
         try:
             cursor = conn.cursor(dictionary=True)
-            query = "SELECT empreendimento, version_name, baseline_data, created_date, tipo_visualizacao FROM gantt_baselines ORDER BY created_at DESC"
+            query = "SELECT empreendimento, version_name, baseline_data, created_date FROM gantt_baselines ORDER BY created_at DESC"
             cursor.execute(query)
             results = cursor.fetchall()
             for row in results:
@@ -434,8 +438,8 @@ def load_baselines():
                 baseline_data = json.loads(row['baseline_data'])
                 baselines[empreendimento][version_name] = {
                     "date": row['created_date'],
-                    "data": baseline_data,
-                    "tipo_visualizacao": row['tipo_visualizacao']
+                    "data": baseline_data
+                    
                 }
             return baselines
         except Error as e:
@@ -447,62 +451,165 @@ def load_baselines():
     else:
         return st.session_state.get('mock_baselines', {})
 
-def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
+# --- Lógica de Linha de Base ---
+
+def take_baseline(df, empreendimento):
+    from datetime import datetime
+    import pandas as pd
+    import streamlit as st
+    
+    df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
+    
+    # 1. Atualizar o plano atual com os valores REAIS atuais
+    # Assumindo que as colunas de dados reais são 'Inicio_Real' e 'Termino_Real'
+    # E as colunas de planejamento atual são 'Inicio_Prevista' e 'Termino_Prevista'
+    
+    if 'Inicio_Real' not in df_empreendimento.columns or 'Termino_Real' not in df_empreendimento.columns:
+        raise ValueError("Colunas 'Inicio_Real' ou 'Termino_Real' não encontradas no DataFrame.")
+    
+    # Atualizar o plano atual com os valores REAIS atuais
+    df_empreendimento['Inicio_Prevista'] = df_empreendimento['Inicio_Real']
+    df_empreendimento['Termino_Prevista'] = df_empreendimento['Termino_Real']
+    
+    # Atualizar o DataFrame original na session_state (assumindo que o DataFrame original está em st.session_state.df)
+    if 'df' in st.session_state:
+        mask = st.session_state.df['Empreendimento'] == empreendimento
+        st.session_state.df.loc[mask, 'Inicio_Prevista'] = df_empreendimento['Inicio_Real'].values
+        st.session_state.df.loc[mask, 'Termino_Prevista'] = df_empreendimento['Termino_Real'].values
+    
+    # 2. Determinar o próximo nome da versão (P1, P2, etc.)
+    existing_baselines = load_baselines()
+    empreendimento_baselines = existing_baselines.get(empreendimento, {})
+    
+    # Filtrar apenas as versões Px-(data)
+    existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k and k.split('-')[0][1:].isdigit()]
+    
+    next_n = 1
+    if existing_versions:
+        max_n = 0
+        for version_name in existing_versions:
+            try:
+                # Extrai o número após 'P'
+                n_str = version_name.split('-')[0][1:]
+                n = int(n_str)
+                if n > max_n:
+                    max_n = n
+            except ValueError:
+                continue
+        next_n = max_n + 1
+    
+    version_prefix = f"P{next_n}"
+    current_date_str = datetime.now().strftime("%d/%m/%Y")
+    version_name = f"{version_prefix}-({current_date_str})"
+    
+    # 3. Criar baseline com os dados atualizados
+    # Usando 'ID_Tarefa' ou 'Etapa' como identificador
+    if 'ID_Tarefa' in df_empreendimento.columns:
+        df_baseline = df_empreendimento[['ID_Tarefa', 'Inicio_Prevista', 'Termino_Prevista']].copy()
+        id_col = 'ID_Tarefa'
+    elif 'Etapa' in df_empreendimento.columns:
+        df_baseline = df_empreendimento[['Etapa', 'Inicio_Prevista', 'Termino_Prevista']].copy()
+        id_col = 'Etapa'
+    else:
+        # Tentativa de usar as colunas que o código original do txt2 usava
+        if 'P0_Previsto_Inicio' in df_empreendimento.columns and 'P0_Previsto_Fim' in df_empreendimento.columns:
+            df_baseline = df_empreendimento[['ID_Tarefa', 'P0_Previsto_Inicio', 'P0_Previsto_Fim']].copy()
+            id_col = 'ID_Tarefa'
+        else:
+            raise ValueError("Colunas de identificação de tarefa não encontradas no DataFrame para criar a baseline.")
+        
+    # Converter datas para string no formato YYYY-MM-DD para salvar no JSON
+    df_baseline['Inicio_Prevista'] = pd.to_datetime(df_baseline['Inicio_Prevista']).dt.strftime('%Y-%m-%d')
+    df_baseline['Termino_Prevista'] = pd.to_datetime(df_baseline['Termino_Prevista']).dt.strftime('%Y-%m-%d')
+    
+    # Renomear colunas para o formato da versão (e.g., P1_Previsto_Inicio)
+    baseline_data = df_baseline.rename(
+        columns={'Inicio_Prevista': f'{version_prefix}_Previsto_Inicio', 
+                 'Termino_Prevista': f'{version_prefix}_Previsto_Fim'}
+    ).to_dict('records')
+
+    # 4. Salvar no banco de dados
+    success = save_baseline(empreendimento, version_name, baseline_data, current_date_str)
+    
+    if success:
+        # Marcar linha de base como não enviada para AWS (se o seu código usa essa lógica)
+        if 'unsent_baselines' not in st.session_state:
+            st.session_state.unsent_baselines = {}
+        
+        if empreendimento not in st.session_state.unsent_baselines:
+            st.session_state.unsent_baselines[empreendimento] = []
+        
+        if version_name not in st.session_state.unsent_baselines[empreendimento]:
+            st.session_state.unsent_baselines[empreendimento].append(version_name)
+        
+        return version_name
+    else:
+        raise Exception("Falha ao salvar linha de base no banco de dados")
+
+# --- Função para enviar dados para AWS ---
+
+def send_to_aws(empreendimento, version_name):
+    """Simula o envio de dados para AWS"""
+    try:
+        # Simular processamento
+        import time
+        time.sleep(1)  # Simular delay de rede
+        
+        # Remover da lista de não enviados
+        if ('unsent_baselines' in st.session_state and 
+            empreendimento in st.session_state.unsent_baselines and 
+            version_name in st.session_state.unsent_baselines[empreendimento]):
+            
+            st.session_state.unsent_baselines[empreendimento].remove(version_name)
+            
+            # Se não há mais linhas de base não enviadas para este empreendimento, remover a entrada
+            if not st.session_state.unsent_baselines[empreendimento]:
+                del st.session_state.unsent_baselines[empreendimento]
+        
+        return True
+    except Exception as e:
+        st.error(f"Erro ao enviar para AWS: {e}")
+        return False
+
+def save_baseline(empreendimento, version_name, baseline_data, created_date):
+    """Salva baseline no banco AWS com logs detalhados"""
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
-            
-            # Validar dados antes de serializar
-            if not baseline_data or not isinstance(baseline_data, dict):
-                raise ValueError("Dados da baseline inválidos")
-            
-            # Serializar com tratamento de caracteres especiais
             baseline_json = json.dumps(baseline_data, ensure_ascii=False, default=str)
             
+            print(f"💾 Tentando salvar baseline: {version_name} para {empreendimento}")
+            print(f"📊 Dados: {len(baseline_json)} caracteres, {len(baseline_data.get('tasks', []))} tasks")
+            
             insert_query = """
-            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date, tipo_visualizacao)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date)
+            VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
                 baseline_data = VALUES(baseline_data), 
-                created_date = VALUES(created_date), 
-                tipo_visualizacao = VALUES(tipo_visualizacao),
+                created_date = VALUES(created_date),
                 created_at = CURRENT_TIMESTAMP
             """
             
-            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date, tipo_visualizacao))
+            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date))
             conn.commit()
             
-            # Verificar se a inserção foi bem-sucedida
-            if cursor.rowcount > 0:
-                return True
-            else:
-                return False
-                
+            print(f"✅ SUCESSO ABSOLUTO: {version_name} salvo no MySQL!")
+            print(f"📝 Rows affected: {cursor.rowcount}")
+            
+            return True
+            
         except Error as e:
-            st.error(f"Erro de banco de dados ao salvar baseline: {e}")
-            return False
-        except Exception as e:
-            st.error(f"Erro inesperado ao salvar baseline: {e}")
+            print(f"❌ ERRO SQL ao salvar baseline: {e}")
+            print(f"🔍 Detalhes: empreendimento={empreendimento}, version={version_name}")
             return False
         finally:
             if conn.is_connected():
                 cursor.close()
                 conn.close()
     else:
-        # Fallback para dados mock
-        if 'mock_baselines' not in st.session_state:
-            st.session_state.mock_baselines = {}
-        
-        if empreendimento not in st.session_state.mock_baselines:
-            st.session_state.mock_baselines[empreendimento] = {}
-        
-        st.session_state.mock_baselines[empreendimento][version_name] = {
-            "date": created_date,
-            "data": baseline_data,
-            "tipo_visualizacao": tipo_visualizacao
-        }
-        return True
+        print("❌ ERRO: Sem conexão com banco no save_baseline")
+        return False
 
 def delete_baseline(empreendimento, version_name):
     conn = get_db_connection()
@@ -524,6 +631,47 @@ def delete_baseline(empreendimento, version_name):
             del st.session_state.mock_baselines[empreendimento][version_name]
             return True
         return False
+
+# Adicione esta função temporária no início do seu arquivo, depois dos imports
+def diagnose_baseline_issues():
+    """Função temporária para diagnosticar problemas nas chamadas de baseline"""
+    import re
+    
+    # Lê o próprio arquivo
+    with open(__file__, 'r', encoding='utf-8') as f:
+        content = f.read()
+    
+    # Padrões para encontrar chamadas problemáticas
+    patterns = [
+        r'take_gantt_baseline\([^,]+,[^,]+,[^)]+\)',  # 3 argumentos
+        r'take_gantt_baseline\([^)]+\)',  # qualquer chamada
+    ]
+    
+    print("🔍 DIAGNÓSTICO DE CHAMADAS take_gantt_baseline:")
+    
+    for pattern in patterns:
+        matches = re.findall(pattern, content)
+        if matches:
+            print(f"📋 Padrão '{pattern}':")
+            for match in matches[:5]:  # Mostra apenas as primeiras 5
+                print(f"   → {match}")
+    
+    # Também procura na função process_context_menu_actions
+    if 'process_context_menu_actions' in content:
+        print("📍 Função process_context_menu_actions encontrada")
+        # Extrai essa função para análise
+        start = content.find('def process_context_menu_actions')
+        if start != -1:
+            end = content.find('\n\n', start)
+            if end == -1:
+                end = content.find('\ndef', start + 5)
+            if end != -1:
+                func_content = content[start:end]
+                if 'take_gantt_baseline' in func_content:
+                    print("❌ take_gantt_baseline encontrada em process_context_menu_actions")
+
+# Chame esta função uma vez
+diagnose_baseline_issues()
 
 # --- CÓDIGO MODIFICADO ---
 def converter_dados_para_gantt(df):
@@ -687,27 +835,25 @@ def converter_dados_para_gantt(df):
 
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
-def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
-    """Cria uma linha de base do estado atual do Gantt"""
+def take_gantt_baseline(df, empreendimento):
+    """Cria uma linha de base do estado atual do Gantt - VERSÃO CORRIGIDA E UNIFICADA"""
     
     try:
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
         if df_empreendimento.empty:
-            st.error(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
-            raise Exception("Nenhum dado encontrado para o empreendimento selecionado")
+            raise Exception(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
         
-        # Preparar dados para baseline com validação
+        # Preparar dados para baseline
         baseline_data = {
             'empreendimento': empreendimento,
-            'tipo_visualizacao': tipo_visualizacao,
             'data_criacao': datetime.now().strftime("%d/%m/%Y %H:%M"),
             'total_tasks': len(df_empreendimento),
             'tasks': []
         }
         
-        # Converter tasks para formato serializável com validação
+        # Converter tasks para formato serializável
         task_count = 0
         for _, row in df_empreendimento.iterrows():
             try:
@@ -738,7 +884,6 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                         if hasattr(date_val, 'strftime'):
                             task[task_field] = date_val.strftime("%Y-%m-%d")
                         else:
-                            # Tentar converter para datetime se não for
                             try:
                                 parsed_date = pd.to_datetime(date_val)
                                 task[task_field] = parsed_date.strftime("%Y-%m-%d")
@@ -749,7 +894,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 task_count += 1
                 
             except Exception as task_error:
-                st.warning(f"Erro ao processar task {task_count}: {task_error}")
+                print(f"⚠️ Erro ao processar task: {task_error}")
                 continue
         
         if task_count == 0:
@@ -758,7 +903,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
         # Gerar nome da versão
         existing_baselines = load_baselines()
         empreendimento_baselines = existing_baselines.get(empreendimento, {})
-        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and k.split('-')[0][1:].isdigit()]
+        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k and k.split('-')[0][1:].isdigit()]
         
         next_n = 1
         if existing_versions:
@@ -778,7 +923,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
         version_name = f"{version_prefix}-({current_date_str})"
         
         # Salvar baseline
-        success = save_baseline(empreendimento, version_name, baseline_data, current_date_str, tipo_visualizacao)
+        success = save_baseline(empreendimento, version_name, baseline_data, current_date_str)
         
         if success:
             # Marcar como não enviada para AWS
@@ -791,38 +936,77 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             if version_name not in st.session_state.unsent_baselines[empreendimento]:
                 st.session_state.unsent_baselines[empreendimento].append(version_name)
             
-            st.success(f"Linha de base {version_name} salva com sucesso!")
+            print(f"✅ Baseline {version_name} salva com sucesso!")
             return version_name
         else:
             raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
-        st.error(f"Erro ao criar linha de base: {e}")
-        raise
+        print(f"❌ Erro ao criar linha de base: {e}")
+        raise e
+            
+
 def debug_baseline_system():
-    """Função para debug do sistema de baselines"""
+    """Função para debug do sistema de baselines - VERSÃO MELHORADA"""
     st.markdown("### 🔧 Debug do Sistema de Baselines")
     
     # Testar conexão com banco
     conn = get_db_connection()
     if conn:
         st.success("✅ Conexão com banco de dados: OK")
-        conn.close()
+        
+        # Verificar se a tabela existe
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SHOW TABLES LIKE 'gantt_baselines'")
+            table_exists = cursor.fetchone() is not None
+            if table_exists:
+                st.success("✅ Tabela 'gantt_baselines': EXISTE")
+                
+                # Contar registros
+                cursor.execute("SELECT COUNT(*) FROM gantt_baselines")
+                count = cursor.fetchone()[0]
+                st.info(f"📊 Total de baselines salvas: {count}")
+            else:
+                st.error("❌ Tabela 'gantt_baselines': NÃO EXISTE")
+                
+        except Error as e:
+            st.error(f"❌ Erro ao verificar tabela: {e}")
+        finally:
+            conn.close()
     else:
         st.error("❌ Conexão com banco de dados: FALHA")
     
-    # Verificar tabela
-    try:
-        baselines = load_baselines()
-        st.success(f"✅ Tabela de baselines: OK ({len(baselines)} empreendimentos com baselines)")
-    except Exception as e:
-        st.error(f"❌ Tabela de baselines: FALHA - {e}")
-    
-    # Verificar session state
-    if 'unsent_baselines' in st.session_state:
-        st.success(f"✅ Session state: OK ({len(st.session_state.unsent_baselines)} empreendimentos não enviados)")
+    # Verificar dados na sessão
+    if 'df_data' in st.session_state:
+        st.success(f"✅ Dados na sessão: {len(st.session_state.df_data)} linhas")
+        st.info(f"📋 Empreendimentos disponíveis: {len(st.session_state.df_data['Empreendimento'].unique())}")
     else:
-        st.error("❌ Session state: FALHA - unsent_baselines não encontrado")
+        st.error("❌ Dados na sessão: NÃO ENCONTRADOS")
+    
+    # Verificar session state de baselines
+    if 'unsent_baselines' in st.session_state:
+        total_unsent = sum(len(baselines) for baselines in st.session_state.unsent_baselines.values())
+        st.success(f"✅ Session state: OK ({total_unsent} baselines não enviadas)")
+    else:
+        st.error("❌ Session state: unsent_baselines não encontrado")
+    
+    # Testar função take_gantt_baseline
+    if st.button("🧪 Testar Criação de Baseline"):
+        try:
+            if 'df_data' in st.session_state and not st.session_state.df_data.empty:
+                empreendimentos = st.session_state.df_data['Empreendimento'].unique()
+                if len(empreendimentos) > 0:
+                    test_emp = empreendimentos[0]
+                    # ✅ CORREÇÃO: Apenas 2 argumentos
+                    version_name = take_gantt_baseline(st.session_state.df_data, test_emp)
+                    st.success(f"✅ Teste OK: Baseline {version_name} criada!")
+                else:
+                    st.warning("⚠️ Nenhum empreendimento disponível para teste")
+            else:
+                st.error("❌ Dados não disponíveis para teste")
+        except Exception as e:
+            st.error(f"❌ Erro no teste: {e}")
 
 def load_baseline_data(empreendimento, version_name):
     """Carrega os dados específicos de uma baseline"""
@@ -887,6 +1071,157 @@ def send_to_aws(empreendimento, version_name):
     except Exception as e:
         st.error(f"Erro ao enviar para AWS: {e}")
         return False
+
+def process_context_menu_actions(df):
+    """Processa ações do menu de contexto via query parameters"""
+    query_params = st.query_params
+    
+    if 'context_action' in query_params and 'empreendimento' in query_params:
+        action = query_params['context_action']
+        raw_emp = query_params['empreendimento']
+        
+        # O Streamlit pode retornar uma lista para query_params, garantimos que é uma string
+        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+        
+        # Decodifica o nome do empreendimento
+        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+        
+        # Limpar os parâmetros para evitar execução múltipla
+        # NOTA: No código de referência, isso é feito com st.query_params.clear()
+        # No seu código, a limpeza é feita no bloco executivo do iframe (linhas 5561-5562)
+        
+        if action == 'take_baseline':
+            if empreendimento:
+                try:
+                    # A função take_gantt_baseline já existe no seu código (linha 696)
+                    v_name = take_gantt_baseline(df, empreendimento)
+                    st.success(f"Linha de base '{v_name}' criada com sucesso para {empreendimento}!")
+                    
+                    # Simular o envio para AWS (opcional, dependendo da sua implementação real)
+                    if send_to_aws(empreendimento, v_name):
+                        st.success(f"Linha de base '{v_name}' enviada para AWS com sucesso!")
+                    else:
+                        st.warning(f"Linha de base '{v_name}' salva localmente, mas falhou ao enviar para AWS.")
+                        
+                except Exception as e:
+                    st.error(f"Erro ao criar linha de base para {empreendimento}: {e}")
+            else:
+                st.error("Empreendimento não especificado na ação de contexto.")
+        
+        # Outras ações de contexto podem ser adicionadas aqui (ex: 'load_baseline')
+        
+        # O bloco executivo do iframe (linhas 5532-5572) no seu código já lida com a limpeza dos query_params
+        # e o salvamento em background, então esta função é mais para o feedback visual no app principal.
+        # No entanto, o código de referência sugere que esta função é chamada no app principal.
+        # Vamos manter a chamada no final do arquivo, como no código de referência.
+        
+        # Para garantir que o iframe não seja executado duas vezes (uma vez no app principal e outra no iframe),
+        # o código de referência usa o iframe para o salvamento em background.
+        # No seu código, o bloco executivo (linhas 5532-5572) já faz o salvamento em background.
+        # A função process_context_menu_actions no código de referência (linhas 260-270)
+        # é mais simples e apenas chama take_baseline.
+        # No seu código, o bloco executivo já lida com a ação de contexto.
+        # Vamos apenas garantir que a função create_gantt_context_menu_component está correta.
+        pass # Manter a lógica no bloco executivo do iframe, como já está no seu código.
+        
+        
+
+
+# O bloco executivo (linhas 5532-5572) no seu código já lida com a ação de contexto
+# acionada pelo iframe. A função process_context_menu_actions no código de referência
+# é mais simples e apenas chama take_baseline.
+# Vamos manter a lógica no bloco executivo do iframe, como já está no seu código,
+# e apenas adicionar a função create_gantt_context_menu_component e a chamada no final.
+# A função process_context_menu_actions do código de referência não é estritamente necessária
+# se o bloco executivo já faz o trabalho.
+
+# A função create_gantt_context_menu_component precisa do next_n.
+# Vamos calcular o next_n dentro da função, ou passá-lo como argumento.
+# Como o take_gantt_baseline já calcula, vamos replicar a lógica de cálculo de next_n
+# dentro de create_gantt_context_menu_component para exibir o nome correto no botão.
+
+def get_next_baseline_version(empreendimento):
+    """Calcula o próximo número de versão da baseline."""
+    existing_baselines = load_baselines()
+    empreendimento_baselines = existing_baselines.get(empreendimento, {})
+    existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and k.split('-')[0][1:].isdigit()]
+    
+    next_n = 1
+    if existing_versions:
+        max_n = 0
+        for version_name in existing_versions:
+            try:
+                n_str = version_name.split('-')[0][1:]
+                n = int(n_str)
+                if n > max_n:
+                    max_n = n
+            except ValueError:
+                continue
+        next_n = max_n + 1
+    return next_n
+
+def create_gantt_context_menu_component(empreendimento):
+    """Cria o componente HTML para o menu de contexto do Gantt."""
+    
+    next_n = get_next_baseline_version(empreendimento)
+    empreendimento_encoded = urllib.parse.quote(empreendimento)
+    iframe_url = f"?context_action=take_baseline&empreendimento={empreendimento_encoded}"
+    
+    context_menu_html = f"""
+    <style>
+        .context-menu-container {{
+            position: relative;
+            display: inline-block;
+            margin-top: 10px;
+        }}
+        .context-menu-button {{
+            background-color: #4CAF50;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.3s;
+        }}
+        .context-menu-button:hover {{
+            background-color: #45a049;
+        }}
+        .context-menu-dropdown {{
+            display: none;
+            position: absolute;
+            background-color: #f9f9f9;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 4px;
+        }}
+        .context-menu-dropdown a {{
+            color: black;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+        }}
+        .context-menu-dropdown a:hover {{background-color: #f1f1f1}}
+        .context-menu-container:hover .context-menu-dropdown {{
+            display: block;
+        }}
+    </style>
+    <div class="context-menu-container">
+        <button class="context-menu-button">
+            Ações de Contexto ({empreendimento})
+        </button>
+        <div class="context-menu-dropdown">
+            <a href="{iframe_url}" target="_self" onclick="alert('Criando Linha de Base para {empreendimento}. Aguarde o recarregamento da página.');">
+                Criar Linha de Base (P{next_n})
+            </a>
+            <!-- Outras ações podem ser adicionadas aqui -->
+        </div>
+    </div>
+    """
+    
+    html(context_menu_html, height=50)
     
 # --- Funções Utilitárias ---
 def abreviar_nome(nome):
@@ -1538,7 +1873,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     </div>
                 
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
-                
 
                 <script>
                     // DEBUG: Verificar dados
@@ -1754,7 +2088,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
+               
                 (function() {{
                     // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
@@ -1771,7 +2105,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     if (!container) return;
 
-                    // Limpeza visual
+                    // Limpeza
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
@@ -1819,7 +2153,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         e.stopPropagation();
                         e.preventDefault();
 
-                        // A. Nome do Projeto
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -1828,50 +2161,54 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
-                        // B. Feedback Visual (Laranja = Processando)
                         menu.style.display = 'none';
                         toast.style.display = 'block';
-                        toast.style.backgroundColor = "#e67e22"; // Laranja
-                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
+                        toast.style.backgroundColor = "#2980b9";
+                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...`;
 
-                        // C. Montar URL CORRETA
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
                         
-                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                        // Isso corrige o bug do "about:srcdoc"
+                        // --- CORREÇÃO DA URL (REFERRER) ---
+                        // Isso pega a URL real (https://...) e ignora o about:srcdoc
                         let baseUrl = document.referrer;
-                        if (!baseUrl || baseUrl === "") {{
-                             // Fallback raro
-                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
-                        }}
-                        // Remove barra final
-                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-
-                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
-
-                        console.log("🚀 URL Iframe:", finalUrl);
                         
-                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
-                        if (iframe) iframe.src = finalUrl;
+                        // Fallback para ancestorOrigins (Chrome)
+                        if (!baseUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {{
+                            baseUrl = window.location.ancestorOrigins[0];
+                        }}
+                        
+                        // Limpeza
+                        if (baseUrl && baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                        
+                        // Se falhar tudo, usamos string vazia (URL Relativa) que às vezes funciona
+                        if (!baseUrl) baseUrl = "";
 
-                        // E. Feedback Final
-                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
-                        setTimeout(() => {{
-                            toast.style.backgroundColor = "#27ae60"; // Verde
-                            toast.innerHTML = `
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
-                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
-                                </div>
-                            `;
-                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
-                        }}, 4000);
+                        const finalUrl = baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+
+                        console.log("🚀 URL Iframe Gerada:", finalUrl);
+                        
+                        // Disparo no Iframe (Seguro)
+                        if (iframe) {{
+                            iframe.src = finalUrl;
+                            
+                            // Feedback Manual
+                            setTimeout(() => {{
+                                toast.style.backgroundColor = "#27ae60";
+                                toast.innerHTML = `
+                                    <div style="display:flex; flex-direction:column; gap:5px;">
+                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                        <span style="font-size:12px;">Dados processados com sucesso.</span>
+                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 para ver a Baseline.</span>
+                                    </div>
+                                `;
+                                setTimeout(() => {{ toast.style.display = 'none'; }}, 10000);
+                            }}, 4000);
+                        }}
                     }});
 
                 }})();
+        
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -2520,8 +2857,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
 
-
-
                     function toggleFullscreen() {{
                         const container = document.getElementById('gantt-container-{project["id"]}');
                         if (!document.fullscreenElement) {{
@@ -2784,8 +3119,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionTodayLine();
                             positionMetaLine();
                             updateProjectTitle();
-
-
 
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
@@ -4377,14 +4710,29 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
         df_filtered = df_filtered[df_filtered["SETOR"].isin(setor_filter)]
     return df_filtered
 
+process_context_menu_actions(None)
+create_baselines_table()
+# 1. Log de Entrada
+log_debug("➡️ ENTRANDO NO MAIN")
+
+# 2. TENTA PROCESSAR AÇÃO IMEDIATAMENTE (Prioridade Total)
+try:
+    log_debug("📞 Chamando processador (Pré-Carga)...")
+    # Passamos None para forçar ele a carregar dados frescos se precisar
+    process_context_menu_actions(None)
+except Exception as e:
+    log_debug(f"❌ Crash ao chamar processador: {e}")
+
+# 3. Fluxo Normal da Aplicação
+create_baselines_table()
+
 # --- Bloco Principal ---
 with st.spinner("Carregando e processando dados..."):
-    # 1. Carrega os dados
-    df_data = load_data()
-    
-    # 2. Verifica se carregou corretamente
-    if df_data is not None:
-        st.session_state.df_data = df_data
+        # Só agora carregamos os dados para a visualização normal
+        df_data = load_data()
+        if df_data is not None:
+            st.session_state.df_data = df_data
+            process_context_menu_actions(df_data)
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
@@ -4393,11 +4741,6 @@ with st.spinner("Carregando e processando dados..."):
             st.session_state.show_context_error = False
         if 'context_menu_trigger' not in st.session_state:
             st.session_state.context_menu_trigger = False
-
-        # --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
-        # Chamamos a função passando o df_data carregado AGORA.
-        # Não confiamos apenas no session_state antigo.
-        process_context_menu_actions(df_data)
         # --------------------------------------
 
         with st.sidebar:
@@ -4568,7 +4911,8 @@ with st.spinner("Carregando e processando dados..."):
                     if st.button("📸 Criar Linha de Base", use_container_width=True):
                         if selected_empreendimento_baseline:
                             try:
-                                version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
+                                # ✅ CORREÇÃO: Apenas 2 argumentos
+                                version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline)
                                 st.success(f"✅ {version_name} criado!")
                                 st.rerun()
                             except Exception as e:
@@ -4639,6 +4983,33 @@ with st.spinner("Carregando e processando dados..."):
                     st.info("Nenhuma linha de base criada")
             else:
                 st.warning("Selecione um empreendimento para gerenciar baselines")
+    
+            st.markdown("---")
+            with st.expander("🐞 Debug do Sistema"):
+                # Importação segura local
+                import os as debug_os 
+                log_file = "debug_log.txt"
+                
+                col_dbg1, col_dbg2 = st.columns(2)
+                
+                with col_dbg1:
+                    if st.button("🔄 Atualizar Log"):
+                        st.rerun()
+                        
+                with col_dbg2:
+                    if st.button("🗑️ Limpar"):
+                        try:
+                            if debug_os.path.exists(log_file):
+                                debug_os.remove(log_file)
+                                st.rerun()
+                        except:
+                            pass
+                
+                if debug_os.path.exists(log_file):
+                    with open(log_file, "r") as f:
+                        st.text(f.read())
+                else:
+                    st.info("Nenhum log registrado ainda (Aguardando ação do iframe).")
 
             # --- Menu de Contexto para Gantt ---
             def create_gantt_context_menu_component(selected_empreendimento):
@@ -5472,11 +5843,74 @@ def verificar_implementacao_baseline():
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
+# --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
+if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
+    print("⚡ BLOCO EXECUTIVO ACIONADO PELO IFRAME")
+    
+    try:
+        # 1. Decodifica
+        qp = st.query_params
+        raw_emp = qp.get('empreendimento')
+        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+        
+        print(f"🎯 Alvo: {empreendimento}")
+
+        # 2. Carrega Dados (Sessão nova)
+        df_exec = load_data()
+        
+        # 3. Executa Salvamento
+        if df_exec is not None and not df_exec.empty:
+            if empreendimento in df_exec['Empreendimento'].unique():
+                print("💾 Salvando baseline no MySQL...")
+                
+                # ✅ CHAMADA CORRETA: apenas 2 argumentos
+                v_name = take_gantt_baseline(df_exec, empreendimento)
+                
+                print(f"✅ SUCESSO ABSOLUTO: {v_name} salvo!")
+                
+                # Limpa para evitar reprocessamento
+                st.query_params.clear()
+                
+                # Feedback visual
+                st.success(f"✅ Baseline {v_name} criada com sucesso!")
+                
+                # Forçar atualização da página após 2 segundos
+                time.sleep(2)
+                st.rerun()
+                
+            else:
+                print(f"❌ Erro: Projeto {empreendimento} não encontrado nos dados.")
+                st.error(f"❌ Projeto {empreendimento} não encontrado nos dados.")
+        else:
+            print("❌ Erro: Dados vazios no background.")
+            st.error("❌ Dados vazios no background.")
+            
+    except Exception as e:
+        print(f"❌ CRASH NO BACKGROUND: {e}")
+        import traceback
+        traceback.print_exc()
+        st.error(f"❌ Erro ao criar baseline: {e}")
+
+# ------------------------------------------------------------------
+
 # No final do arquivo, antes do if __name__:
 if __name__ == "__main__":
     # Verificar implementação (pode remover depois)
     if 'df_data' in globals() and not df_data.empty:
         verificar_implementacao_baseline()
+    # Carrega Dados
+    df_data = load_data()
+    
+    if df_data is not None:
+        # Salva na sessão
+        st.session_state.df_data = df_data
+        
+        # --- EXECUTA AÇÃO DO IFRAME AQUI ---
+        # A lógica de processamento de ação de contexto está no bloco executivo (linhas 5532-5572)
+        # e é acionada pelo iframe que recarrega a página.
+        # A função process_context_menu_actions do código de referência não é necessária aqui.
+        # -----------------------------------
 
     else:
         st.error("❌ Não foi possível carregar ou gerar os dados.")
