@@ -1189,6 +1189,9 @@ def process_context_menu_actions(df):
                 st.session_state.context_menu_error = "❌ Empreendimento não especificado na ação de contexto."
                 st.session_state.show_context_error = True
         
+        # Limpar os parâmetros de consulta APÓS o processamento para evitar reexecução
+        st.query_params.clear()
+        
         # Outras ações de contexto podem ser adicionadas aqui (ex: 'load_baseline')
         
         # O bloco executivo do iframe (linhas 5532-5572) no seu código já lida com a limpeza dos query_params
@@ -5855,6 +5858,7 @@ def verificar_implementacao_baseline():
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
+# --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
 # --- BLOCO EXECUTIVO FINAL (SALVAMENTO EM BACKGROUND) ---
 if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
     print("🎯🎯🎯 BLOCO EXECUTIVO ACIONADO 🎯🎯🎯")
