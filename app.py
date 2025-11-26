@@ -2225,6 +2225,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         link.click(); // Simula o clique humano
                         document.body.removeChild(link); // Limpeza
                     }});
+
+                }})();
         
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
