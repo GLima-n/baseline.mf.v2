@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #create_direct_test_component
+from dateutil.relativedelta import relativedelta #process_context_menu_actions
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -236,7 +236,14 @@ if 'context_menu_trigger' not in st.session_state:
     
 def process_context_menu_actions():
     """Processa ações do menu de contexto - VERSÃO ULTRA AGRESSIVA"""
+    if df is None:
+        df = st.session_state.get('df_data')
     
+    # Se ainda for None (caso extremo), tenta carregar
+    if df is None or df.empty:
+        print("⚠️ DF vazio no processador, tentando load_data de emergência...")
+        df = load_data()
+        
     print("🎯🎯🎯 PROCESS_CONTEXT_MENU_ACTIONS CHAMADA 🎯🎯🎯")
     print(f"📦 Query params na função: {dict(st.query_params)}")
     
@@ -4468,14 +4475,18 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             titulo_extra=titulo_extra  # Novo parâmetro
         )
 
-# Tente executar a tela de boas-vindas. Se os arquivos não existirem, apenas pule.
-try:
-    if show_welcome_screen():
-        st.stop()
-except NameError:
-    st.warning("Arquivo `popup.py` não encontrado. Pulando tela de boas-vindas.")
-except Exception as e:
-    st.warning(f"Erro ao carregar `popup.py`: {e}")
+# --- Modificação: Bypass para o Iframe ---
+# Se houver 'context_action' na URL, ignoramos a tela de boas-vindas para permitir o processamento
+is_headless_action = 'context_action' in st.query_params
+
+if not is_headless_action:
+    try:
+        if show_welcome_screen():
+            st.stop()
+    except NameError:
+        st.warning("Arquivo `popup.py` não encontrado. Pulando tela de boas-vindas.")
+    except Exception as e:
+        st.warning(f"Erro ao carregar `popup.py`: {e}")
 
 
 st.markdown("""
@@ -5858,7 +5869,6 @@ def verificar_implementacao_baseline():
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
-# --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
 # --- BLOCO EXECUTIVO FINAL (SALVAMENTO EM BACKGROUND) ---
 if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
     print("🎯🎯🎯 BLOCO EXECUTIVO ACIONADO 🎯🎯🎯")
@@ -5870,21 +5880,24 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
 
 # No final do arquivo, antes do if __name__:
 if __name__ == "__main__":
-    # Verificar implementação (pode remover depois)
-    if 'df_data' in globals() and not df_data.empty:
-        verificar_implementacao_baseline()
-    # Carrega Dados
     df_data = load_data()
     
+    # 2. Verifica implementação (opcional)
+    if 'df_data' in globals() and not df_data.empty:
+        # verificar_implementacao_baseline() # Pode comentar se quiser
+        pass
+
     if df_data is not None:
-        # Salva na sessão
         st.session_state.df_data = df_data
         
-        # --- EXECUTA AÇÃO DO IFRAME AQUI ---
-        # A lógica de processamento de ação de contexto está no bloco executivo (linhas 5532-5572)
-        # e é acionada pelo iframe que recarrega a página.
-        # A função process_context_menu_actions do código de referência não é necessária aqui.
-        # -----------------------------------
+        # --- 3. BLOCO CRÍTICO: Executa a ação do Iframe IMEDIATAMENTE após carregar dados ---
+        if 'context_action' in st.query_params:
+            action = st.query_params['context_action']
+            print(f"🚀 Ação de contexto detectada no MAIN: {action}")
+            
+            if action == 'take_baseline':
+                # Passamos o df_data recém carregado
+                process_context_menu_actions(df_data)
 
     else:
         st.error("❌ Não foi possível carregar ou gerar os dados.")
