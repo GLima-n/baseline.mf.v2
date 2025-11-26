@@ -2193,7 +2193,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX: NOVA ABA)
+                    // --- 5. AÇÃO DO BOTÃO ---
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
@@ -2211,31 +2211,47 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         menu.style.display = 'none';
                         toast.style.display = 'block';
                         toast.style.backgroundColor = "#2980b9";
-                        
-                        // Mensagem ajustada para o comportamento de nova aba
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>Uma nova aba abrirá para processar.</span>`;
+                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...`;
 
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
-                        const targetUrl = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
-
-                        console.log("🔄 Abrindo worker tab:", targetUrl);
-
-                        const link = document.createElement('a');
-                        link.href = targetUrl;
-                        // ⚠️ A MUDANÇA CRUCIAL: _blank em vez de _top
-                        // O navegador permite abrir popups/abas, mas não permite mudar a aba atual.
-                        link.target = "_blank"; 
-                        link.style.display = 'none';
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
                         
-                        // Feedback visual para o usuário atualizar a página atual depois
-                        setTimeout(() => {{
-                             toast.style.backgroundColor = "#27ae60";
-                             toast.innerHTML = `✅ <b>Processamento Iniciado!</b><br><span style='font-size:10px'>Pressione F5 nesta tela após o fechamento da outra aba.</span>`;
-                        }}, 2000);
+                        // --- CORREÇÃO DA URL (REFERRER) ---
+                        // Isso pega a URL real (https://...) e ignora o about:srcdoc
+                        let baseUrl = document.referrer;
+                        
+                        // Fallback para ancestorOrigins (Chrome)
+                        if (!baseUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {{
+                            baseUrl = window.location.ancestorOrigins[0];
+                        }}
+                        
+                        // Limpeza
+                        if (baseUrl && baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                        
+                        // Se falhar tudo, usamos string vazia (URL Relativa) que às vezes funciona
+                        if (!baseUrl) baseUrl = "";
+
+                        const finalUrl = baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+
+                        console.log("🚀 URL Iframe Gerada:", finalUrl);
+                        
+                        // Disparo no Iframe (Seguro)
+                        if (iframe) {{
+                            iframe.src = finalUrl;
+                            
+                            // Feedback Manual
+                            setTimeout(() => {{
+                                toast.style.backgroundColor = "#27ae60";
+                                toast.innerHTML = `
+                                    <div style="display:flex; flex-direction:column; gap:5px;">
+                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                        <span style="font-size:12px;">Dados processados com sucesso.</span>
+                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 para ver a Baseline.</span>
+                                    </div>
+                                `;
+                                setTimeout(() => {{ toast.style.display = 'none'; }}, 10000);
+                            }}, 4000);
+                        }}
                     }});
 
                 }})();
@@ -5737,41 +5753,19 @@ if __name__ == "__main__":
 
         # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
         # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
-        # No final do arquivo Python...
-
         if 'context_action' in st.query_params:
             try:
                 action = st.query_params['context_action']
                 if action == 'take_baseline':
                     raw_emp = st.query_params.get('empreendimento')
+                    # Normaliza se vier como lista
                     if isinstance(raw_emp, list): raw_emp = raw_emp[0]
                     
                     if raw_emp:
-                        # Executa a lógica (Salva no Banco)
-                        result = executar_logica_baseline(df_data, raw_emp)
-                        
-                        if result:
-                            # Mostra uma tela limpa de sucesso na NOVA ABA
-                            st.markdown("""
-                                <style>
-                                    header, .stAppHeader, footer {display: none !important;}
-                                    .main {background-color: #d4edda;}
-                                </style>
-                                <div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center;'>
-                                    <h1 style='color: #155724; font-size: 80px;'>✅</h1>
-                                    <h2 style='color: #155724;'>Sucesso!</h2>
-                                    <p style='font-size: 20px; color: #155724;'>A Linha de Base foi salva.</p>
-                                    <p style='color: #666;'>Você pode fechar esta aba e atualizar a anterior.</p>
-                                    <script>
-                                        // Tenta fechar a aba automaticamente após 3 segundos
-                                        setTimeout(function() { window.close(); }, 3000);
-                                    </script>
-                                </div>
-                            """, unsafe_allow_html=True)
-                            st.stop() # Impede que o resto do app carregue na aba "trabalhadora"
-
+                        # Executa EXATAMENTE a mesma lógica do botão
+                        executar_logica_baseline(df_data, raw_emp)
             except Exception as e:
-                st.error(f"Erro: {e}")
+                st.error(f"Erro ao processar ação de contexto: {e}")
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
