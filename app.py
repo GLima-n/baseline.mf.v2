@@ -2188,13 +2188,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}, true);
 
                     // 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX DO STREAMLIT)
+                    c// 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX: NOVA ABA)
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
                         e.stopPropagation();
                         e.preventDefault();
 
-                        // Recupera o nome do projeto atual
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -2203,27 +2203,34 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
-                        // Feedback Visual Imediato
                         menu.style.display = 'none';
                         toast.style.display = 'block';
                         toast.style.backgroundColor = "#2980b9";
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>Redirecionando...</span>`;
+                        
+                        // Mensagem ajustada para o comportamento de nova aba
+                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>Uma nova aba abrirá para processar.</span>`;
 
-                        // Prepara os parâmetros
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
                         const targetUrl = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
 
-                        console.log("🔄 Tentando navegação via link _top para:", targetUrl);
+                        console.log("🔄 Abrindo worker tab:", targetUrl);
 
-                        // 🚀 TRUQUE DO LINK OCULTO (Bypassa o bloqueio de Sandbox)
                         const link = document.createElement('a');
                         link.href = targetUrl;
-                        link.target = "_top"; // Isso diz ao navegador para abrir na janela pai
+                        // ⚠️ A MUDANÇA CRUCIAL: _blank em vez de _top
+                        // O navegador permite abrir popups/abas, mas não permite mudar a aba atual.
+                        link.target = "_blank"; 
                         link.style.display = 'none';
                         document.body.appendChild(link);
-                        link.click(); // Simula o clique humano
-                        document.body.removeChild(link); // Limpeza
+                        link.click();
+                        document.body.removeChild(link);
+                        
+                        // Feedback visual para o usuário atualizar a página atual depois
+                        setTimeout(() => {{
+                             toast.style.backgroundColor = "#27ae60";
+                             toast.innerHTML = `✅ <b>Processamento Iniciado!</b><br><span style='font-size:10px'>Pressione F5 nesta tela após o fechamento da outra aba.</span>`;
+                        }}, 2000);
                     }});
 
                 }})();
@@ -5725,19 +5732,41 @@ if __name__ == "__main__":
 
         # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
         # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
-        if 'context_action' in st.query_params:
-            try:
-                action = st.query_params['context_action']
-                if action == 'take_baseline':
-                    raw_emp = st.query_params.get('empreendimento')
-                    # Normaliza se vier como lista
-                    if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+        # No final do arquivo Python...
+
+    if 'context_action' in st.query_params:
+        try:
+            action = st.query_params['context_action']
+            if action == 'take_baseline':
+                raw_emp = st.query_params.get('empreendimento')
+                if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+                
+                if raw_emp:
+                    # Executa a lógica (Salva no Banco)
+                    result = executar_logica_baseline(df_data, raw_emp)
                     
-                    if raw_emp:
-                        # Executa EXATAMENTE a mesma lógica do botão
-                        executar_logica_baseline(df_data, raw_emp)
-            except Exception as e:
-                st.error(f"Erro ao processar ação de contexto: {e}")
+                    if result:
+                        # Mostra uma tela limpa de sucesso na NOVA ABA
+                        st.markdown("""
+                            <style>
+                                header, .stAppHeader, footer {display: none !important;}
+                                .main {background-color: #d4edda;}
+                            </style>
+                            <div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center;'>
+                                <h1 style='color: #155724; font-size: 80px;'>✅</h1>
+                                <h2 style='color: #155724;'>Sucesso!</h2>
+                                <p style='font-size: 20px; color: #155724;'>A Linha de Base foi salva.</p>
+                                <p style='color: #666;'>Você pode fechar esta aba e atualizar a anterior.</p>
+                                <script>
+                                    // Tenta fechar a aba automaticamente após 3 segundos
+                                    setTimeout(function() { window.close(); }, 3000);
+                                </script>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        st.stop() # Impede que o resto do app carregue na aba "trabalhadora"
+
+        except Exception as e:
+            st.error(f"Erro: {e}")
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
