@@ -2137,22 +2137,30 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
                
                 (function() {{
-                    // 1. Configuração e Seleção do Container
+                    // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
+                    // Garante iframe
+                    let iframe = document.getElementById('hidden-iframe');
+                    if (!iframe) {{
+                        iframe = document.createElement('iframe');
+                        iframe.id = 'hidden-iframe';
+                        iframe.style.display = 'none';
+                        if(container) container.appendChild(iframe);
+                    }}
+
                     if (!container) return;
 
-                    // Limpeza de elementos antigos para evitar duplicatas
+                    // Limpeza
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
                     if (oldToast) oldToast.remove();
 
-                    // 2. Criar o Menu de Contexto
+                    // 2. Criar Menu
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
-                    // Estilos inline para garantir visualização correta (z-index alto)
                     menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
                     menu.innerHTML = `
                         <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
@@ -2161,15 +2169,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast de Carregamento
+                    // 3. Criar Toast
                     const toast = document.createElement('div');
                     toast.className = 'js-toast-loading';
                     toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
                     container.appendChild(toast);
 
-                    // 4. Listeners para Abrir/Fechar o Menu
+                    // 4. Listeners
                     container.addEventListener('contextmenu', function(e) {{
-                        // Verifica se o clique foi em uma área válida do gráfico ou sidebar
                         if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
                             menu.style.display = 'block';
@@ -2180,15 +2187,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }});
 
-                    // Fecha o menu ao clicar fora
                     document.addEventListener('click', function(e) {{
                         if (menu.style.display === 'block' && !menu.contains(e.target)) {{
                             menu.style.display = 'none';
                         }}
                     }}, true);
 
-                    // 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX DO STREAMLIT)
-                    c// 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX: NOVA ABA)
+                    // 5. AÇÃO DO BOTÃO (CORRIGIDA PARA SANDBOX: NOVA ABA)
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
@@ -2231,7 +2236,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                              toast.style.backgroundColor = "#27ae60";
                              toast.innerHTML = `✅ <b>Processamento Iniciado!</b><br><span style='font-size:10px'>Pressione F5 nesta tela após o fechamento da outra aba.</span>`;
                         }}, 2000);
-                    
+                    }});
 
                 }})();
         
@@ -5732,41 +5737,19 @@ if __name__ == "__main__":
 
         # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
         # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
-        # No final do arquivo Python...
-
-    if 'context_action' in st.query_params:
-        try:
-            action = st.query_params['context_action']
-            if action == 'take_baseline':
-                raw_emp = st.query_params.get('empreendimento')
-                if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-                
-                if raw_emp:
-                    # Executa a lógica (Salva no Banco)
-                    result = executar_logica_baseline(df_data, raw_emp)
+        if 'context_action' in st.query_params:
+            try:
+                action = st.query_params['context_action']
+                if action == 'take_baseline':
+                    raw_emp = st.query_params.get('empreendimento')
+                    # Normaliza se vier como lista
+                    if isinstance(raw_emp, list): raw_emp = raw_emp[0]
                     
-                    if result:
-                        # Mostra uma tela limpa de sucesso na NOVA ABA
-                        st.markdown("""
-                            <style>
-                                header, .stAppHeader, footer {display: none !important;}
-                                .main {background-color: #d4edda;}
-                            </style>
-                            <div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center;'>
-                                <h1 style='color: #155724; font-size: 80px;'>✅</h1>
-                                <h2 style='color: #155724;'>Sucesso!</h2>
-                                <p style='font-size: 20px; color: #155724;'>A Linha de Base foi salva.</p>
-                                <p style='color: #666;'>Você pode fechar esta aba e atualizar a anterior.</p>
-                                <script>
-                                    // Tenta fechar a aba automaticamente após 3 segundos
-                                    setTimeout(function() { window.close(); }, 3000);
-                                </script>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        st.stop() # Impede que o resto do app carregue na aba "trabalhadora"
-
-        except Exception as e:
-            st.error(f"Erro: {e}")
+                    if raw_emp:
+                        # Executa EXATAMENTE a mesma lógica do botão
+                        executar_logica_baseline(df_data, raw_emp)
+            except Exception as e:
+                st.error(f"Erro ao processar ação de contexto: {e}")
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
