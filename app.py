@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit as os
 import pandas as pd
 import numpy as np
 import matplotlib as mpl
@@ -11,9 +10,9 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_context_menu_actions
-import streamlit.components.v1 as components
-from streamlit.components.v1 import html # Adicionado para o iframe  
+from dateutil.relativedelta import relativedelta #get_db_connection
+import traceback
+import streamlit.components.v1 as components  
 import json
 import random
 import time
@@ -50,7 +49,7 @@ except ImportError:
     MODO_REAL = False
 
 # --- Configurações do Banco AWS ---
-if "aws_db" in st.secrets:
+try:
     DB_CONFIG = {
         'host': st.secrets["aws_db"]["host"],
         'user': st.secrets["aws_db"]["user"],
@@ -58,19 +57,14 @@ if "aws_db" in st.secrets:
         'database': st.secrets["aws_db"]["database"],
         'port': 3306
     }
-else:
-    # Se falhar isso, nada funciona.
-    st.stop()
-
-def log_debug(message):
-    import os as debug_os
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    try:
-        with open("debug_log.txt", "a") as f:
-            f.write(f"[{timestamp}] {message}\n")
-        print(f"[{timestamp}] {message}")
-    except:
-        pass
+except Exception:
+    DB_CONFIG = {
+        'host': "mock_host",
+        'user': "mock_user", 
+        'password': "mock_password",
+        'database': "mock_db",
+        'port': 3306
+    }
 
 # --- ORDEM DAS ETAPAS (DEFINIDA PELO USUÁRIO) ---
 ORDEM_ETAPAS_GLOBAL = [
@@ -188,14 +182,15 @@ def get_db_connection():
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
     except Error as e:
-        print(f"❌ ERRO CONEXÃO MYSQL: {e}") # Isso vai aparecer nos logs do servidor
+        print(f"❌ Erro de Conexão MySQL: {e}") # Log no terminal
         return None
-    
+
 def create_baselines_table():
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
+            # Cria tabela garantindo coluna tipo_visualizacao
             create_table_query = """
             CREATE TABLE IF NOT EXISTS gantt_baselines (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -203,102 +198,116 @@ def create_baselines_table():
                 version_name VARCHAR(255) NOT NULL,
                 baseline_data JSON NOT NULL,
                 created_date VARCHAR(50) NOT NULL,
-                synced_aws BOOLEAN DEFAULT FALSE,  -- <--- NOVO CAMPO
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                tipo_visualizacao VARCHAR(50) DEFAULT 'Gantt',
                 UNIQUE KEY unique_baseline (empreendimento, version_name)
             )
             """
             cursor.execute(create_table_query)
             conn.commit()
         except Error as e:
-            print(f"Erro ao criar tabela: {e}")
+            print(f"Erro tabela: {e}")
         finally:
             conn.close()
-# O restante do código Streamlit...
-st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
-# Inicializar variáveis de contexto se não existirem
-if 'context_menu_success' not in st.session_state:
-    st.session_state.context_menu_success = ""
-if 'show_context_success' not in st.session_state:
-    st.session_state.show_context_success = False
-if 'context_menu_error' not in st.session_state:
-    st.session_state.context_menu_error = ""
-if 'show_context_error' not in st.session_state:
-    st.session_state.show_context_error = False
-if 'context_menu_trigger' not in st.session_state:
-    st.session_state.context_menu_trigger = False
+
+def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao="Gantt"):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            baseline_json = json.dumps(baseline_data, ensure_ascii=False, default=str)
+            
+            # Query robusta com ON DUPLICATE KEY UPDATE
+            insert_query = """
+            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date, tipo_visualizacao)
+            VALUES (%s, %s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE 
+                baseline_data = VALUES(baseline_data), 
+                created_date = VALUES(created_date),
+                created_at = CURRENT_TIMESTAMP
+            """
+            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date, tipo_visualizacao))
+            conn.commit()
+            print(f"✅ SAVE AWS SUCESSO: {version_name}")
+            return True
+        except Error as e:
+            print(f"❌ ERRO SQL AWS: {e}")
+            return False
+        finally:
+            conn.close()
+    else:
+        print("❌ FALHA CONEXÃO: Não foi possível conectar para salvar.")
+        return False
     
+def take_baseline(df, empreendimento):
+    # 1. Filtra o DataFrame atual
+    df_emp = df[df['Empreendimento'] == empreendimento].copy()
 
+    # 2. Define o nome da nova versão (ex: P1, P2...)
+    # (Adicione aqui a lógica de contagem de versões existente no exemplo)
+    version_name = "P_NOVA" # Exemplo simplificado
 
-# --- DIAGNÓSTICO INICIAL --- 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔍 Diagnóstico Context Menu")
+    # 3. Prepara os dados para salvar (Snapshot)
+    # Aqui você define o que quer salvar. No exemplo, ele salva Inicio/Fim.
+    baseline_data = []
+    for _, row in df_emp.iterrows():
+        baseline_data.append({
+            "tarefa": row['Etapa'], # Ou o ID da tarefa se tiver
+            "inicio_previsto": row['Inicio_Real'].strftime('%Y-%m-%d') if pd.notna(row['Inicio_Real']) else None,
+            "termino_previsto": row['Termino_Real'].strftime('%Y-%m-%d') if pd.notna(row['Termino_Real']) else None
+        })
 
-# Mostra os parâmetros atuais
-st.sidebar.write("**Query Params:**", dict(st.query_params))
-st.sidebar.write("**Session State:**", list(st.session_state.keys()))
+    # 4. Salva no banco
+    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"))
+    return version_name
 
-# Botão de limpeza
-if st.sidebar.button("🧹 Limpar Parâmetros"):
-    st.query_params.clear()
-    st.sidebar.success("Parâmetros limpos!")
-    st.rerun()
-
-# --- DIAGNÓSTICO ULTRA DETALHADO ---
-print("=" * 60)
-print("🚀 STREAMLIT APP INICIANDO")
-print(f"📋 Query params: {dict(st.query_params)}")
-print(f"🔍 Tem context_action? {'context_action' in st.query_params}")
-if 'context_action' in st.query_params:
-    print(f"🎯 context_action: {st.query_params['context_action']}")
-    print(f"🏢 empreendimento: {st.query_params.get('empreendimento')}")
-print("=" * 60)
-
-# Componente de teste SIMPLES - coloque perto do gráfico Gantt
-def create_simple_test_component(empreendimento):
-    """Componente de teste SIMPLES sem JavaScript complexo"""
+# --- Processar ações do menu de contexto (BACKEND ROBUSTO) ---
+# --- Processar ações do menu de contexto (DEBUG EXTREMO) ---
+# --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
+def process_context_menu_actions(df=None):
+    query_params = st.query_params
     
-    html_code = f'''
-    <div style="padding: 10px; border: 2px solid #4CAF50; border-radius: 5px; margin: 10px 0;">
-        <h4>🧪 Teste Simples de Baseline</h4>
-        <p>Empreendimento: <strong>{empreendimento}</strong></p>
-        <a href="?context_action=take_baseline&empreendimento={urllib.parse.quote(empreendimento)}&t={int(time.time())}" 
-           target="_self" 
-           style="background: #4CAF50; color: white; padding: 10px 15px; text-decoration: none; border-radius: 5px; display: inline-block;">
-           📸 Criar Baseline (Link Direto)
-        </a>
-    </div>
-    '''
-    
-    components.html(html_code, height=120)
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        # 1. Decodifica parâmetros
+        raw_emp = query_params.get('empreendimento', None)
+        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+        
+        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
 
-def create_direct_test_component(empreendimento):
-    """Componente de teste DIRETO para verificar se o processamento funciona"""
-    
-    encoded_emp = urllib.parse.quote(empreendimento)
-    url = f"?context_action=take_baseline&empreendimento={encoded_emp}&t={int(time.time())}"
-    
-    html_code = f'''
-    <div style="padding: 15px; border: 2px solid #ff4444; border-radius: 8px; margin: 15px 0; background: #ffeaea;">
-        <h4>🧪 TESTE DIRETO (DEBUG)</h4>
-        <p><strong>Empreendimento:</strong> {empreendimento}</p>
-        <p><strong>URL:</strong> {url}</p>
-        <a href="{url}" 
-           style="background: #ff4444; color: white; padding: 10px 15px; text-decoration: none; 
-                  border-radius: 5px; display: inline-block; font-weight: bold;">
-           🔥 TESTAR AGORA (Link Direto)
-        </a>
-        <p style="font-size: 12px; color: #666; margin-top: 8px;">
-           Clique e verifique os logs no console do Python
-        </p>
-    </div>
-    '''
-    
-    components.html(html_code, height=160)
+        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
+        if df is None or df.empty:
+            print("⚠️ Sessão Iframe. Carregando dados...")
+            try:
+                df = load_data() # Sua função de carregar Excel/SQL
+            except Exception as e:
+                print(f"❌ Erro load_data: {e}")
+                return
 
+        # 3. Executa Salvamento
+        if empreendimento and df is not None:
+            try:
+                # Cria a baseline (usa sua função take_gantt_baseline existente)
+                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
+                print(f"✅ FINALIZADO: {version_name} criado.")
+                # Limpa URL
+                st.query_params.clear()
+            except Exception as e:
+                print(f"❌ Erro take_gantt_baseline: {e}")
 
-# Use este componente para testar:
-# create_direct_test_component(selected_empreendimento_baseline)
+        # 4. Executa a criação
+        if empreendimento and df is not None and not df.empty:
+            try:
+                # Cria e Salva no MySQL
+                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
+                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
+                
+                # Limpa params para não repetir na próxima carga
+                st.query_params.clear()
+                
+            except Exception as e:
+                print(f"❌ Erro ao salvar baseline: {e}")
+        else:
+            print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -373,12 +382,10 @@ def obter_data_meta_assinatura_novo(df_empreendimento):
 # --- FUNÇÕES DE BANCO DE DADOS PARA BASELINES ---
 
 def get_db_connection():
-    if not DB_CONFIG: return None
     try:
         conn = mysql.connector.connect(**DB_CONFIG)
         return conn
     except Error as e:
-        print(f"❌ ERRO CONEXÃO MYSQL (Background): {e}") 
         return None
 
 def create_baselines_table():
@@ -394,7 +401,7 @@ def create_baselines_table():
                 baseline_data JSON NOT NULL,
                 created_date VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
+                tipo_visualizacao VARCHAR(50) NOT NULL,
                 UNIQUE KEY unique_baseline (empreendimento, version_name)
             )
             """
@@ -416,7 +423,7 @@ def load_baselines():
         baselines = {}
         try:
             cursor = conn.cursor(dictionary=True)
-            query = "SELECT empreendimento, version_name, baseline_data, created_date FROM gantt_baselines ORDER BY created_at DESC"
+            query = "SELECT empreendimento, version_name, baseline_data, created_date, tipo_visualizacao FROM gantt_baselines ORDER BY created_at DESC"
             cursor.execute(query)
             results = cursor.fetchall()
             for row in results:
@@ -427,8 +434,8 @@ def load_baselines():
                 baseline_data = json.loads(row['baseline_data'])
                 baselines[empreendimento][version_name] = {
                     "date": row['created_date'],
-                    "data": baseline_data
-                    
+                    "data": baseline_data,
+                    "tipo_visualizacao": row['tipo_visualizacao']
                 }
             return baselines
         except Error as e:
@@ -440,165 +447,62 @@ def load_baselines():
     else:
         return st.session_state.get('mock_baselines', {})
 
-# --- Lógica de Linha de Base ---
-
-def take_baseline(df, empreendimento):
-    from datetime import datetime
-    import pandas as pd
-    import streamlit as st
-    
-    df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
-    
-    # 1. Atualizar o plano atual com os valores REAIS atuais
-    # Assumindo que as colunas de dados reais são 'Inicio_Real' e 'Termino_Real'
-    # E as colunas de planejamento atual são 'Inicio_Prevista' e 'Termino_Prevista'
-    
-    if 'Inicio_Real' not in df_empreendimento.columns or 'Termino_Real' not in df_empreendimento.columns:
-        raise ValueError("Colunas 'Inicio_Real' ou 'Termino_Real' não encontradas no DataFrame.")
-    
-    # Atualizar o plano atual com os valores REAIS atuais
-    df_empreendimento['Inicio_Prevista'] = df_empreendimento['Inicio_Real']
-    df_empreendimento['Termino_Prevista'] = df_empreendimento['Termino_Real']
-    
-    # Atualizar o DataFrame original na session_state (assumindo que o DataFrame original está em st.session_state.df)
-    if 'df' in st.session_state:
-        mask = st.session_state.df['Empreendimento'] == empreendimento
-        st.session_state.df.loc[mask, 'Inicio_Prevista'] = df_empreendimento['Inicio_Real'].values
-        st.session_state.df.loc[mask, 'Termino_Prevista'] = df_empreendimento['Termino_Real'].values
-    
-    # 2. Determinar o próximo nome da versão (P1, P2, etc.)
-    existing_baselines = load_baselines()
-    empreendimento_baselines = existing_baselines.get(empreendimento, {})
-    
-    # Filtrar apenas as versões Px-(data)
-    existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k and k.split('-')[0][1:].isdigit()]
-    
-    next_n = 1
-    if existing_versions:
-        max_n = 0
-        for version_name in existing_versions:
-            try:
-                # Extrai o número após 'P'
-                n_str = version_name.split('-')[0][1:]
-                n = int(n_str)
-                if n > max_n:
-                    max_n = n
-            except ValueError:
-                continue
-        next_n = max_n + 1
-    
-    version_prefix = f"P{next_n}"
-    current_date_str = datetime.now().strftime("%d/%m/%Y")
-    version_name = f"{version_prefix}-({current_date_str})"
-    
-    # 3. Criar baseline com os dados atualizados
-    # Usando 'ID_Tarefa' ou 'Etapa' como identificador
-    if 'ID_Tarefa' in df_empreendimento.columns:
-        df_baseline = df_empreendimento[['ID_Tarefa', 'Inicio_Prevista', 'Termino_Prevista']].copy()
-        id_col = 'ID_Tarefa'
-    elif 'Etapa' in df_empreendimento.columns:
-        df_baseline = df_empreendimento[['Etapa', 'Inicio_Prevista', 'Termino_Prevista']].copy()
-        id_col = 'Etapa'
-    else:
-        # Tentativa de usar as colunas que o código original do txt2 usava
-        if 'P0_Previsto_Inicio' in df_empreendimento.columns and 'P0_Previsto_Fim' in df_empreendimento.columns:
-            df_baseline = df_empreendimento[['ID_Tarefa', 'P0_Previsto_Inicio', 'P0_Previsto_Fim']].copy()
-            id_col = 'ID_Tarefa'
-        else:
-            raise ValueError("Colunas de identificação de tarefa não encontradas no DataFrame para criar a baseline.")
-        
-    # Converter datas para string no formato YYYY-MM-DD para salvar no JSON
-    df_baseline['Inicio_Prevista'] = pd.to_datetime(df_baseline['Inicio_Prevista']).dt.strftime('%Y-%m-%d')
-    df_baseline['Termino_Prevista'] = pd.to_datetime(df_baseline['Termino_Prevista']).dt.strftime('%Y-%m-%d')
-    
-    # Renomear colunas para o formato da versão (e.g., P1_Previsto_Inicio)
-    baseline_data = df_baseline.rename(
-        columns={'Inicio_Prevista': f'{version_prefix}_Previsto_Inicio', 
-                 'Termino_Prevista': f'{version_prefix}_Previsto_Fim'}
-    ).to_dict('records')
-
-    # 4. Salvar no banco de dados
-    success = save_baseline(empreendimento, version_name, baseline_data, current_date_str)
-    
-    if success:
-        # Marcar linha de base como não enviada para AWS (se o seu código usa essa lógica)
-        if 'unsent_baselines' not in st.session_state:
-            st.session_state.unsent_baselines = {}
-        
-        if empreendimento not in st.session_state.unsent_baselines:
-            st.session_state.unsent_baselines[empreendimento] = []
-        
-        if version_name not in st.session_state.unsent_baselines[empreendimento]:
-            st.session_state.unsent_baselines[empreendimento].append(version_name)
-        
-        return version_name
-    else:
-        raise Exception("Falha ao salvar linha de base no banco de dados")
-
-# --- Função para enviar dados para AWS ---
-
-def send_to_aws(empreendimento, version_name):
-    """Simula o envio de dados para AWS"""
-    try:
-        # Simular processamento
-        import time
-        time.sleep(1)  # Simular delay de rede
-        
-        # Remover da lista de não enviados
-        if ('unsent_baselines' in st.session_state and 
-            empreendimento in st.session_state.unsent_baselines and 
-            version_name in st.session_state.unsent_baselines[empreendimento]):
-            
-            st.session_state.unsent_baselines[empreendimento].remove(version_name)
-            
-            # Se não há mais linhas de base não enviadas para este empreendimento, remover a entrada
-            if not st.session_state.unsent_baselines[empreendimento]:
-                del st.session_state.unsent_baselines[empreendimento]
-        
-        return True
-    except Exception as e:
-        st.error(f"Erro ao enviar para AWS: {e}")
-        return False
-
-def save_baseline(empreendimento, version_name, baseline_data, created_date):
-    """Salva baseline no banco AWS com logs detalhados"""
+def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor()
+            
+            # Validar dados antes de serializar
+            if not baseline_data or not isinstance(baseline_data, dict):
+                raise ValueError("Dados da baseline inválidos")
+            
+            # Serializar com tratamento de caracteres especiais
             baseline_json = json.dumps(baseline_data, ensure_ascii=False, default=str)
             
-            print(f"💾 Tentando salvar baseline: {version_name} para {empreendimento}")
-            print(f"📊 Dados: {len(baseline_json)} caracteres, {len(baseline_data.get('tasks', []))} tasks")
-            
             insert_query = """
-            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date, tipo_visualizacao)
+            VALUES (%s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE 
                 baseline_data = VALUES(baseline_data), 
-                created_date = VALUES(created_date),
+                created_date = VALUES(created_date), 
+                tipo_visualizacao = VALUES(tipo_visualizacao),
                 created_at = CURRENT_TIMESTAMP
             """
             
-            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date))
+            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date, tipo_visualizacao))
             conn.commit()
             
-            print(f"✅ SUCESSO ABSOLUTO: {version_name} salvo no MySQL!")
-            print(f"📝 Rows affected: {cursor.rowcount}")
-            
-            return True
-            
+            # Verificar se a inserção foi bem-sucedida
+            if cursor.rowcount > 0:
+                return True
+            else:
+                return False
+                
         except Error as e:
-            print(f"❌ ERRO SQL ao salvar baseline: {e}")
-            print(f"🔍 Detalhes: empreendimento={empreendimento}, version={version_name}")
+            st.error(f"Erro de banco de dados ao salvar baseline: {e}")
+            return False
+        except Exception as e:
+            st.error(f"Erro inesperado ao salvar baseline: {e}")
             return False
         finally:
             if conn.is_connected():
                 cursor.close()
                 conn.close()
     else:
-        print("❌ ERRO: Sem conexão com banco no save_baseline")
-        return False
+        # Fallback para dados mock
+        if 'mock_baselines' not in st.session_state:
+            st.session_state.mock_baselines = {}
+        
+        if empreendimento not in st.session_state.mock_baselines:
+            st.session_state.mock_baselines[empreendimento] = {}
+        
+        st.session_state.mock_baselines[empreendimento][version_name] = {
+            "date": created_date,
+            "data": baseline_data,
+            "tipo_visualizacao": tipo_visualizacao
+        }
+        return True
 
 def delete_baseline(empreendimento, version_name):
     conn = get_db_connection()
@@ -620,47 +524,6 @@ def delete_baseline(empreendimento, version_name):
             del st.session_state.mock_baselines[empreendimento][version_name]
             return True
         return False
-
-# Adicione esta função temporária no início do seu arquivo, depois dos imports
-def diagnose_baseline_issues():
-    """Função temporária para diagnosticar problemas nas chamadas de baseline"""
-    import re
-    
-    # Lê o próprio arquivo
-    with open(__file__, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Padrões para encontrar chamadas problemáticas
-    patterns = [
-        r'take_gantt_baseline\([^,]+,[^,]+,[^)]+\)',  # 3 argumentos
-        r'take_gantt_baseline\([^)]+\)',  # qualquer chamada
-    ]
-    
-    print("🔍 DIAGNÓSTICO DE CHAMADAS take_gantt_baseline:")
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, content)
-        if matches:
-            print(f"📋 Padrão '{pattern}':")
-            for match in matches[:5]:  # Mostra apenas as primeiras 5
-                print(f"   → {match}")
-    
-    # Também procura na função process_context_menu_actions
-    if 'process_context_menu_actions' in content:
-        print("📍 Função process_context_menu_actions encontrada")
-        # Extrai essa função para análise
-        start = content.find('def process_context_menu_actions')
-        if start != -1:
-            end = content.find('\n\n', start)
-            if end == -1:
-                end = content.find('\ndef', start + 5)
-            if end != -1:
-                func_content = content[start:end]
-                if 'take_gantt_baseline' in func_content:
-                    print("❌ take_gantt_baseline encontrada em process_context_menu_actions")
-
-# Chame esta função uma vez
-diagnose_baseline_issues()
 
 # --- CÓDIGO MODIFICADO ---
 def converter_dados_para_gantt(df):
@@ -824,25 +687,27 @@ def converter_dados_para_gantt(df):
 
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
-def take_gantt_baseline(df, empreendimento):
-    """Cria uma linha de base do estado atual do Gantt - VERSÃO CORRIGIDA E UNIFICADA"""
+def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
+    """Cria uma linha de base do estado atual do Gantt"""
     
     try:
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
         if df_empreendimento.empty:
-            raise Exception(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
+            st.error(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
+            raise Exception("Nenhum dado encontrado para o empreendimento selecionado")
         
-        # Preparar dados para baseline
+        # Preparar dados para baseline com validação
         baseline_data = {
             'empreendimento': empreendimento,
+            'tipo_visualizacao': tipo_visualizacao,
             'data_criacao': datetime.now().strftime("%d/%m/%Y %H:%M"),
             'total_tasks': len(df_empreendimento),
             'tasks': []
         }
         
-        # Converter tasks para formato serializável
+        # Converter tasks para formato serializável com validação
         task_count = 0
         for _, row in df_empreendimento.iterrows():
             try:
@@ -873,6 +738,7 @@ def take_gantt_baseline(df, empreendimento):
                         if hasattr(date_val, 'strftime'):
                             task[task_field] = date_val.strftime("%Y-%m-%d")
                         else:
+                            # Tentar converter para datetime se não for
                             try:
                                 parsed_date = pd.to_datetime(date_val)
                                 task[task_field] = parsed_date.strftime("%Y-%m-%d")
@@ -883,7 +749,7 @@ def take_gantt_baseline(df, empreendimento):
                 task_count += 1
                 
             except Exception as task_error:
-                print(f"⚠️ Erro ao processar task: {task_error}")
+                st.warning(f"Erro ao processar task {task_count}: {task_error}")
                 continue
         
         if task_count == 0:
@@ -892,7 +758,7 @@ def take_gantt_baseline(df, empreendimento):
         # Gerar nome da versão
         existing_baselines = load_baselines()
         empreendimento_baselines = existing_baselines.get(empreendimento, {})
-        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k and k.split('-')[0][1:].isdigit()]
+        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and k.split('-')[0][1:].isdigit()]
         
         next_n = 1
         if existing_versions:
@@ -912,7 +778,7 @@ def take_gantt_baseline(df, empreendimento):
         version_name = f"{version_prefix}-({current_date_str})"
         
         # Salvar baseline
-        success = save_baseline(empreendimento, version_name, baseline_data, current_date_str)
+        success = save_baseline(empreendimento, version_name, baseline_data, current_date_str, tipo_visualizacao)
         
         if success:
             # Marcar como não enviada para AWS
@@ -925,77 +791,38 @@ def take_gantt_baseline(df, empreendimento):
             if version_name not in st.session_state.unsent_baselines[empreendimento]:
                 st.session_state.unsent_baselines[empreendimento].append(version_name)
             
-            print(f"✅ Baseline {version_name} salva com sucesso!")
+            st.success(f"Linha de base {version_name} salva com sucesso!")
             return version_name
         else:
             raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
-        print(f"❌ Erro ao criar linha de base: {e}")
-        raise e
-            
-
+        st.error(f"Erro ao criar linha de base: {e}")
+        raise
 def debug_baseline_system():
-    """Função para debug do sistema de baselines - VERSÃO MELHORADA"""
+    """Função para debug do sistema de baselines"""
     st.markdown("### 🔧 Debug do Sistema de Baselines")
     
     # Testar conexão com banco
     conn = get_db_connection()
     if conn:
         st.success("✅ Conexão com banco de dados: OK")
-        
-        # Verificar se a tabela existe
-        try:
-            cursor = conn.cursor()
-            cursor.execute("SHOW TABLES LIKE 'gantt_baselines'")
-            table_exists = cursor.fetchone() is not None
-            if table_exists:
-                st.success("✅ Tabela 'gantt_baselines': EXISTE")
-                
-                # Contar registros
-                cursor.execute("SELECT COUNT(*) FROM gantt_baselines")
-                count = cursor.fetchone()[0]
-                st.info(f"📊 Total de baselines salvas: {count}")
-            else:
-                st.error("❌ Tabela 'gantt_baselines': NÃO EXISTE")
-                
-        except Error as e:
-            st.error(f"❌ Erro ao verificar tabela: {e}")
-        finally:
-            conn.close()
+        conn.close()
     else:
         st.error("❌ Conexão com banco de dados: FALHA")
     
-    # Verificar dados na sessão
-    if 'df_data' in st.session_state:
-        st.success(f"✅ Dados na sessão: {len(st.session_state.df_data)} linhas")
-        st.info(f"📋 Empreendimentos disponíveis: {len(st.session_state.df_data['Empreendimento'].unique())}")
-    else:
-        st.error("❌ Dados na sessão: NÃO ENCONTRADOS")
+    # Verificar tabela
+    try:
+        baselines = load_baselines()
+        st.success(f"✅ Tabela de baselines: OK ({len(baselines)} empreendimentos com baselines)")
+    except Exception as e:
+        st.error(f"❌ Tabela de baselines: FALHA - {e}")
     
-    # Verificar session state de baselines
+    # Verificar session state
     if 'unsent_baselines' in st.session_state:
-        total_unsent = sum(len(baselines) for baselines in st.session_state.unsent_baselines.values())
-        st.success(f"✅ Session state: OK ({total_unsent} baselines não enviadas)")
+        st.success(f"✅ Session state: OK ({len(st.session_state.unsent_baselines)} empreendimentos não enviados)")
     else:
-        st.error("❌ Session state: unsent_baselines não encontrado")
-    
-    # Testar função take_gantt_baseline
-    if st.button("🧪 Testar Criação de Baseline"):
-        try:
-            if 'df_data' in st.session_state and not st.session_state.df_data.empty:
-                empreendimentos = st.session_state.df_data['Empreendimento'].unique()
-                if len(empreendimentos) > 0:
-                    test_emp = empreendimentos[0]
-                    # ✅ CORREÇÃO: Apenas 2 argumentos
-                    version_name = take_gantt_baseline(st.session_state.df_data, test_emp)
-                    st.success(f"✅ Teste OK: Baseline {version_name} criada!")
-                else:
-                    st.warning("⚠️ Nenhum empreendimento disponível para teste")
-            else:
-                st.error("❌ Dados não disponíveis para teste")
-        except Exception as e:
-            st.error(f"❌ Erro no teste: {e}")
+        st.error("❌ Session state: FALHA - unsent_baselines não encontrado")
 
 def load_baseline_data(empreendimento, version_name):
     """Carrega os dados específicos de uma baseline"""
@@ -1060,229 +887,6 @@ def send_to_aws(empreendimento, version_name):
     except Exception as e:
         st.error(f"Erro ao enviar para AWS: {e}")
         return False
-
-def process_context_menu_actions(df_current=None):
-    """
-    Intercepta a ação vinda do JavaScript via URL, salva a baseline na AWS
-    e recarrega a página limpa.
-    """
-    import urllib.parse
-    
-    # 1. Verificar se há uma ação na URL
-    if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
-        
-        # 2. Identificar o empreendimento alvo
-        raw_emp = st.query_params.get('empreendimento')
-        # O Streamlit às vezes retorna lista, às vezes string, dependendo da versão
-        if isinstance(raw_emp, list): 
-            raw_emp = raw_emp[0]
-        
-        if raw_emp:
-            # Decodifica caracteres especiais da URL (ex: "Viana%20e%20Moura" -> "Viana e Moura")
-            empreendimento = urllib.parse.unquote(raw_emp)
-            print(f"🚀 AÇÃO DE CONTEXTO DETECTADA: Criar Baseline para {empreendimento}")
-
-            # 3. Garantir que temos dados para trabalhar
-            # Se a sessão estiver vazia (fresh reload), precisamos carregar os dados
-            if df_current is None or df_current.empty:
-                with st.spinner("🔄 Carregando dados para processar solicitação..."):
-                    df_current = load_data()
-            
-            if df_current is not None and not df_current.empty:
-                try:
-                    # --- 4. EXECUÇÃO CRÍTICA: Salvar na AWS ---
-                    # Chama a mesma função que o botão da sidebar usa
-                    version_name = take_gantt_baseline(df_current, empreendimento)
-                    
-                    # 5. Sucesso: Armazena mensagem na Sessão para exibir APÓS o recarregamento
-                    st.session_state['toast_message'] = {
-                        'msg': f"✅ Baseline '{version_name}' salva com sucesso na AWS para {empreendimento}!",
-                        'icon': "☁️"
-                    }
-                    print(f"✅ Sucesso ao salvar: {version_name}")
-
-                except Exception as e:
-                    # Erro: Armazena mensagem de erro
-                    st.session_state['toast_message'] = {
-                        'msg': f"❌ Erro ao salvar baseline: {str(e)}",
-                        'icon': "⚠️"
-                    }
-                    print(f"❌ Erro Crítico no Context Menu: {e}")
-            else:
-                st.session_state['toast_message'] = {
-                    'msg': "❌ Erro: Não foi possível carregar os dados para salvar a baseline.",
-                    'icon': "⚠️"
-                }
-
-            # 6. LIMPEZA CRÍTICA: Limpar a URL para não entrar em loop infinito
-            st.query_params.clear()
-            
-            # 7. RELOAD: Forçar recarregamento para limpar a URL visualmente e atualizar a UI
-            st.rerun()
-            
-def get_next_baseline_version(empreendimento):
-    """Calcula o próximo número de versão da baseline."""
-    existing_baselines = load_baselines()
-    empreendimento_baselines = existing_baselines.get(empreendimento, {})
-    existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and k.split('-')[0][1:].isdigit()]
-    
-    next_n = 1
-    if existing_versions:
-        max_n = 0
-        for version_name in existing_versions:
-            try:
-                n_str = version_name.split('-')[0][1:]
-                n = int(n_str)
-                if n > max_n:
-                    max_n = n
-            except ValueError:
-                continue
-        next_n = max_n + 1
-    return next_n
-
-def create_gantt_context_menu_component(selected_empreendimento):
-    """
-    Cria um menu invisível que intercepta o clique direito e recarrega a página
-    passando parâmetros para o Python processar.
-    """
-    import urllib.parse
-    import time
-    import streamlit.components.v1 as components
-    
-    # Codifica o nome para URL (segurança para nomes com espaços e acentos)
-    emp_encoded = urllib.parse.quote(selected_empreendimento)
-    timestamp = int(time.time()) # Evita cache do navegador
-    
-    html_code = f"""
-    <style>
-        /* Área de Gatilho Visual (opcional, pode deixar transparente se preferir) */
-        #gantt-context-trigger {{
-            padding: 12px;
-            margin: 10px 0;
-            border: 2px dashed #cbd5e1;
-            border-radius: 8px;
-            background-color: #f8fafc;
-            text-align: center;
-            color: #64748b;
-            font-family: sans-serif;
-            font-size: 13px;
-            cursor: context-menu; /* Ícone do mouse muda */
-            transition: all 0.2s;
-        }}
-        #gantt-context-trigger:hover {{
-            background-color: #e2e8f0;
-            border-color: #94a3b8;
-            color: #334155;
-        }}
-        
-        /* O Menu Flutuante Personalizado */
-        #custom-context-menu {{
-            display: none;
-            position: fixed;
-            z-index: 99999;
-            width: 220px;
-            background: white;
-            border-radius: 6px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            border: 1px solid #e2e8f0;
-            overflow: hidden;
-            font-family: 'Segoe UI', sans-serif;
-            animation: fadeIn 0.1s ease-out;
-        }}
-        
-        .menu-item {{
-            padding: 12px 16px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 14px;
-            color: #334155;
-            transition: background 0.1s;
-        }}
-        
-        .menu-item:hover {{
-            background-color: #f1f5f9;
-            color: #0f172a;
-        }}
-        
-        .menu-header {{
-            padding: 8px 16px;
-            background: #f8fafc;
-            border-bottom: 1px solid #e2e8f0;
-            font-size: 11px;
-            font-weight: bold;
-            color: #94a3b8;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }}
-        
-        @keyframes fadeIn {{ from {{ opacity: 0; transform: scale(0.95); }} to {{ opacity: 1; transform: scale(1); }} }}
-    </style>
-
-    <div id="gantt-context-trigger">
-        🖱️ <b>Clique com o Botão Direito aqui</b> para opções de: <strong>{selected_empreendimento}</strong>
-    </div>
-
-    <div id="custom-context-menu">
-        <div class="menu-header">Ações do Projeto</div>
-        <div class="menu-item" onclick="triggerBaseline()">
-            <span>📸</span>
-            <span>Criar Nova Baseline</span>
-        </div>
-        <div class="menu-item" style="border-top: 1px solid #f1f5f9; color: #cbd5e1; cursor: default;">
-            <span>🚫</span>
-            <span>Deletar (Em breve)</span>
-        </div>
-    </div>
-
-    <script>
-        const triggerArea = document.getElementById('gantt-context-trigger');
-        const menu = document.getElementById('custom-context-menu');
-
-        // 1. Detectar Botão Direito para abrir o menu
-        triggerArea.addEventListener('contextmenu', function(e) {{
-            e.preventDefault(); // Bloqueia o menu padrão do navegador
-            
-            // Posiciona o menu onde o mouse está
-            menu.style.top = e.clientY + 'px';
-            menu.style.left = e.clientX + 'px';
-            menu.style.display = 'block';
-        }});
-
-        // 2. Fechar menu se clicar fora
-        document.addEventListener('click', function(e) {{
-            if (menu.style.display === 'block') {{
-                menu.style.display = 'none';
-            }}
-        }});
-
-        // 3. AÇÃO PRINCIPAL: Envia comando para o Python via URL
-        function triggerBaseline() {{
-            console.log("Disparando criação de baseline...");
-            
-            // Feedback visual imediato para o usuário saber que clicou
-            triggerArea.innerHTML = '⏳ Processando solicitação... A página irá recarregar...';
-            triggerArea.style.backgroundColor = '#fff3cd';
-            triggerArea.style.borderColor = '#ffeeba';
-            triggerArea.style.color = '#856404';
-            
-            // Pega a URL da janela PRINCIPAL (window.top), não do iframe
-            const currentUrl = new URL(window.top.location.href);
-            
-            // Define os parâmetros que o Python vai ler na função process_context_menu_actions
-            currentUrl.searchParams.set('context_action', 'take_baseline');
-            currentUrl.searchParams.set('empreendimento', decodeURIComponent('{emp_encoded}'));
-            currentUrl.searchParams.set('t', '{timestamp}'); // Timestamp força o navegador a não usar cache
-            
-            // Força o recarregamento da página principal com os novos parâmetros
-            window.top.location.href = currentUrl.toString();
-        }}
-    </script>
-    """
-    
-    # Renderiza o HTML com altura suficiente para o trigger
-    components.html(html_code, height=160)
     
 # --- Funções Utilitárias ---
 def abreviar_nome(nome):
@@ -1934,6 +1538,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     </div>
                 
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
+                
 
                 <script>
                     // DEBUG: Verificar dados
@@ -2149,7 +1754,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-               
+                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                 (function() {{
                     // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
@@ -2166,7 +1771,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     if (!container) return;
 
-                    // Limpeza
+                    // Limpeza visual
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
@@ -2214,6 +1819,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         e.stopPropagation();
                         e.preventDefault();
 
+                        // A. Nome do Projeto
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -2222,54 +1828,50 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
+                        // B. Feedback Visual (Laranja = Processando)
                         menu.style.display = 'none';
                         toast.style.display = 'block';
-                        toast.style.backgroundColor = "#2980b9";
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...`;
+                        toast.style.backgroundColor = "#e67e22"; // Laranja
+                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
+                        // C. Montar URL CORRETA
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
                         
-                        // --- CORREÇÃO DA URL (REFERRER) ---
-                        // Isso pega a URL real (https://...) e ignora o about:srcdoc
+                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
+                        // Isso corrige o bug do "about:srcdoc"
                         let baseUrl = document.referrer;
-                        
-                        // Fallback para ancestorOrigins (Chrome)
-                        if (!baseUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {{
-                            baseUrl = window.location.ancestorOrigins[0];
+                        if (!baseUrl || baseUrl === "") {{
+                             // Fallback raro
+                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
                         }}
-                        
-                        // Limpeza
-                        if (baseUrl && baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-                        
-                        // Se falhar tudo, usamos string vazia (URL Relativa) que às vezes funciona
-                        if (!baseUrl) baseUrl = "";
+                        // Remove barra final
+                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-                        const finalUrl = baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
+                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
 
-                        console.log("🚀 URL Iframe Gerada:", finalUrl);
+                        console.log("🚀 URL Iframe:", finalUrl);
                         
-                        // Disparo no Iframe (Seguro)
-                        if (iframe) {{
-                            iframe.src = finalUrl;
-                            
-                            // Feedback Manual
-                            setTimeout(() => {{
-                                toast.style.backgroundColor = "#27ae60";
-                                toast.innerHTML = `
-                                    <div style="display:flex; flex-direction:column; gap:5px;">
-                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                        <span style="font-size:12px;">Dados processados com sucesso.</span>
-                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 para ver a Baseline.</span>
-                                    </div>
-                                `;
-                                setTimeout(() => {{ toast.style.display = 'none'; }}, 10000);
-                            }}, 4000);
-                        }}
+                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
+                        if (iframe) iframe.src = finalUrl;
+
+                        // E. Feedback Final
+                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
+                        setTimeout(() => {{
+                            toast.style.backgroundColor = "#27ae60"; // Verde
+                            toast.innerHTML = `
+                                <div style="display:flex; flex-direction:column; gap:5px;">
+                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
+                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
+                                </div>
+                            `;
+                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
+                        }}, 4000);
                     }});
 
                 }})();
-        
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -2918,6 +2520,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
 
+
+
                     function toggleFullscreen() {{
                         const container = document.getElementById('gantt-container-{project["id"]}');
                         if (!document.fullscreenElement) {{
@@ -3180,6 +2784,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionTodayLine();
                             positionMetaLine();
                             updateProjectTitle();
+
+
 
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
@@ -4434,9 +4040,6 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     components.html(gantt_html, height=altura_gantt, scrolling=True)
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
-    if 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
-                create_gantt_context_menu_component(selected_empreendimento_baseline)
-
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
 def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False):
     """
@@ -4476,18 +4079,17 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             titulo_extra=titulo_extra  # Novo parâmetro
         )
 
-# --- Modificação: Bypass para o Iframe ---
-# Se houver 'context_action' na URL, ignoramos a tela de boas-vindas para permitir o processamento
-is_headless_action = 'context_action' in st.query_params
+# O restante do código Streamlit...
+st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
 
-if not is_headless_action:
-    try:
-        if show_welcome_screen():
-            st.stop()
-    except NameError:
-        st.warning("Arquivo `popup.py` não encontrado. Pulando tela de boas-vindas.")
-    except Exception as e:
-        st.warning(f"Erro ao carregar `popup.py`: {e}")
+# Tente executar a tela de boas-vindas. Se os arquivos não existirem, apenas pule.
+try:
+    if show_welcome_screen():
+        st.stop()
+except NameError:
+    st.warning("Arquivo `popup.py` não encontrado. Pulando tela de boas-vindas.")
+except Exception as e:
+    st.warning(f"Erro ao carregar `popup.py`: {e}")
 
 
 st.markdown("""
@@ -4775,40 +4377,27 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
         df_filtered = df_filtered[df_filtered["SETOR"].isin(setor_filter)]
     return df_filtered
 
-create_baselines_table()
-# 1. Log de Entrada
-log_debug("➡️ ENTRANDO NO MAIN")
-
-# 2. TENTA PROCESSAR AÇÃO IMEDIATAMENTE (Prioridade Total)
-try:
-    log_debug("📞 Chamando processador (Pré-Carga)...")
-    # Passamos None para forçar ele a carregar dados frescos se precisar
-    process_context_menu_actions(None)
-except Exception as e:
-    log_debug(f"❌ Crash ao chamar processador: {e}")
-
-# 3. Fluxo Normal da Aplicação
-create_baselines_table()
-
 # --- Bloco Principal ---
-with st.spinner("Carregando dados..."):
+with st.spinner("Carregando e processando dados..."):
+    # 1. Carrega os dados
     df_data = load_data()
     
+    # 2. Verifica se carregou corretamente
     if df_data is not None:
         st.session_state.df_data = df_data
         
-        # ✅✅✅ CHAMADA DIRETA - SEM CONDIÇÕES ✅✅✅
-        print("🔄 CHAMANDO PROCESS_CONTEXT_MENU_ACTIONS...")
-        
-            # Código temporário para debug - adicione no final do arquivo
-        if st.button("🧪 TESTAR BASELINE MANUALMENTE"):
-            if 'df_data' in st.session_state:
-                test_emp = st.session_state.df_data['Empreendimento'].iloc[0] if not st.session_state.df_data.empty else "TESTE"
-                try:
-                    version = take_gantt_baseline(st.session_state.df_data, test_emp)
-                    st.success(f"✅ Baseline {version} criada via botão!")
-                except Exception as e:
-                    st.error(f"❌ Erro: {e}")
+        # Inicializa variáveis de controle visual (prevenção de erro de chave)
+        if 'show_context_success' not in st.session_state:
+            st.session_state.show_context_success = False
+        if 'show_context_error' not in st.session_state:
+            st.session_state.show_context_error = False
+        if 'context_menu_trigger' not in st.session_state:
+            st.session_state.context_menu_trigger = False
+
+        # --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
+        # Chamamos a função passando o df_data carregado AGORA.
+        # Não confiamos apenas no session_state antigo.
+        process_context_menu_actions(df_data)
         # --------------------------------------
 
         with st.sidebar:
@@ -4979,8 +4568,7 @@ with st.spinner("Carregando dados..."):
                     if st.button("📸 Criar Linha de Base", use_container_width=True):
                         if selected_empreendimento_baseline:
                             try:
-                                # ✅ CORREÇÃO: Apenas 2 argumentos
-                                version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline)
+                                version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
                                 st.success(f"✅ {version_name} criado!")
                                 st.rerun()
                             except Exception as e:
@@ -4996,106 +4584,355 @@ with st.spinner("Carregando dados..."):
             baselines = load_baselines()
             unsent_baselines = st.session_state.get('unsent_baselines', {})
             
+            # CORREÇÃO: Verificar se selected_empreendimento_baseline está definido
             if selected_empreendimento_baseline:
                 emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
                 
                 if emp_unsent:
-                    st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando sincronização")
+                    st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando envio")
                     
-                    # Itera sobre as baselines pendentes
-                    for version_name in emp_unsent:
+                    for version_name in emp_unsent[:3]:  # Mostrar apenas 3 primeiras
                         col1, col2, col3 = st.columns([3, 1, 1])
-                        
-                        # Coluna 1: Nome da Versão
                         with col1:
                             st.write(f"`{version_name}`")
-                        
-                        # Coluna 2: Botão de Enviar (A Lógica do Passo 3)
                         with col2:
-                            if st.button("☁️", key=f"send_{version_name}", help="Enviar para AWS"):
-                                with st.spinner(f"Enviando {version_name} para nuvem..."):
-                                    # 1. Tenta enviar para AWS (sua função existente)
-                                    sucesso_aws = send_to_aws(selected_empreendimento_baseline, version_name)
-                                    
-                                    if sucesso_aws:
-                                        # 2. Atualiza banco de dados local marcando como sincronizado
-                                        conn = get_db_connection()
-                                        if conn:
-                                            try:
-                                                cursor = conn.cursor()
-                                                # Define synced_aws = TRUE (ou 1) para não aparecer mais como pendente
-                                                update_query = """
-                                                    UPDATE gantt_baselines 
-                                                    SET synced_aws = 1 
-                                                    WHERE empreendimento = %s AND version_name = %s
-                                                """
-                                                cursor.execute(update_query, (selected_empreendimento_baseline, version_name))
-                                                conn.commit()
-                                                print(f"✅ Status DB atualizado para {version_name}")
-                                            except Error as e:
-                                                st.error(f"Erro ao atualizar status no banco: {e}")
-                                            finally:
-                                                if conn.is_connected():
-                                                    cursor.close()
-                                                    conn.close()
-                                        
-                                        # 3. Remove da lista visual da sessão (Session State)
-                                        if selected_empreendimento_baseline in st.session_state.unsent_baselines:
-                                            if version_name in st.session_state.unsent_baselines[selected_empreendimento_baseline]:
-                                                st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                                
-                                                # Se a lista ficar vazia, remove a chave do empreendimento
-                                                if not st.session_state.unsent_baselines[selected_empreendimento_baseline]:
-                                                    del st.session_state.unsent_baselines[selected_empreendimento_baseline]
-                                        
-                                        # 4. Feedback e Reload
-                                        st.toast(f"✅ {version_name} sincronizado com sucesso!", icon="🚀")
-                                        st.rerun()
-                                    else:
-                                        st.error("Falha ao enviar para AWS. Tente novamente.")
-
-                        # Coluna 3: Botão de Excluir (Manutenção local)
+                            if st.button("☁️", key=f"send_{version_name}"):
+                                if send_to_aws(selected_empreendimento_baseline, version_name):
+                                    st.success(f"✅ {version_name} enviado!")
+                                    st.rerun()
                         with col3:
-                            if st.button("🗑️", key=f"del_unsent_{version_name}", help="Descartar"):
+                            if st.button("🗑️", key=f"del_unsent_{version_name}"):
                                 if delete_baseline(selected_empreendimento_baseline, version_name):
-                                    # Remove da sessão se deletar do banco
                                     if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
                                         st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                    st.toast(f"Baseline {version_name} descartada.", icon="🗑️")
+                                    st.success(f"✅ {version_name} deletado!")
                                     st.rerun()
                 else:
-                    st.success("✅ Tudo sincronizado com a AWS!")
-            else:
-                st.info("Selecione um empreendimento acima.")
-    
-            st.markdown("---")
-            with st.expander("🐞 Debug do Sistema"):
-                # Importação segura local
-                import os as debug_os 
-                log_file = "debug_log.txt"
+                    st.info("📭 Nenhuma linha de base aguardando envio")
                 
-                col_dbg1, col_dbg2 = st.columns(2)
+                # Todas as linhas de base
+                st.markdown("#### 💾 Todas as Linhas de Base")
                 
-                with col_dbg1:
-                    if st.button("🔄 Atualizar Log"):
-                        st.rerun()
+                emp_baselines = baselines.get(selected_empreendimento_baseline, {})
+                if emp_baselines:
+                    # Mostrar apenas as 5 mais recentes
+                    for version_name in sorted(emp_baselines.keys())[:5]:
+                        is_unsent = version_name in emp_unsent
                         
-                with col_dbg2:
-                    if st.button("🗑️ Limpar"):
-                        try:
-                            if debug_os.path.exists(log_file):
-                                debug_os.remove(log_file)
-                                st.rerun()
-                        except:
-                            pass
-                
-                if debug_os.path.exists(log_file):
-                    with open(log_file, "r") as f:
-                        st.text(f.read())
+                        col1, col2 = st.columns([3, 1])
+                        with col1:
+                            if is_unsent:
+                                st.write(f"`{version_name}` ⏳")
+                            else:
+                                st.write(f"`{version_name}` ✅")
+                        with col2:
+                            if st.button("🗑️", key=f"del_all_{version_name}"):
+                                if delete_baseline(selected_empreendimento_baseline, version_name):
+                                    if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
+                                        st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
+                                    st.success(f"✅ {version_name} deletado!")
+                                    st.rerun()
+                    
+                    if len(emp_baselines) > 5:
+                        st.info(f"... e mais {len(emp_baselines) - 5} linhas de base")
                 else:
-                    st.info("Nenhum log registrado ainda (Aguardando ação do iframe).")
+                    st.info("Nenhuma linha de base criada")
+            else:
+                st.warning("Selecione um empreendimento para gerenciar baselines")
 
-            
+            # --- Menu de Contexto para Gantt ---
+            def create_gantt_context_menu_component(selected_empreendimento):
+                """Cria o componente do menu de contexto para o gráfico Gantt"""
+                
+                # Mostrar mensagens de sucesso/erro do menu de contexto
+                if st.session_state.get('show_context_success'):
+                    success_container = st.empty()
+                    success_container.success(st.session_state.context_menu_success)
+                    st.session_state.show_context_success = False
+                    
+                    # Remover a mensagem após 3 segundos
+                    import time
+                    time.sleep(3)
+                    success_container.empty()
+                
+                if st.session_state.get('show_context_error'):
+                    error_container = st.empty()
+                    error_container.error(st.session_state.context_menu_error)
+                    st.session_state.show_context_error = False
+                    
+                    import time
+                    time.sleep(3)
+                    error_container.empty()
+                
+                # HTML completo com CSS e JavaScript para o menu visual
+                context_menu_html = f"""
+                <style>
+                #context-menu {{
+                    position: fixed;
+                    background: white;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                    box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+                    z-index: 10000;
+                    display: none;
+                    font-family: Arial, sans-serif;
+                }}
+                .context-menu-item {{
+                    padding: 12px 20px;
+                    cursor: pointer;
+                    border-bottom: 1px solid #eee;
+                    font-size: 14px;
+                    transition: background-color 0.2s;
+                }}
+                .context-menu-item:hover {{
+                    background: #f0f0f0;
+                }}
+                .context-menu-item:last-child {{
+                    border-bottom: none;
+                }}
+                #gantt-chart-area {{
+                    position: relative;
+                    border: 2px dashed #ccc;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #f9f9f9;
+                    cursor: pointer;
+                    margin: 10px 0;
+                    user-select: none;
+                    min-height: 100px;
+                }}
+                #baseline-status {{
+                    margin-top: 10px;
+                    padding: 10px;
+                    border-radius: 5px;
+                    text-align: center;
+                    font-weight: bold;
+                    display: none;
+                }}
+                .status-creating {{
+                    background-color: #fff3cd;
+                    border: 1px solid #ffeaa7;
+                    color: #856404;
+                }}
+                .status-success {{
+                    background-color: #d1ecf1;
+                    border: 1px solid #bee5eb;
+                    color: #0c5460;
+                }}
+                .status-error {{
+                    background-color: #f8d7da;
+                    border: 1px solid #f5c6cb;
+                    color: #721c24;
+                }}
+                #hidden-iframe {{
+                    position: absolute;
+                    width: 1px;
+                    height: 1px;
+                    border: none;
+                    opacity: 0;
+                    pointer-events: none;
+                }}
+                .loading-overlay {{
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(255, 255, 255, 0.8);
+                    display: none;
+                    justify-content: center;
+                    align-items: center;
+                    z-index: 10001;
+                    font-family: Arial, sans-serif;
+                }}
+                .loading-spinner {{
+                    background: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                    text-align: center;
+                }}
+                .gantt-context-hint {{
+                    text-align: center;
+                    color: #666;
+                    font-size: 12px;
+                    margin-top: 5px;
+                }}
+                </style>
+
+                <div id="gantt-chart-area">
+                    <div style="text-align: center;">
+                        <h3>📊 Área do Gráfico de Gantt</h3>
+                        <p>Clique com o botão direito para abrir o menu de linha de base</p>
+                        <div class="gantt-context-hint">Empreendimento: {selected_empreendimento}</div>
+                    </div>
+                </div>
+
+                <div id="baseline-status"></div>
+
+                <!-- Overlay de loading -->
+                <div id="loading-overlay" class="loading-overlay">
+                    <div class="loading-spinner">
+                        <h3>🔄 Criando Linha de Base</h3>
+                        <p>Por favor, aguarde...</p>
+                    </div>
+                </div>
+
+                <!-- Iframe invisível para carregamentos -->
+                <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
+
+                <div id="context-menu">
+                    <div class="context-menu-item" id="take-baseline">📸 Criar Linha de Base</div>
+                    <div class="context-menu-item" id="restore-baseline">🔄 Restaurar Linha de Base</div>
+                    <div class="context-menu-item" id="compare-baseline">📊 Comparar com Baseline</div>
+                    <div class="context-menu-item" id="delete-baseline">🗑️ Deletar Linha de Base</div>
+                </div>
+
+                <script>
+                // Elementos
+                const ganttArea = document.getElementById('gantt-chart-area');
+                const contextMenu = document.getElementById('context-menu');
+                const statusDiv = document.getElementById('baseline-status');
+                const takeBaselineBtn = document.getElementById('take-baseline');
+                const loadingOverlay = document.getElementById('loading-overlay');
+                const hiddenIframe = document.getElementById('hidden-iframe');
+                
+                // Função para mostrar o menu
+                function showContextMenu(x, y) {{
+                    contextMenu.style.left = x + 'px';
+                    contextMenu.style.top = y + 'px';
+                    contextMenu.style.display = 'block';
+                }}
+                
+                // Função para esconder o menu
+                function hideContextMenu() {{
+                    contextMenu.style.display = 'none';
+                }}
+                
+                // Função para mostrar/ocultar loading
+                function showLoading() {{
+                    loadingOverlay.style.display = 'flex';
+                }}
+                
+                function hideLoading() {{
+                    loadingOverlay.style.display = 'none';
+                }}
+                
+                // Função para mostrar status
+                function showStatus(message, type) {{
+                    statusDiv.textContent = message;
+                    statusDiv.className = '';
+                    statusDiv.classList.add(type);
+                    statusDiv.style.display = 'block';
+                    
+                    // Auto-esconder após 3 segundos
+                    setTimeout(() => {{
+                        statusDiv.style.display = 'none';
+                    }}, 3000);
+                }}
+                
+                // Função para criar linha de base via iframe invisível
+                function executeTakeBaseline() {{
+                    showStatus('🔄 Criando linha de base...', 'status-creating');
+                    showLoading();
+                    
+                    // Criar URL com parâmetros para o Streamlit processar
+                    const timestamp = new Date().getTime();
+                    const url = `?context_action=take_baseline&empreendimento={selected_empreendimento}&t=${{timestamp}}`;
+                    
+                    // Usar iframe invisível para carregar a URL
+                    hiddenIframe.src = url;
+                    
+                    // Quando o iframe terminar de carregar
+                    hiddenIframe.onload = function() {{
+                        hideLoading();
+                        showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
+                        
+                        // Forçar uma atualização suave após 1 segundo
+                        setTimeout(() => {{
+                            // Disparar um evento customizado para atualizar a interface
+                            const event = new Event('baselineCreated');
+                            document.dispatchEvent(event);
+                        }}, 1000);
+                    }};
+                    
+                    hideContextMenu();
+                }}
+                
+                // Event Listeners
+                if (ganttArea) {{
+                    ganttArea.addEventListener('contextmenu', function(e) {{
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showContextMenu(e.pageX, e.pageY);
+                    }});
+                }}
+                
+                // Event listener para o botão de criar linha de base
+                if (takeBaselineBtn) {{
+                    takeBaselineBtn.addEventListener('click', function() {{
+                        executeTakeBaseline();
+                    }});
+                }}
+                
+                // Event listeners para outros botões (placeholder)
+                const restoreBaselineBtn = document.getElementById('restore-baseline');
+                const compareBaselineBtn = document.getElementById('compare-baseline');
+                const deleteBaselineBtn = document.getElementById('delete-baseline');
+                
+                if (restoreBaselineBtn) {{
+                    restoreBaselineBtn.addEventListener('click', function() {{
+                        showStatus('🔄 Funcionalidade em desenvolvimento...', 'status-creating');
+                        hideContextMenu();
+                    }});
+                }}
+                
+                if (compareBaselineBtn) {{
+                    compareBaselineBtn.addEventListener('click', function() {{
+                        showStatus('📊 Funcionalidade em desenvolvimento...', 'status-creating');
+                        hideContextMenu();
+                    }});
+                }}
+                
+                if (deleteBaselineBtn) {{
+                    deleteBaselineBtn.addEventListener('click', function() {{
+                        showStatus('🗑️ Funcionalidade em desenvolvimento...', 'status-creating');
+                        hideContextMenu();
+                    }});
+                }}
+                
+                // Fechar menu ao clicar fora
+                document.addEventListener('click', function(e) {{
+                    if (contextMenu && !contextMenu.contains(e.target) && e.target !== ganttArea) {{
+                        hideContextMenu();
+                    }}
+                }});
+                
+                // Fechar menu com ESC
+                document.addEventListener('keydown', function(e) {{
+                    if (e.key === 'Escape') {{
+                        hideContextMenu();
+                    }}
+                }});
+                
+                // Prevenir menu de contexto padrão na área do Gantt
+                document.addEventListener('contextmenu', function(e) {{
+                    if (e.target.id === 'gantt-chart-area' || e.target.closest('#gantt-chart-area')) {{
+                        e.preventDefault();
+                    }}
+                }}, true);
+                
+                // Atualizar interface quando linha de base for criada
+                document.addEventListener('baselineCreated', function() {{
+                    console.log('Linha de base criada - interface pode ser atualizada');
+                    // Aqui você pode adicionar lógica para atualizar elementos específicos
+                }});
+                </script>
+                """
+                
+                # Usar html() para injetar o componente completo
+                st.components.v1.html(context_menu_html, height=200)
 
         # --- FIM DO NOVO LAYOUT ---
         # Mantemos a chamada a filter_dataframe, mas com os valores padrão para EMP, GRUPO e SETOR
@@ -5635,95 +5472,11 @@ def verificar_implementacao_baseline():
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
-# --- BLOCO EXECUTIVO FINAL (SALVAMENTO EM BACKGROUND) ---
-if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
-    print("🎯🎯🎯 BLOCO EXECUTIVO ACIONADO 🎯🎯🎯")
-    
-    # Processa IMEDIATAMENTE sem complicação
-    process_context_menu_actions(st.session_state.get('df_data'))
-
-# ------------------------------------------------------------------
-def executar_logica_baseline(df, empreendimento):
-    """
-    Executa a criação da baseline.
-    Usada tanto pelo botão da Sidebar quanto pelo Menu de Contexto.
-    """
-    try:
-        # 1. Cria a baseline
-        version = take_gantt_baseline(df, empreendimento)
-        
-        # 2. Feedback Visual (Exatamente igual ao botão nativo)
-        st.toast(f"✅ Baseline {version} criada com sucesso!", icon="🎉")
-        st.success(f"Linha de base **{version}** salva para o empreendimento **{empreendimento}**.")
-        
-        # 3. Se foi acionado via URL (Menu de Contexto), limpa a URL para evitar loop
-        if 'context_action' in st.query_params:
-            st.query_params.clear()
-            
-        return True
-    except Exception as e:
-        st.error(f"Erro ao criar baseline: {e}")
-        return False
-
-# --- BLOCO PRINCIPAL (Main Execution Flow) ---
+# No final do arquivo, antes do if __name__:
 if __name__ == "__main__":
-    
-    # ==============================================================================
-    # 1. INTERCEPTADOR DE AÇÕES (Prioridade Máxima)
-    # ==============================================================================
-    # Verifica imediatamente se a URL contém um comando de ação vindo do menu de contexto.
-    # Se sim, processa e recarrega a página antes de desenhar qualquer coisa pesada.
-    if 'context_action' in st.query_params:
-        
-        # Tenta obter os dados da sessão, se não existirem, carrega do banco/CSV
-        if 'df_data' not in st.session_state or st.session_state.df_data is None:
-             st.session_state.df_data = load_data()
-        
-        # Executa a ação, salva no banco e dá st.rerun()
-        # Isso impede que o código abaixo seja executado nesta passada
-        process_context_menu_actions(st.session_state.df_data)
-
-    # ==============================================================================
-    # 2. EXIBIÇÃO DE MENSAGENS (Pós-Reload)
-    # ==============================================================================
-    # Se o passo 1 ocorreu e deu st.rerun(), a página recarrega limpa.
-    # Aqui verificamos se há uma mensagem de sucesso/erro deixada pelo passo 1.
-    if 'toast_message' in st.session_state:
-        toast = st.session_state.pop('toast_message') # Pega e remove da sessão
-        st.toast(toast['msg'], icon=toast['icon'])
-        
-        # Efeito sonoro/visual extra se for sucesso (opcional)
-        if "sucesso" in toast['msg'].lower():
-            try:
-                st.balloons() 
-            except: 
-                pass
-
-    # ==============================================================================
-    # 3. CARREGAMENTO NORMAL DO APP (Fluxo Padrão)
-    # ==============================================================================
-    with st.spinner("Carregando sistema..."):
-        # Carrega dados se ainda não estiverem na sessão
-        if 'df_data' not in st.session_state:
-             st.session_state.df_data = load_data()
-        
-        df_data = st.session_state.df_data
-
-    # Se temos dados, desenha a interface
-    if df_data is not None and not df_data.empty:
-        
-        # ... (Seu código existente de Sidebar, Filtros e Tabs continua aqui) ...
-        # ... (Certifique-se de que suas chamadas de gerar_gantt e Sidebar estão indentadas aqui) ...
-        
-        # EXEMPLO DE ONDE CHAMAR O COMPONENTE DO MENU:
-        # Deve ser chamado apenas se um empreendimento estiver selecionado na lógica do seu app
-        if 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
-             st.markdown("### Menu de Ações Rápidas")
-             create_gantt_context_menu_component(selected_empreendimento_baseline)
-             
-        # ... (Resto do seu código de renderização das tabelas e gráficos) ...
+    # Verificar implementação (pode remover depois)
+    if 'df_data' in globals() and not df_data.empty:
+        verificar_implementacao_baseline()
 
     else:
-        st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
-
-
+        st.error("❌ Não foi possível carregar ou gerar os dados.")
