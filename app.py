@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #executar_logica_baseline
+from dateutil.relativedelta import relativedelta #Para Enviar
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -203,8 +203,8 @@ def create_baselines_table():
                 version_name VARCHAR(255) NOT NULL,
                 baseline_data JSON NOT NULL,
                 created_date VARCHAR(50) NOT NULL,
+                synced_aws BOOLEAN DEFAULT FALSE,  -- <--- NOVO CAMPO
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                
                 UNIQUE KEY unique_baseline (empreendimento, version_name)
             )
             """
@@ -4979,61 +4979,77 @@ with st.spinner("Carregando dados..."):
             baselines = load_baselines()
             unsent_baselines = st.session_state.get('unsent_baselines', {})
             
-            # CORREÇÃO: Verificar se selected_empreendimento_baseline está definido
             if selected_empreendimento_baseline:
                 emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
                 
                 if emp_unsent:
-                    st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando envio")
+                    st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando sincronização")
                     
-                    for version_name in emp_unsent[:3]:  # Mostrar apenas 3 primeiras
+                    # Itera sobre as baselines pendentes
+                    for version_name in emp_unsent:
                         col1, col2, col3 = st.columns([3, 1, 1])
+                        
+                        # Coluna 1: Nome da Versão
                         with col1:
                             st.write(f"`{version_name}`")
-                        with col2:
-                            if st.button("☁️", key=f"send_{version_name}"):
-                                if send_to_aws(selected_empreendimento_baseline, version_name):
-                                    st.success(f"✅ {version_name} enviado!")
-                                    st.rerun()
-                        with col3:
-                            if st.button("🗑️", key=f"del_unsent_{version_name}"):
-                                if delete_baseline(selected_empreendimento_baseline, version_name):
-                                    if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
-                                        st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                    st.success(f"✅ {version_name} deletado!")
-                                    st.rerun()
-                else:
-                    st.info("📭 Nenhuma linha de base aguardando envio")
-                
-                # Todas as linhas de base
-                st.markdown("#### 💾 Todas as Linhas de Base")
-                
-                emp_baselines = baselines.get(selected_empreendimento_baseline, {})
-                if emp_baselines:
-                    # Mostrar apenas as 5 mais recentes
-                    for version_name in sorted(emp_baselines.keys())[:5]:
-                        is_unsent = version_name in emp_unsent
                         
-                        col1, col2 = st.columns([3, 1])
-                        with col1:
-                            if is_unsent:
-                                st.write(f"`{version_name}` ⏳")
-                            else:
-                                st.write(f"`{version_name}` ✅")
+                        # Coluna 2: Botão de Enviar (A Lógica do Passo 3)
                         with col2:
-                            if st.button("🗑️", key=f"del_all_{version_name}"):
+                            if st.button("☁️", key=f"send_{version_name}", help="Enviar para AWS"):
+                                with st.spinner(f"Enviando {version_name} para nuvem..."):
+                                    # 1. Tenta enviar para AWS (sua função existente)
+                                    sucesso_aws = send_to_aws(selected_empreendimento_baseline, version_name)
+                                    
+                                    if sucesso_aws:
+                                        # 2. Atualiza banco de dados local marcando como sincronizado
+                                        conn = get_db_connection()
+                                        if conn:
+                                            try:
+                                                cursor = conn.cursor()
+                                                # Define synced_aws = TRUE (ou 1) para não aparecer mais como pendente
+                                                update_query = """
+                                                    UPDATE gantt_baselines 
+                                                    SET synced_aws = 1 
+                                                    WHERE empreendimento = %s AND version_name = %s
+                                                """
+                                                cursor.execute(update_query, (selected_empreendimento_baseline, version_name))
+                                                conn.commit()
+                                                print(f"✅ Status DB atualizado para {version_name}")
+                                            except Error as e:
+                                                st.error(f"Erro ao atualizar status no banco: {e}")
+                                            finally:
+                                                if conn.is_connected():
+                                                    cursor.close()
+                                                    conn.close()
+                                        
+                                        # 3. Remove da lista visual da sessão (Session State)
+                                        if selected_empreendimento_baseline in st.session_state.unsent_baselines:
+                                            if version_name in st.session_state.unsent_baselines[selected_empreendimento_baseline]:
+                                                st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
+                                                
+                                                # Se a lista ficar vazia, remove a chave do empreendimento
+                                                if not st.session_state.unsent_baselines[selected_empreendimento_baseline]:
+                                                    del st.session_state.unsent_baselines[selected_empreendimento_baseline]
+                                        
+                                        # 4. Feedback e Reload
+                                        st.toast(f"✅ {version_name} sincronizado com sucesso!", icon="🚀")
+                                        st.rerun()
+                                    else:
+                                        st.error("Falha ao enviar para AWS. Tente novamente.")
+
+                        # Coluna 3: Botão de Excluir (Manutenção local)
+                        with col3:
+                            if st.button("🗑️", key=f"del_unsent_{version_name}", help="Descartar"):
                                 if delete_baseline(selected_empreendimento_baseline, version_name):
+                                    # Remove da sessão se deletar do banco
                                     if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
                                         st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                    st.success(f"✅ {version_name} deletado!")
+                                    st.toast(f"Baseline {version_name} descartada.", icon="🗑️")
                                     st.rerun()
-                    
-                    if len(emp_baselines) > 5:
-                        st.info(f"... e mais {len(emp_baselines) - 5} linhas de base")
                 else:
-                    st.info("Nenhuma linha de base criada")
+                    st.success("✅ Tudo sincronizado com a AWS!")
             else:
-                st.warning("Selecione um empreendimento para gerenciar baselines")
+                st.info("Selecione um empreendimento acima.")
     
             st.markdown("---")
             with st.expander("🐞 Debug do Sistema"):
