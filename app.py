@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_context_menu_actions
+from dateutil.relativedelta import relativedelta #CAPTURADO
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -71,12 +71,6 @@ def log_debug(message):
         print(f"[{timestamp}] {message}")
     except:
         pass
-
-# Bloco original do usuário (mantido, mas a lógica principal será movida para process_context_menu_actions)
-if 'context_action' in st.query_params:
-    # Salva uma cópia segura dos parâmetros na sessão
-    st.session_state['_url_snapshot'] = dict(st.query_params)
-    log_debug(f"⚡ SNAPSHOT CAPTURADO: {st.session_state['_url_snapshot']}")
 
 # --- ORDEM DAS ETAPAS (DEFINIDA PELO USUÁRIO) ---
 ORDEM_ETAPAS_GLOBAL = [
@@ -243,7 +237,7 @@ def process_context_menu_actions():
     if df is None or df.empty:
         print("⚠️ DF vazio no processador, tentando load_data de emergência...")
         df = load_data()
-        
+
     print("🎯🎯🎯 PROCESS_CONTEXT_MENU_ACTIONS CHAMADA 🎯🎯🎯")
     print(f"📦 Query params na função: {dict(st.query_params)}")
     
@@ -5878,26 +5872,68 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
 
 # ------------------------------------------------------------------
 
-# No final do arquivo, antes do if __name__:
 if __name__ == "__main__":
-    df_data = load_data()
-    
-    # 2. Verifica implementação (opcional)
-    if 'df_data' in globals() and not df_data.empty:
-        # verificar_implementacao_baseline() # Pode comentar se quiser
-        pass
+    # 1. Carregar os dados PRIMEIRO (Essencial para o Iframe funcionar)
+    with st.spinner("Carregando sistema..."):
+        df_data = load_data()
 
-    if df_data is not None:
+    if df_data is not None and not df_data.empty:
+        # Salva na sessão para uso geral
         st.session_state.df_data = df_data
         
-        # --- 3. BLOCO CRÍTICO: Executa a ação do Iframe IMEDIATAMENTE após carregar dados ---
+        # --- 2. VERIFICAÇÃO DE AÇÃO DE CONTEXTO (IFRAME) ---
+        # Agora que temos dados, verificamos se o Iframe chamou a ação
         if 'context_action' in st.query_params:
-            action = st.query_params['context_action']
-            print(f"🚀 Ação de contexto detectada no MAIN: {action}")
+            try:
+                action = st.query_params['context_action']
+                emp_param = st.query_params.get('empreendimento')
+                
+                # Tratamento para quando vem como lista ou string
+                if isinstance(emp_param, list): emp_param = emp_param[0]
+                
+                if action == 'take_baseline' and emp_param:
+                    import urllib.parse
+                    empreendimento_alvo = urllib.parse.unquote(emp_param)
+                    
+                    print(f"🚀 [IFRAME] Iniciando Baseline para: {empreendimento_alvo}")
+                    
+                    # Chama a função de baseline diretamente passando o DF carregado
+                    version = take_gantt_baseline(df_data, empreendimento_alvo)
+                    
+                    # Feedback visual MÍNIMO para o iframe saber que deu certo
+                    st.success(f"BASELINE_OK: {version}")
+                    print(f"✅ [IFRAME] Sucesso: {version}")
+                    
+                    # Mata a execução aqui para o Iframe não tentar renderizar o resto do app pesado
+                    st.stop()
+                    
+            except Exception as e:
+                print(f"❌ [IFRAME] Erro Crítico: {e}")
+                st.error(f"Erro: {e}")
+                st.stop()
+
+        # --- 3. EXECUÇÃO NORMAL DO APP (VISUALIZAÇÃO) ---
+        # Se não for uma ação do iframe, desenha a barra lateral e o app normal
+        
+        # (Aqui começa seu código normal de UI que já existia...)
+        with st.sidebar:
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                try:
+                    st.image("logoNova.png", width=200)
+                except:
+                    pass
             
-            if action == 'take_baseline':
-                # Passamos o df_data recém carregado
-                process_context_menu_actions(df_data)
+            st.markdown("---")
+            # ... (Resto do seu código de sidebar e renderização do Gantt continua aqui) ...
+            
+            # NOTA: Como copiei apenas a lógica de controle, certifique-se de que o resto 
+            # do seu código de interface (filtros, tabs, chamadas de gerar_gantt) 
+            # esteja indentado dentro deste 'if df_data is not None:' ou logo abaixo.
+            
+            # Para facilitar, APENAS COLE o bloco de verificação "2. VERIFICAÇÃO DE AÇÃO"
+            # logo após carregar o df_data e ANTES de começar a desenhar a sidebar.
 
     else:
-        st.error("❌ Não foi possível carregar ou gerar os dados.")
+        st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
