@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #Para Enviar
+from dateutil.relativedelta import relativedelta #iframe
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -2236,25 +2236,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         console.log("🚀 URL Iframe Gerada:", finalUrl);
                         
                         // Disparo no Iframe (Seguro)
-                        if (iframe) {{
-                            iframe.src = finalUrl;
-                            
-                            // Feedback Manual
-                            setTimeout(() => {{
-                                toast.style.backgroundColor = "#27ae60";
-                                toast.innerHTML = `
-                                    <div style="display:flex; flex-direction:column; gap:5px;">
-                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                        <span style="font-size:12px;">Dados processados com sucesso.</span>
-                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 para ver a Baseline.</span>
-                                    </div>
-                                `;
-                                setTimeout(() => {{ toast.style.display = 'none'; }}, 10000);
-                            }}, 4000);
+                            // Força a navegação da janela PRINCIPAL para processar a ação no Python
+                            console.log("🔄 Redirecionando janela principal...");
+                            window.top.location.href = finalUrl;
                         }}
-                    }});
-
-                }})();
+                    }});)();
         
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
