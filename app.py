@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #CAPTURADO
+from dateutil.relativedelta import relativedelta #process_context_menu_actions(None)
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -309,16 +309,6 @@ def process_context_menu_actions():
             st.session_state.show_context_error = True
     else:
         print("💤 Nenhuma ação de contexto detectada")
-
-# --- BLOCO DE DIAGNÓSTICO IMEDIATO ---
-print("=== DIAGNÓSTICO CONTEXT MENU ===")
-print(f"Query params: {dict(st.query_params)}")
-print(f"Session state keys: {list(st.session_state.keys())}")
-
-# Executa o processador IMEDIATAMENTE se houver ação
-if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
-    print("🚨🚨🚨 AÇÃO DETECTADA - EXECUTANDO PROCESSOR 🚨🚨🚨")
-    process_context_menu_actions(st.session_state.get('df_data'))
 
 # --- DIAGNÓSTICO INICIAL --- 
 st.sidebar.markdown("---")
@@ -4768,7 +4758,6 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
         df_filtered = df_filtered[df_filtered["SETOR"].isin(setor_filter)]
     return df_filtered
 
-process_context_menu_actions(None)
 create_baselines_table()
 # 1. Log de Entrada
 log_debug("➡️ ENTRANDO NO MAIN")
@@ -5873,49 +5862,51 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
 # ------------------------------------------------------------------
 
 if __name__ == "__main__":
-    # 1. Carregar os dados PRIMEIRO (Essencial para o Iframe funcionar)
+    # 1. Carrega os dados PRIMEIRO (Essencial para o Iframe não travar)
     with st.spinner("Carregando sistema..."):
         df_data = load_data()
+    
+    # Verifica implementação opcional
+    if 'df_data' in globals() and not df_data.empty:
+        # verificar_implementacao_baseline() 
+        pass
 
     if df_data is not None and not df_data.empty:
-        # Salva na sessão para uso geral
+        # Salva na sessão
         st.session_state.df_data = df_data
         
-        # --- 2. VERIFICAÇÃO DE AÇÃO DE CONTEXTO (IFRAME) ---
-        # Agora que temos dados, verificamos se o Iframe chamou a ação
+        # --- BLOCO CRÍTICO: Executa a ação do Iframe AQUI ---
+        # Só executamos isso agora que df_data EXISTE na memória
         if 'context_action' in st.query_params:
             try:
                 action = st.query_params['context_action']
-                emp_param = st.query_params.get('empreendimento')
+                # Pega o parâmetro, tratando lista ou string
+                raw_emp = st.query_params.get('empreendimento')
+                if isinstance(raw_emp, list): raw_emp = raw_emp[0]
                 
-                # Tratamento para quando vem como lista ou string
-                if isinstance(emp_param, list): emp_param = emp_param[0]
-                
-                if action == 'take_baseline' and emp_param:
+                if action == 'take_baseline' and raw_emp:
                     import urllib.parse
-                    empreendimento_alvo = urllib.parse.unquote(emp_param)
+                    emp_decoded = urllib.parse.unquote(raw_emp)
                     
-                    print(f"🚀 [IFRAME] Iniciando Baseline para: {empreendimento_alvo}")
+                    print(f"🚀 [IFRAME] Iniciando Baseline para: {emp_decoded}")
                     
-                    # Chama a função de baseline diretamente passando o DF carregado
-                    version = take_gantt_baseline(df_data, empreendimento_alvo)
+                    # Chama a função passando o DF que acabamos de carregar
+                    version = take_gantt_baseline(df_data, emp_decoded)
                     
-                    # Feedback visual MÍNIMO para o iframe saber que deu certo
-                    st.success(f"BASELINE_OK: {version}")
-                    print(f"✅ [IFRAME] Sucesso: {version}")
+                    # Mensagem de sucesso para o Iframe
+                    st.success(f"BASELINE CRIADA: {version}")
                     
-                    # Mata a execução aqui para o Iframe não tentar renderizar o resto do app pesado
+                    # Opcional: Para a execução aqui para economizar recursos no Iframe
                     st.stop()
                     
             except Exception as e:
-                print(f"❌ [IFRAME] Erro Crítico: {e}")
+                print(f"❌ Erro no Iframe: {e}")
                 st.error(f"Erro: {e}")
-                st.stop()
-
-        # --- 3. EXECUÇÃO NORMAL DO APP (VISUALIZAÇÃO) ---
-        # Se não for uma ação do iframe, desenha a barra lateral e o app normal
-        
-        # (Aqui começa seu código normal de UI que já existia...)
+    
+    # --- 2. RESTO DO APP (Visualização) ---
+    # Se não caiu no st.stop() acima, continua carregando a interface normal
+    
+    if df_data is not None:
         with st.sidebar:
             st.markdown("<br>", unsafe_allow_html=True)
             col1, col2, col3 = st.columns([1, 2, 1])
@@ -5924,16 +5915,9 @@ if __name__ == "__main__":
                     st.image("logoNova.png", width=200)
                 except:
                     pass
-            
+        
             st.markdown("---")
-            # ... (Resto do seu código de sidebar e renderização do Gantt continua aqui) ...
-            
-            # NOTA: Como copiei apenas a lógica de controle, certifique-se de que o resto 
-            # do seu código de interface (filtros, tabs, chamadas de gerar_gantt) 
-            # esteja indentado dentro deste 'if df_data is not None:' ou logo abaixo.
-            
-            # Para facilitar, APENAS COLE o bloco de verificação "2. VERIFICAÇÃO DE AÇÃO"
-            # logo após carregar o df_data e ANTES de começar a desenhar a sidebar.
+            # ... (O restante do seu código da sidebar continua aqui normalmente)
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
