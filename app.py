@@ -2231,7 +2231,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                              toast.style.backgroundColor = "#27ae60";
                              toast.innerHTML = `✅ <b>Processamento Iniciado!</b><br><span style='font-size:10px'>Pressione F5 nesta tela após o fechamento da outra aba.</span>`;
                         }}, 2000);
-                    }});
+                    
 
                 }})();
         
