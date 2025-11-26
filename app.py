@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #df_data
+from dateutil.relativedelta import relativedelta #spinner
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -4710,7 +4710,6 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
         df_filtered = df_filtered[df_filtered["SETOR"].isin(setor_filter)]
     return df_filtered
 
-process_context_menu_actions(None)
 create_baselines_table()
 # 1. Log de Entrada
 log_debug("➡️ ENTRANDO NO MAIN")
@@ -4732,7 +4731,7 @@ with st.spinner("Carregando e processando dados..."):
         df_data = load_data()
         if df_data is not None:
             st.session_state.df_data = df_data
-            process_context_menu_actions(df_data)
+           
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
@@ -5848,7 +5847,7 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
     print("⚡ BLOCO EXECUTIVO ACIONADO PELO IFRAME")
     
     try:
-        # 1. Decodifica
+        # 1. Decodifica Parametros
         qp = st.query_params
         raw_emp = qp.get('empreendimento')
         if isinstance(raw_emp, list): raw_emp = raw_emp[0]
@@ -5856,7 +5855,8 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
         
         print(f"🎯 Alvo: {empreendimento}")
 
-        # 2. Carrega Dados (Sessão nova)
+        # 2. Carrega Dados (Sessão nova isolada para o Iframe)
+        # Isso garante que o iframe tenha dados frescos para tirar a foto da baseline
         df_exec = load_data()
         
         # 3. Executa Salvamento
@@ -5864,24 +5864,26 @@ if 'context_action' in st.query_params and st.query_params['context_action'] == 
             if empreendimento in df_exec['Empreendimento'].unique():
                 print("💾 Salvando baseline no MySQL...")
                 
-                # ✅ CHAMADA CORRETA: apenas 2 argumentos
+                # Chama a função de salvar (que já está definida no seu código)
                 v_name = take_gantt_baseline(df_exec, empreendimento)
                 
                 print(f"✅ SUCESSO ABSOLUTO: {v_name} salvo!")
                 
-                # Limpa para evitar reprocessamento
+                # Limpa para evitar reprocessamento e loop infinito
                 st.query_params.clear()
                 
-                # Feedback visual
+                # Feedback visual (aparecerá dentro do iframe invisível, mas útil para debug)
                 st.success(f"✅ Baseline {v_name} criada com sucesso!")
                 
-                # Forçar atualização da página após 2 segundos
-                time.sleep(2)
+                # Pequeno delay para garantir que o banco processou antes do reload
+                time.sleep(1.5)
+                
+                # Força recarregamento para atualizar a UI principal
                 st.rerun()
                 
             else:
-                print(f"❌ Erro: Projeto {empreendimento} não encontrado nos dados.")
-                st.error(f"❌ Projeto {empreendimento} não encontrado nos dados.")
+                print(f"❌ Erro: Projeto {empreendimento} não encontrado nos dados carregados.")
+                st.error(f"❌ Projeto {empreendimento} não encontrado.")
         else:
             print("❌ Erro: Dados vazios no background.")
             st.error("❌ Dados vazios no background.")
