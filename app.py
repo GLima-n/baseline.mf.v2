@@ -5737,19 +5737,41 @@ if __name__ == "__main__":
 
         # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
         # Se o Javascript recarregou a página com parâmetros, executamos a lógica aqui
+        # No final do arquivo Python...
+
         if 'context_action' in st.query_params:
             try:
                 action = st.query_params['context_action']
                 if action == 'take_baseline':
                     raw_emp = st.query_params.get('empreendimento')
-                    # Normaliza se vier como lista
                     if isinstance(raw_emp, list): raw_emp = raw_emp[0]
                     
                     if raw_emp:
-                        # Executa EXATAMENTE a mesma lógica do botão
-                        executar_logica_baseline(df_data, raw_emp)
+                        # Executa a lógica (Salva no Banco)
+                        result = executar_logica_baseline(df_data, raw_emp)
+                        
+                        if result:
+                            # Mostra uma tela limpa de sucesso na NOVA ABA
+                            st.markdown("""
+                                <style>
+                                    header, .stAppHeader, footer {display: none !important;}
+                                    .main {background-color: #d4edda;}
+                                </style>
+                                <div style='display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; text-align:center;'>
+                                    <h1 style='color: #155724; font-size: 80px;'>✅</h1>
+                                    <h2 style='color: #155724;'>Sucesso!</h2>
+                                    <p style='font-size: 20px; color: #155724;'>A Linha de Base foi salva.</p>
+                                    <p style='color: #666;'>Você pode fechar esta aba e atualizar a anterior.</p>
+                                    <script>
+                                        // Tenta fechar a aba automaticamente após 3 segundos
+                                        setTimeout(function() { window.close(); }, 3000);
+                                    </script>
+                                </div>
+                            """, unsafe_allow_html=True)
+                            st.stop() # Impede que o resto do app carregue na aba "trabalhadora"
+
             except Exception as e:
-                st.error(f"Erro ao processar ação de contexto: {e}")
+                st.error(f"Erro: {e}")
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
