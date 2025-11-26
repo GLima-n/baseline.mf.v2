@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #executeTakeBaseline
+from dateutil.relativedelta import relativedelta #create_direct_test_component
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -5249,37 +5249,32 @@ with st.spinner("Carregando dados..."):
                     // 🎯🎯🎯 FUNÇÃO PRINCIPAL CORRIGIDA: usa IFRAME invisível 🎯🎯🎯
                     function executeTakeBaseline() {{
                         console.log("🎯 Iniciando criação de baseline via iframe...");
-                        
-                        const timestamp = new Date().getTime();
-                        const encodedEmp = encodeURIComponent("${selected_empreendimento}");
-                        const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
-                        
-                        console.log("🔗 URL completa:", url);
-                        
                         showStatus('🔄 Criando linha de base...', 'status-creating');
                         showLoading();
                         
-                        // 🚨 MÉTODO IFRAME
+                        // Criar URL com parâmetros para o Streamlit processar
+                        const timestamp = new Date().getTime();
+                        const encodedEmp = encodeURIComponent("{selected_empreendimento}");
+                        const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
+                        
+                        console.log("🔗 URL para iframe:", url);
+                        
+                        // 🚨🚨🚨 MÉTODO CORRETO: usar iframe invisível em vez de recarregar a página 🚨🚨🚨
                         hiddenIframe.src = url;
                         
+                        // Quando o iframe terminar de carregar
                         hiddenIframe.onload = function() {{
-                            console.log("✅ Iframe carregado COMPLETAMENTE");
-                            console.log("📊 Se você vê esta mensagem mas a baseline não foi criada,");
-                            console.log("📊 o problema está no processamento do Streamlit");
-                            
+                            console.log("✅ Iframe carregado - baseline deve ter sido criada");
                             hideLoading();
-                            showStatus('✅ Linha de base criada!', 'status-success');
+                            showStatus('✅ Linha de base criada! Verifique a barra lateral.', 'status-success');
                             
-                            hideContextMenu();
+                            // Forçar uma atualização suave após 1 segundo
+                            setTimeout(() => {{
+                                // Disparar um evento customizado se necessário
+                                const event = new Event('baselineCreated');
+                                document.dispatchEvent(event);
+                            }}, 1000);
                         }};
-                        
-                        hiddenIframe.onerror = function() {{
-                            console.error("❌ Erro ao carregar iframe");
-                            hideLoading();
-                            showStatus('❌ Erro ao criar baseline', 'status-error');
-                            hideContextMenu();
-                        }};
-                    }}
                         
                         hideContextMenu();
                     }}
