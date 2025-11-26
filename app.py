@@ -2137,30 +2137,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
                
                 (function() {{
-                    // 1. Configuração
+                    // 1. Configuração e Seleção do Container
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
-                    // Garante iframe
-                    let iframe = document.getElementById('hidden-iframe');
-                    if (!iframe) {{
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'hidden-iframe';
-                        iframe.style.display = 'none';
-                        if(container) container.appendChild(iframe);
-                    }}
-
                     if (!container) return;
 
-                    // Limpeza
+                    // Limpeza de elementos antigos para evitar duplicatas
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
                     if (oldToast) oldToast.remove();
 
-                    // 2. Criar Menu
+                    // 2. Criar o Menu de Contexto
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
+                    // Estilos inline para garantir visualização correta (z-index alto)
                     menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
                     menu.innerHTML = `
                         <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
@@ -2169,14 +2161,15 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast
+                    // 3. Criar Toast de Carregamento
                     const toast = document.createElement('div');
                     toast.className = 'js-toast-loading';
                     toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
                     container.appendChild(toast);
 
-                    // 4. Listeners
+                    // 4. Listeners para Abrir/Fechar o Menu
                     container.addEventListener('contextmenu', function(e) {{
+                        // Verifica se o clique foi em uma área válida do gráfico ou sidebar
                         if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
                             menu.style.display = 'block';
@@ -2187,19 +2180,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }});
 
+                    // Fecha o menu ao clicar fora
                     document.addEventListener('click', function(e) {{
                         if (menu.style.display === 'block' && !menu.contains(e.target)) {{
                             menu.style.display = 'none';
                         }}
                     }}, true);
 
-                    // --- 5. AÇÃO DO BOTÃO ---
+                    // 5. AÇÃO DO BOTÃO (A CORREÇÃO PRINCIPAL ESTÁ AQUI)
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
                         e.stopPropagation();
                         e.preventDefault();
 
+                        // Recupera o nome do projeto atual
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -2208,39 +2203,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
+                        // Feedback Visual Imediato
                         menu.style.display = 'none';
                         toast.style.display = 'block';
                         toast.style.backgroundColor = "#2980b9";
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...`;
+                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...<br><span style='font-size:10px'>A página será recarregada.</span>`;
 
+                        // Prepara os parâmetros da URL
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
                         
-                        // --- CORREÇÃO DA URL (REFERRER) ---
-                        // Isso pega a URL real (https://...) e ignora o about:srcdoc
-                        let baseUrl = document.referrer;
-                        
-                        // Fallback para ancestorOrigins (Chrome)
-                        if (!baseUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {{
-                            baseUrl = window.location.ancestorOrigins[0];
-                        }}
-                        
-                        // Limpeza
-                        if (baseUrl && baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-                        
-                        // Se falhar tudo, usamos string vazia (URL Relativa) que às vezes funciona
-                        if (!baseUrl) baseUrl = "";
+                        // Constrói a URL com os parâmetros de ação
+                        // Usamos '?' para adicionar query params à URL atual
+                        const params = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
 
-                        const finalUrl = baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
-
-                        console.log("🚀 URL Iframe Gerada:", finalUrl);
+                        console.log("🔄 Redirecionando janela principal para:", params);
                         
-                        // Disparo no Iframe (Seguro)
-                            // Força a navegação da janela PRINCIPAL para processar a ação no Python
-                            console.log("🔄 Redirecionando janela principal...");
-                            window.top.location.href = finalUrl;
-                        }}
-                    }});)();
+                        // 🚀 A MÁGICA: Força a janela principal a navegar para a URL com parâmetros.
+                        // Isso faz o Streamlit rodar o Python novamente, capturar 'take_baseline',
+                        // salvar no banco e mostrar o botão na sidebar.
+                        window.top.location.href = params;
+                    }});
+
+                }})();
         
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
