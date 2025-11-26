@@ -1173,18 +1173,21 @@ def process_context_menu_actions(df):
                 try:
                     # A função take_gantt_baseline já existe no seu código (linha 696)
                     v_name = take_gantt_baseline(df, empreendimento)
-                    st.success(f"Linha de base '{v_name}' criada com sucesso para {empreendimento}!")
-                    
-                    # Simular o envio para AWS (opcional, dependendo da sua implementação real)
-                    if send_to_aws(empreendimento, v_name):
-                        st.success(f"Linha de base '{v_name}' enviada para AWS com sucesso!")
-                    else:
-                        st.warning(f"Linha de base '{v_name}' salva localmente, mas falhou ao enviar para AWS.")
+                    # O feedback visual é tratado pelo componente create_gantt_context_menu_component (linhas 5069-5083)
+                    # que lê as variáveis de st.session_state preenchidas pelo bloco executivo do iframe.
+                    # A função take_gantt_baseline já salva no banco de dados.
+                    # A lógica de envio para AWS (send_to_aws) deve ser tratada separadamente,
+                    # como já é feito no bloco da barra lateral (linhas 4995-5000).
+                    # Apenas garantimos que a baseline foi criada.
+                    st.session_state.context_menu_success = f"✅ Linha de base '{v_name}' criada com sucesso para {empreendimento}!"
+                    st.session_state.show_context_success = True
                         
                 except Exception as e:
-                    st.error(f"Erro ao criar linha de base para {empreendimento}: {e}")
+                    st.session_state.context_menu_error = f"❌ Erro ao criar linha de base para {empreendimento}: {e}"
+                    st.session_state.show_context_error = True
             else:
-                st.error("Empreendimento não especificado na ação de contexto.")
+                st.session_state.context_menu_error = "❌ Empreendimento não especificado na ação de contexto."
+                st.session_state.show_context_error = True
         
         # Outras ações de contexto podem ser adicionadas aqui (ex: 'load_baseline')
         
@@ -5852,7 +5855,6 @@ def verificar_implementacao_baseline():
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
-# --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
 # --- BLOCO EXECUTIVO FINAL (SALVAMENTO EM BACKGROUND) ---
 if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
     print("🎯🎯🎯 BLOCO EXECUTIVO ACIONADO 🎯🎯🎯")
