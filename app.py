@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_context_menu_actions
+from dateutil.relativedelta import relativedelta #executeTakeBaseline
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -220,7 +220,8 @@ def create_baselines_table():
             print(f"Erro ao criar tabela: {e}")
         finally:
             conn.close()
-
+# O restante do código Streamlit...
+st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
 # Inicializar variáveis de contexto se não existirem
 if 'context_menu_success' not in st.session_state:
     st.session_state.context_menu_success = ""
@@ -234,48 +235,79 @@ if 'context_menu_trigger' not in st.session_state:
     st.session_state.context_menu_trigger = False
     
 def process_context_menu_actions():
-    """Processa ações do menu de contexto via query parameters - VERSÃO IFRAME"""
+    """Processa ações do menu de contexto - VERSÃO ULTRA AGRESSIVA"""
+    
+    print("🎯🎯🎯 PROCESS_CONTEXT_MENU_ACTIONS CHAMADA 🎯🎯🎯")
+    print(f"📦 Query params na função: {dict(st.query_params)}")
     
     query_params = st.query_params
     
-    if 'context_action' in query_params and 'empreendimento' in query_params:
-        print("🎯🎯🎯 ACTION DETECTADA NO PROCESS_CONTEXT_MENU_ACTIONS 🎯🎯🎯")
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        print("✅✅✅ AÇÃO TAKE_BASELINE DETECTADA! ✅✅✅")
         
-        action = query_params['context_action']
-        raw_emp = query_params['empreendimento']
+        # Pega o empreendimento
+        raw_emp = query_params.get('empreendimento')
+        print(f"📦 Raw emp: {raw_emp}")
         
         if isinstance(raw_emp, list):
             raw_emp = raw_emp[0]
         
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        print(f"🎯 Empreendimento: {empreendimento}")
+        print(f"🎯 Empreendimento decodificado: {empreendimento}")
         
-        # Limpar os parâmetros para evitar execução múltipla
-        st.query_params.clear()
-        
-        if action == 'take_baseline' and empreendimento:
+        if empreendimento:
             try:
+                # 🚨🚨🚨 LIMPAR OS PARÂMETROS IMEDIATAMENTE 🚨🚨🚨
+                st.query_params.clear()
+                print("🧹 Parâmetros limpos!")
+                
                 # Usar dados da session_state
                 if 'df_data' in st.session_state and not st.session_state.df_data.empty:
-                    print(f"💾 Salvando baseline para: {empreendimento}")
+                    print(f"💾 SALVANDO BASELINE PARA: {empreendimento}")
+                    
                     version_name = take_gantt_baseline(st.session_state.df_data, empreendimento)
-                    print(f"✅✅✅ Baseline {version_name} criada! ✅✅✅")
                     
-                    # Usar session_state para mostrar mensagem sem recarregar a página
-                    st.session_state.context_menu_success = f"✅ {version_name} criado via menu de contexto!"
+                    print(f"✅✅✅ BASELINE {version_name} CRIADA COM SUCESSO! ✅✅✅")
+                    
+                    # Feedback visual
+                    st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
                     st.session_state.show_context_success = True
-                    st.session_state.context_menu_trigger = True
                     
-                    # Forçar rerun para atualizar a interface
+                    # 🚨 FORÇAR RERUN IMEDIATO 🚨
                     st.rerun()
-                else:
-                    st.session_state.context_menu_error = "❌ Dados não disponíveis para criar baseline"
-                    st.session_state.show_context_error = True
                     
+                else:
+                    print("❌ Dados não disponíveis na session_state")
+                    # Tentar carregar dados fresh
+                    try:
+                        df_fresh = load_data()
+                        if df_fresh is not None and not df_fresh.empty:
+                            st.session_state.df_data = df_fresh
+                            print("💾 Dados carregados fresh, salvando baseline...")
+                            version_name = take_gantt_baseline(df_fresh, empreendimento)
+                            print(f"✅ Baseline {version_name} criada!")
+                            st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
+                            st.session_state.show_context_success = True
+                            st.rerun()
+                        else:
+                            st.session_state.context_menu_error = "❌ Não foi possível carregar dados"
+                            st.session_state.show_context_error = True
+                    except Exception as load_error:
+                        st.session_state.context_menu_error = f"❌ Erro ao carregar dados: {load_error}"
+                        st.session_state.show_context_error = True
+                        
             except Exception as e:
-                print(f"❌ ERRO: {e}")
-                st.session_state.context_menu_error = f"❌ Erro ao criar linha de base: {e}"
+                print(f"❌ ERRO NA CRIAÇÃO DA BASELINE: {e}")
+                import traceback
+                print("TRACEBACK:")
+                print(traceback.format_exc())
+                st.session_state.context_menu_error = f"❌ Erro ao criar baseline: {e}"
                 st.session_state.show_context_error = True
+        else:
+            st.session_state.context_menu_error = "❌ Empreendimento não especificado"
+            st.session_state.show_context_error = True
+    else:
+        print("💤 Nenhuma ação de contexto detectada")
 
 # --- BLOCO DE DIAGNÓSTICO IMEDIATO ---
 print("=== DIAGNÓSTICO CONTEXT MENU ===")
@@ -302,14 +334,14 @@ if st.sidebar.button("🧹 Limpar Parâmetros"):
     st.rerun()
 
 # --- DIAGNÓSTICO ULTRA DETALHADO ---
-print("=" * 50)
-print("🚀 STREAMLIT APP INICIADO")
-print(f"📋 Query params na inicialização: {dict(st.query_params)}")
-print(f"🔍 Tem 'context_action'? {'context_action' in st.query_params}")
+print("=" * 60)
+print("🚀 STREAMLIT APP INICIANDO")
+print(f"📋 Query params: {dict(st.query_params)}")
+print(f"🔍 Tem context_action? {'context_action' in st.query_params}")
 if 'context_action' in st.query_params:
-    print(f"🎯 Valor de context_action: {st.query_params['context_action']}")
-    print(f"🏢 Valor de empreendimento: {st.query_params.get('empreendimento')}")
-print("=" * 50)
+    print(f"🎯 context_action: {st.query_params['context_action']}")
+    print(f"🏢 empreendimento: {st.query_params.get('empreendimento')}")
+print("=" * 60)
 
 # Componente de teste SIMPLES - coloque perto do gráfico Gantt
 def create_simple_test_component(empreendimento):
@@ -330,29 +362,29 @@ def create_simple_test_component(empreendimento):
     components.html(html_code, height=120)
 
 def create_direct_test_component(empreendimento):
-    """Componente de teste DIRETO sem JavaScript"""
+    """Componente de teste DIRETO para verificar se o processamento funciona"""
     
-    # Cria a URL manualmente
     encoded_emp = urllib.parse.quote(empreendimento)
     url = f"?context_action=take_baseline&empreendimento={encoded_emp}&t={int(time.time())}"
     
     html_code = f'''
-    <div style="padding: 15px; border: 2px solid #ff6b00; border-radius: 8px; margin: 15px 0; background: #fff3e0;">
-        <h4>🧪 TESTE DIRETO DE BASELINE</h4>
+    <div style="padding: 15px; border: 2px solid #ff4444; border-radius: 8px; margin: 15px 0; background: #ffeaea;">
+        <h4>🧪 TESTE DIRETO (DEBUG)</h4>
         <p><strong>Empreendimento:</strong> {empreendimento}</p>
-        <p><strong>URL Gerada:</strong> {url}</p>
+        <p><strong>URL:</strong> {url}</p>
         <a href="{url}" 
-           style="background: #ff6b00; color: white; padding: 12px 20px; text-decoration: none; 
-                  border-radius: 6px; display: inline-block; font-weight: bold; font-size: 16px;">
-           🚀 CRIAR BASELINE (LINK DIRETO)
+           style="background: #ff4444; color: white; padding: 10px 15px; text-decoration: none; 
+                  border-radius: 5px; display: inline-block; font-weight: bold;">
+           🔥 TESTAR AGORA (Link Direto)
         </a>
         <p style="font-size: 12px; color: #666; margin-top: 8px;">
-           Clique e a página será recarregada com os parâmetros
+           Clique e verifique os logs no console do Python
         </p>
     </div>
     '''
     
-    components.html(html_code, height=180)
+    components.html(html_code, height=160)
+
 
 # Use este componente para testar:
 # create_direct_test_component(selected_empreendimento_baseline)
@@ -4430,9 +4462,6 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             titulo_extra=titulo_extra  # Novo parâmetro
         )
 
-# O restante do código Streamlit...
-st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
-
 # Tente executar a tela de boas-vindas. Se os arquivos não existirem, apenas pule.
 try:
     if show_welcome_screen():
@@ -5220,32 +5249,37 @@ with st.spinner("Carregando dados..."):
                     // 🎯🎯🎯 FUNÇÃO PRINCIPAL CORRIGIDA: usa IFRAME invisível 🎯🎯🎯
                     function executeTakeBaseline() {{
                         console.log("🎯 Iniciando criação de baseline via iframe...");
+                        
+                        const timestamp = new Date().getTime();
+                        const encodedEmp = encodeURIComponent("${selected_empreendimento}");
+                        const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
+                        
+                        console.log("🔗 URL completa:", url);
+                        
                         showStatus('🔄 Criando linha de base...', 'status-creating');
                         showLoading();
                         
-                        // Criar URL com parâmetros para o Streamlit processar
-                        const timestamp = new Date().getTime();
-                        const encodedEmp = encodeURIComponent("{selected_empreendimento}");
-                        const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
-                        
-                        console.log("🔗 URL para iframe:", url);
-                        
-                        // 🚨🚨🚨 MÉTODO CORRETO: usar iframe invisível em vez de recarregar a página 🚨🚨🚨
+                        // 🚨 MÉTODO IFRAME
                         hiddenIframe.src = url;
                         
-                        // Quando o iframe terminar de carregar
                         hiddenIframe.onload = function() {{
-                            console.log("✅ Iframe carregado - baseline deve ter sido criada");
-                            hideLoading();
-                            showStatus('✅ Linha de base criada! Verifique a barra lateral.', 'status-success');
+                            console.log("✅ Iframe carregado COMPLETAMENTE");
+                            console.log("📊 Se você vê esta mensagem mas a baseline não foi criada,");
+                            console.log("📊 o problema está no processamento do Streamlit");
                             
-                            // Forçar uma atualização suave após 1 segundo
-                            setTimeout(() => {{
-                                // Disparar um evento customizado se necessário
-                                const event = new Event('baselineCreated');
-                                document.dispatchEvent(event);
-                            }}, 1000);
+                            hideLoading();
+                            showStatus('✅ Linha de base criada!', 'status-success');
+                            
+                            hideContextMenu();
                         }};
+                        
+                        hiddenIframe.onerror = function() {{
+                            console.error("❌ Erro ao carregar iframe");
+                            hideLoading();
+                            showStatus('❌ Erro ao criar baseline', 'status-error');
+                            hideContextMenu();
+                        }};
+                    }}
                         
                         hideContextMenu();
                     }}
