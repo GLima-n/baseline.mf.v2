@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #iframe
+from dateutil.relativedelta import relativedelta #selected_empreendimento_baseline
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -228,87 +228,7 @@ if 'show_context_error' not in st.session_state:
 if 'context_menu_trigger' not in st.session_state:
     st.session_state.context_menu_trigger = False
     
-def process_context_menu_actions():
-    """Processa ações do menu de contexto - VERSÃO ULTRA AGRESSIVA"""
-    if df is None:
-        df = st.session_state.get('df_data')
-    
-    # Se ainda for None (caso extremo), tenta carregar
-    if df is None or df.empty:
-        print("⚠️ DF vazio no processador, tentando load_data de emergência...")
-        df = load_data()
 
-    print("🎯🎯🎯 PROCESS_CONTEXT_MENU_ACTIONS CHAMADA 🎯🎯🎯")
-    print(f"📦 Query params na função: {dict(st.query_params)}")
-    
-    query_params = st.query_params
-    
-    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
-        print("✅✅✅ AÇÃO TAKE_BASELINE DETECTADA! ✅✅✅")
-        
-        # Pega o empreendimento
-        raw_emp = query_params.get('empreendimento')
-        print(f"📦 Raw emp: {raw_emp}")
-        
-        if isinstance(raw_emp, list):
-            raw_emp = raw_emp[0]
-        
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        print(f"🎯 Empreendimento decodificado: {empreendimento}")
-        
-        if empreendimento:
-            try:
-                # 🚨🚨🚨 LIMPAR OS PARÂMETROS IMEDIATAMENTE 🚨🚨🚨
-                st.query_params.clear()
-                print("🧹 Parâmetros limpos!")
-                
-                # Usar dados da session_state
-                if 'df_data' in st.session_state and not st.session_state.df_data.empty:
-                    print(f"💾 SALVANDO BASELINE PARA: {empreendimento}")
-                    
-                    version_name = take_gantt_baseline(st.session_state.df_data, empreendimento)
-                    
-                    print(f"✅✅✅ BASELINE {version_name} CRIADA COM SUCESSO! ✅✅✅")
-                    
-                    # Feedback visual
-                    st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
-                    st.session_state.show_context_success = True
-                    
-                    # 🚨 FORÇAR RERUN IMEDIATO 🚨
-                    st.rerun()
-                    
-                else:
-                    print("❌ Dados não disponíveis na session_state")
-                    # Tentar carregar dados fresh
-                    try:
-                        df_fresh = load_data()
-                        if df_fresh is not None and not df_fresh.empty:
-                            st.session_state.df_data = df_fresh
-                            print("💾 Dados carregados fresh, salvando baseline...")
-                            version_name = take_gantt_baseline(df_fresh, empreendimento)
-                            print(f"✅ Baseline {version_name} criada!")
-                            st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
-                            st.session_state.show_context_success = True
-                            st.rerun()
-                        else:
-                            st.session_state.context_menu_error = "❌ Não foi possível carregar dados"
-                            st.session_state.show_context_error = True
-                    except Exception as load_error:
-                        st.session_state.context_menu_error = f"❌ Erro ao carregar dados: {load_error}"
-                        st.session_state.show_context_error = True
-                        
-            except Exception as e:
-                print(f"❌ ERRO NA CRIAÇÃO DA BASELINE: {e}")
-                import traceback
-                print("TRACEBACK:")
-                print(traceback.format_exc())
-                st.session_state.context_menu_error = f"❌ Erro ao criar baseline: {e}"
-                st.session_state.show_context_error = True
-        else:
-            st.session_state.context_menu_error = "❌ Empreendimento não especificado"
-            st.session_state.show_context_error = True
-    else:
-        print("💤 Nenhuma ação de contexto detectada")
 
 # --- DIAGNÓSTICO INICIAL --- 
 st.sidebar.markdown("---")
@@ -1141,79 +1061,62 @@ def send_to_aws(empreendimento, version_name):
         st.error(f"Erro ao enviar para AWS: {e}")
         return False
 
-def process_context_menu_actions(df):
-    """Processa ações do menu de contexto via query parameters"""
+def process_context_menu_actions():
+    """
+    Processa ações vindas do Menu de Contexto via URL.
+    Salva no banco, atualiza o estado e limpa a URL.
+    """
+    # 1. Ler parâmetros da URL
     query_params = st.query_params
     
-    if 'context_action' in query_params and 'empreendimento' in query_params:
-        action = query_params['context_action']
-        raw_emp = query_params['empreendimento']
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        # Pegar o empreendimento da URL
+        raw_emp = query_params.get('empreendimento')
+        if isinstance(raw_emp, list):
+            raw_emp = raw_emp[0]
         
-        # O Streamlit pode retornar uma lista para query_params, garantimos que é uma string
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-        
-        # Decodifica o nome do empreendimento
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        # Limpar os parâmetros para evitar execução múltipla
-        # NOTA: No código de referência, isso é feito com st.query_params.clear()
-        # No seu código, a limpeza é feita no bloco executivo do iframe (linhas 5561-5562)
-        
-        if action == 'take_baseline':
-            if empreendimento:
+        if empreendimento:
+            print(f"🚀 AÇÃO DE CONTEXTO DETECTADA: Criar Baseline para {empreendimento}")
+            
+            # 2. Garantir que temos dados para trabalhar
+            df_atual = st.session_state.get('df_data')
+            if df_atual is None or df_atual.empty:
+                df_atual = load_data() # Recarrega se a sessão estiver vazia
+            
+            if df_atual is not None and not df_atual.empty:
                 try:
-                    # A função take_gantt_baseline já existe no seu código (linha 696)
-                    v_name = take_gantt_baseline(df, empreendimento)
-                    # O feedback visual é tratado pelo componente create_gantt_context_menu_component (linhas 5069-5083)
-                    # que lê as variáveis de st.session_state preenchidas pelo bloco executivo do iframe.
-                    # A função take_gantt_baseline já salva no banco de dados.
-                    # A lógica de envio para AWS (send_to_aws) deve ser tratada separadamente,
-                    # como já é feito no bloco da barra lateral (linhas 4995-5000).
-                    # Apenas garantimos que a baseline foi criada.
-                    st.session_state.context_menu_success = f"✅ Linha de base '{v_name}' criada com sucesso para {empreendimento}!"
-                    st.session_state.show_context_success = True
-                        
+                    # 3. EXECUTAR A CRIAÇÃO DA BASELINE (Mesma função do botão lateral)
+                    # Isso salva no MySQL/AWS
+                    version_name = take_gantt_baseline(df_atual, empreendimento)
+                    
+                    # 4. Feedback para o usuário (usando Session State para persistir após o rerun)
+                    st.session_state['toast_message'] = {
+                        'msg': f"✅ Baseline '{version_name}' criada com sucesso para {empreendimento}!",
+                        'icon': "🎉"
+                    }
+                    
+                    # Adicionar à lista de 'Não enviados' para AWS (se necessário para sua lógica de sync)
+                    if 'unsent_baselines' not in st.session_state:
+                        st.session_state.unsent_baselines = {}
+                    if empreendimento not in st.session_state.unsent_baselines:
+                        st.session_state.unsent_baselines[empreendimento] = []
+                    if version_name not in st.session_state.unsent_baselines[empreendimento]:
+                        st.session_state.unsent_baselines[empreendimento].append(version_name)
+
                 except Exception as e:
-                    st.session_state.context_menu_error = f"❌ Erro ao criar linha de base para {empreendimento}: {e}"
-                    st.session_state.show_context_error = True
-            else:
-                st.session_state.context_menu_error = "❌ Empreendimento não especificado na ação de contexto."
-                st.session_state.show_context_error = True
-        
-        # Limpar os parâmetros de consulta APÓS o processamento para evitar reexecução
-        st.query_params.clear()
-        
-        # Outras ações de contexto podem ser adicionadas aqui (ex: 'load_baseline')
-        
-        # O bloco executivo do iframe (linhas 5532-5572) no seu código já lida com a limpeza dos query_params
-        # e o salvamento em background, então esta função é mais para o feedback visual no app principal.
-        # No entanto, o código de referência sugere que esta função é chamada no app principal.
-        # Vamos manter a chamada no final do arquivo, como no código de referência.
-        
-        # Para garantir que o iframe não seja executado duas vezes (uma vez no app principal e outra no iframe),
-        # o código de referência usa o iframe para o salvamento em background.
-        # No seu código, o bloco executivo (linhas 5532-5572) já faz o salvamento em background.
-        # A função process_context_menu_actions no código de referência (linhas 260-270)
-        # é mais simples e apenas chama take_baseline.
-        # No seu código, o bloco executivo já lida com a ação de contexto.
-        # Vamos apenas garantir que a função create_gantt_context_menu_component está correta.
-        pass # Manter a lógica no bloco executivo do iframe, como já está no seu código.
-        
-        
-
-
-# O bloco executivo (linhas 5532-5572) no seu código já lida com a ação de contexto
-# acionada pelo iframe. A função process_context_menu_actions no código de referência
-# é mais simples e apenas chama take_baseline.
-# Vamos manter a lógica no bloco executivo do iframe, como já está no seu código,
-# e apenas adicionar a função create_gantt_context_menu_component e a chamada no final.
-# A função process_context_menu_actions do código de referência não é estritamente necessária
-# se o bloco executivo já faz o trabalho.
-
-# A função create_gantt_context_menu_component precisa do next_n.
-# Vamos calcular o next_n dentro da função, ou passá-lo como argumento.
-# Como o take_gantt_baseline já calcula, vamos replicar a lógica de cálculo de next_n
-# dentro de create_gantt_context_menu_component para exibir o nome correto no botão.
+                    st.session_state['toast_message'] = {
+                        'msg': f"❌ Erro ao criar baseline: {str(e)}",
+                        'icon': "⚠️"
+                    }
+                    print(f"❌ ERRO NO CONTEXT MENU: {e}")
+            
+            # 5. LIMPEZA CRÍTICA: Limpar a URL para não executar novamente ao recarregar
+            st.query_params.clear()
+            
+            # 6. Forçar recarregamento para atualizar a UI
+            st.rerun()
 
 def get_next_baseline_version(empreendimento):
     """Calcula o próximo número de versão da baseline."""
@@ -1236,39 +1139,128 @@ def get_next_baseline_version(empreendimento):
     return next_n
 
 def create_gantt_context_menu_component(selected_empreendimento):
-    """Componente FINAL - versão ultra simples"""
+    """
+    Cria o menu de contexto invisível que intercepta o clique direito
+    e envia o comando para o Python via URL.
+    """
+    import urllib.parse
     
-    context_menu_html = f"""
+    # Codifica o nome para URL (ex: "Viana e Moura" vira "Viana%20e%20Moura")
+    emp_encoded = urllib.parse.quote(selected_empreendimento)
+    
+    # Timestamp para evitar cache do navegador
+    timestamp = int(time.time())
+    
+    component_html = f"""
+    <style>
+        /* Área de Contexto */
+        #gantt-context-trigger {{
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px dashed #27ae60;
+            border-radius: 8px;
+            background-color: #f0fdf4;
+            text-align: center;
+            color: #15803d;
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 14px;
+            cursor: context-menu;
+            transition: all 0.3s ease;
+        }}
+        #gantt-context-trigger:hover {{
+            background-color: #dcfce7;
+            border-color: #16a34a;
+        }}
+        
+        /* O Menu Flutuante Personalizado */
+        #custom-context-menu {{
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            width: 200px;
+            background: white;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+            font-family: sans-serif;
+        }}
+        
+        .menu-item {{
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: #334155;
+            transition: background 0.2s;
+        }}
+        
+        .menu-item:hover {{
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }}
+        
+        .menu-icon {{ font-size: 16px; }}
+    </style>
+
+    <div id="gantt-context-trigger">
+        🖱️ <b>Clique com Botão Direito aqui</b> para opções de: <strong>{selected_empreendimento}</strong>
+    </div>
+
+    <div id="custom-context-menu">
+        <div class="menu-item" onclick="triggerBaseline()">
+            <span class="menu-icon">📸</span>
+            <span>Criar Baseline Agora</span>
+        </div>
+        <div class="menu-item" style="border-top: 1px solid #eee; color: #94a3b8; cursor: default;">
+            <span class="menu-icon">🚫</span>
+            <span>Outras ações (Em breve)</span>
+        </div>
+    </div>
+
     <script>
-        function createBaseline() {{
-            console.log("🎯 Criando baseline para: {selected_empreendimento}");
+        const triggerArea = document.getElementById('gantt-context-trigger');
+        const menu = document.getElementById('custom-context-menu');
+
+        // 1. Detectar Botão Direito
+        triggerArea.addEventListener('contextmenu', function(e) {{
+            e.preventDefault(); // Bloqueia o menu padrão do navegador
             
-            // Método MAIS SIMPLES: link direto
-            const encodedEmp = encodeURIComponent("{selected_empreendimento}");
-            const url = `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{Date.now()}}`;
+            // Posiciona o menu onde o mouse está
+            menu.style.top = e.clientY + 'px';
+            menu.style.left = e.clientX + 'px';
+            menu.style.display = 'block';
+        }});
+
+        // 2. Fechar menu se clicar fora
+        document.addEventListener('click', function(e) {{
+            if (menu.style.display === 'block') {{
+                menu.style.display = 'none';
+            }}
+        }});
+
+        // 3. AÇÃO PRINCIPAL: Envia comando para o Python
+        function triggerBaseline() {{
+            console.log("Disparando criação de baseline...");
             
-            console.log("🔗 Navegando para:", url);
+            // Pega a URL atual do navegador (topo)
+            const currentUrl = new URL(window.top.location.href);
             
-            // 🚨 MÉTODO MAIS CONFIÁVEL: navegação direta
-            window.top.location.href = url;
+            // Adiciona os parâmetros que o Python vai ler
+            currentUrl.searchParams.set('context_action', 'take_baseline');
+            currentUrl.searchParams.set('empreendimento', decodeURIComponent('{emp_encoded}'));
+            currentUrl.searchParams.set('t', '{timestamp}'); // Força atualização
+            
+            // Redireciona a página (Reload com parâmetros)
+            window.top.location.href = currentUrl.toString();
         }}
     </script>
-    
-    <div style="padding: 15px; border: 2px solid #4CAF50; border-radius: 8px; margin: 15px 0;">
-        <h4>📸 Criar Baseline do Projeto</h4>
-        <p><strong>Projeto:</strong> {selected_empreendimento}</p>
-        <button onclick="createBaseline()" 
-                style="background: #4CAF50; color: white; padding: 12px 20px; border: none; 
-                       border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold;">
-            🚀 CRIAR BASELINE AGORA
-        </button>
-        <p style="font-size: 12px; color: #666; margin-top: 8px;">
-           A página será recarregada para processar a baseline
-        </p>
-    </div>
     """
     
-    components.html(context_menu_html, height=180)
+    # Renderiza o componente HTML com altura suficiente para a área de clique
+    components.html(component_html, height=100)
     
 # --- Funções Utilitárias ---
 def abreviar_nome(nome):
@@ -4420,6 +4412,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     components.html(gantt_html, height=altura_gantt, scrolling=True)
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
+    if 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
+                create_gantt_context_menu_component(selected_empreendimento_baseline)
+
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
 def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False):
     """
@@ -5078,95 +5073,7 @@ with st.spinner("Carregando dados..."):
                 else:
                     st.info("Nenhum log registrado ainda (Aguardando ação do iframe).")
 
-            # --- Menu de Contexto para Gantt ---
-            def create_gantt_context_menu_component(selected_empreendimento):
-                # Codifica o nome para URL (para lidar com espaços e acentos)
-                import urllib.parse
-                emp_encoded = urllib.parse.quote(selected_empreendimento)
-                
-                # Javascript Puro: Redireciona a página principal (window.top) adicionando os parâmetros
-                # Isso força o Streamlit a rodar o script Python novamente, detectando a ação.
-                context_menu_html = f"""
-                <style>
-                    #context-menu {{
-                        position: fixed;
-                        background: white;
-                        border: 1px solid #ccc;
-                        border-radius: 5px;
-                        box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
-                        z-index: 10000;
-                        display: none;
-                        font-family: Arial, sans-serif;
-                        min-width: 150px;
-                    }}
-                    .context-menu-item {{
-                        padding: 12px 20px;
-                        cursor: pointer;
-                        border-bottom: 1px solid #eee;
-                        font-size: 14px;
-                        color: #333;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                    }}
-                    .context-menu-item:hover {{
-                        background: #f0f0f0;
-                    }}
-                    .gantt-context-area {{
-                        padding: 10px;
-                        margin: 10px 0;
-                        border: 2px dashed #ddd;
-                        border-radius: 5px;
-                        background: #f9f9f9;
-                        text-align: center;
-                        font-size: 13px;
-                        color: #666;
-                    }}
-                </style>
-
-                <div id="gantt-context-area" class="gantt-context-area">
-                    🖱️ <b>Área Ativa:</b> Clique com botão direito aqui para opções de <b>{selected_empreendimento}</b>
-                </div>
-
-                <div id="context-menu">
-                    <div class="context-menu-item" id="btn-take-baseline">
-                        <span>📸</span> Criar Linha de Base
-                    </div>
-                </div>
-
-                <script>
-                    const area = document.getElementById('gantt-context-area');
-                    const menu = document.getElementById('context-menu');
-                    const btn = document.getElementById('btn-take-baseline');
-
-                    // Mostrar Menu
-                    area.addEventListener('contextmenu', function(e) {{
-                        e.preventDefault();
-                        menu.style.left = e.pageX + 'px';
-                        menu.style.top = e.pageY + 'px';
-                        menu.style.display = 'block';
-                    }});
-
-                    // Fechar Menu ao clicar fora
-                    document.addEventListener('click', function(e) {{
-                        if (menu.style.display === 'block') {{
-                            menu.style.display = 'none';
-                        }}
-                    }});
-
-                    // AÇÃO: Navegar na janela principal (simula o comportamento do botão nativo)
-                    btn.addEventListener('click', function() {{
-                        // Adiciona parâmetros na URL atual e recarrega
-                        const currentUrl = new URL(window.top.location.href);
-                        currentUrl.searchParams.set('context_action', 'take_baseline');
-                        currentUrl.searchParams.set('empreendimento', '{selected_empreendimento}');
-                        
-                        // Força o navegador a ir para a URL (Recarrega o Streamlit)
-                        window.top.location.href = currentUrl.toString();
-                    }});
-                </script>
-                """
-                components.html(context_menu_html, height=100)
+            
 
         # --- FIM DO NOVO LAYOUT ---
         # Mantemos a chamada a filter_dataframe, mas com os valores padrão para EMP, GRUPO e SETOR
@@ -5739,16 +5646,20 @@ def executar_logica_baseline(df, empreendimento):
 # --- BLOCO PRINCIPAL COMPLETO ---
 if __name__ == "__main__":
     # 1. Verificar implementação (Opcional, pode remover em produção)
-    if 'df_data' in globals() and not df_data.empty:
-        # verificar_implementacao_baseline() 
-        pass
+    if 'context_action' in st.query_params:
+        process_context_menu_actions()
 
-    # 2. Carregar Dados
+    # --- PASSO B: EXIBIR MENSAGENS TOAST (Memória do Navegador Simulada) ---
+    # Se processamos algo no passo anterior e demos rerun, a mensagem estará aqui
+    if 'toast_message' in st.session_state:
+        toast = st.session_state.pop('toast_message') # Pega e remove da sessão
+        st.toast(toast['msg'], icon=toast['icon'])
+
+    # --- PASSO C: CARREGAMENTO NORMAL DO APP ---
     with st.spinner("Carregando sistema..."):
         df_data = load_data()
     
     if df_data is not None and not df_data.empty:
-        # Salva na sessão
         st.session_state.df_data = df_data
 
         # --- A. VERIFICAR AÇÃO DO MENU DE CONTEXTO (URL) ---
@@ -5769,3 +5680,5 @@ if __name__ == "__main__":
 
     else:
         st.error("❌ Não foi possível carregar os dados. Verifique a conexão ou os arquivos de origem.")
+
+
