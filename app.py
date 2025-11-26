@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #spinner
+from dateutil.relativedelta import relativedelta #take_gantt_baseline
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -202,12 +202,13 @@ def create_baselines_table():
     if conn:
         try:
             cursor = conn.cursor()
+            # Recomendação para create_baselines_table
             create_table_query = """
             CREATE TABLE IF NOT EXISTS gantt_baselines (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 empreendimento VARCHAR(255) NOT NULL,
                 version_name VARCHAR(255) NOT NULL,
-                baseline_data JSON NOT NULL,
+                baseline_data JSON NOT NULL,  -- Use JSON ou LONGTEXT
                 created_date VARCHAR(50) NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 
@@ -549,24 +550,38 @@ def take_baseline(df, empreendimento):
 # --- Função para enviar dados para AWS ---
 
 def send_to_aws(empreendimento, version_name):
-    """Simula o envio de dados para AWS"""
+    """
+    Tenta enviar uma baseline existente (marcada como não enviada) para o banco AWS.
+    """
     try:
-        # Simular processamento
-        import time
-        time.sleep(1)  # Simular delay de rede
+        # 1. Recuperar os dados da baseline que estão na memória ou cache local
+        # Se você usa st.session_state.mock_baselines como fallback local:
+        baselines = load_baselines() 
         
-        # Remover da lista de não enviados
-        if ('unsent_baselines' in st.session_state and 
-            empreendimento in st.session_state.unsent_baselines and 
-            version_name in st.session_state.unsent_baselines[empreendimento]):
+        if empreendimento in baselines and version_name in baselines[empreendimento]:
+            dados_baseline = baselines[empreendimento][version_name]['data']
+            data_criacao = baselines[empreendimento][version_name]['date']
             
-            st.session_state.unsent_baselines[empreendimento].remove(version_name)
+            # 2. Tentar salvar no banco AWS
+            sucesso = save_baseline(empreendimento, version_name, dados_baseline, data_criacao)
             
-            # Se não há mais linhas de base não enviadas para este empreendimento, remover a entrada
-            if not st.session_state.unsent_baselines[empreendimento]:
-                del st.session_state.unsent_baselines[empreendimento]
-        
-        return True
+            if sucesso:
+                # 3. Se salvou no banco, remove da lista de pendências
+                if ('unsent_baselines' in st.session_state and 
+                    empreendimento in st.session_state.unsent_baselines and 
+                    version_name in st.session_state.unsent_baselines[empreendimento]):
+                    
+                    st.session_state.unsent_baselines[empreendimento].remove(version_name)
+                    
+                    if not st.session_state.unsent_baselines[empreendimento]:
+                        del st.session_state.unsent_baselines[empreendimento]
+                return True
+            else:
+                return False
+        else:
+            st.error("Dados da baseline não encontrados para envio.")
+            return False
+
     except Exception as e:
         st.error(f"Erro ao enviar para AWS: {e}")
         return False
@@ -836,16 +851,25 @@ def converter_dados_para_gantt(df):
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
 def take_gantt_baseline(df, empreendimento):
-    """Cria uma linha de base do estado atual do Gantt - VERSÃO CORRIGIDA E UNIFICADA"""
-    
+    """
+    Cria uma linha de base (snapshot) do estado atual do Gantt.
+    Tenta salvar na AWS; se falhar, salva localmente para envio posterior.
+    """
+    from datetime import datetime
+    import json
+    import pandas as pd
+    import streamlit as st
+
     try:
-        # Filtrar dados do empreendimento
+        # 1. Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
         if df_empreendimento.empty:
             raise Exception(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
         
-        # Preparar dados para baseline
+        # 2. Preparar estrutura do JSON da Baseline
+        current_date_str = datetime.now().strftime("%d/%m/%Y")
+        
         baseline_data = {
             'empreendimento': empreendimento,
             'data_criacao': datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -853,24 +877,29 @@ def take_gantt_baseline(df, empreendimento):
             'tasks': []
         }
         
-        # Converter tasks para formato serializável
+        # 3. Converter tasks para formato serializável
         task_count = 0
         for _, row in df_empreendimento.iterrows():
             try:
+                # Tenta obter o nome completo, se falhar usa a sigla
+                etapa_nome = row.get('Etapa', '')
+                etapa_completa = sigla_para_nome_completo.get(etapa_nome, etapa_nome) if 'sigla_para_nome_completo' in globals() else etapa_nome
+
                 task = {
-                    'etapa': row.get('Etapa', ''),
-                    'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
-                    'inicio_previsto': None,
-                    'termino_previsto': None,
-                    'inicio_real': None,
-                    'termino_real': None,
+                    'etapa': etapa_nome,
+                    'etapa_nome_completo': etapa_completa,
                     'percentual_concluido': row.get('% concluído', 0),
                     'setor': row.get('SETOR', ''),
                     'grupo': row.get('GRUPO', ''),
-                    'ugb': row.get('UGB', '')
+                    'ugb': row.get('UGB', ''),
+                    # Inicializa datas como None
+                    'inicio_previsto': None,
+                    'termino_previsto': None,
+                    'inicio_real': None,
+                    'termino_real': None
                 }
                 
-                # Converter datas para string com tratamento seguro
+                # Converter datas para string (YYYY-MM-DD) com segurança
                 date_fields = {
                     'inicio_previsto': 'Inicio_Prevista',
                     'termino_previsto': 'Termino_Prevista', 
@@ -885,6 +914,7 @@ def take_gantt_baseline(df, empreendimento):
                             task[task_field] = date_val.strftime("%Y-%m-%d")
                         else:
                             try:
+                                # Tenta converter se for string ou outro formato
                                 parsed_date = pd.to_datetime(date_val)
                                 task[task_field] = parsed_date.strftime("%Y-%m-%d")
                             except:
@@ -894,23 +924,27 @@ def take_gantt_baseline(df, empreendimento):
                 task_count += 1
                 
             except Exception as task_error:
-                print(f"⚠️ Erro ao processar task: {task_error}")
+                print(f"⚠️ Erro ao processar task para baseline: {task_error}")
                 continue
         
         if task_count == 0:
-            raise Exception("Nenhuma task válida encontrada para salvar")
+            raise Exception("Nenhuma task válida processada para salvar na baseline.")
         
-        # Gerar nome da versão
+        # 4. Gerar Nome da Versão (Px)
+        # Carrega baselines existentes (do banco ou cache) para saber qual o próximo número
         existing_baselines = load_baselines()
         empreendimento_baselines = existing_baselines.get(empreendimento, {})
-        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k and k.split('-')[0][1:].isdigit()]
+        
+        # Filtra chaves que começam com 'P' e têm número (Ex: P1-(DATA))
+        existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and '-' in k]
         
         next_n = 1
         if existing_versions:
             max_n = 0
             for version_name in existing_versions:
                 try:
-                    n_str = version_name.split('-')[0][1:]
+                    # Extrai o número após 'P' e antes do '-'
+                    n_str = version_name.split('-')[0][1:] # P10 -> 10
                     n = int(n_str)
                     if n > max_n:
                         max_n = n
@@ -919,14 +953,39 @@ def take_gantt_baseline(df, empreendimento):
             next_n = max_n + 1
         
         version_prefix = f"P{next_n}"
-        current_date_str = datetime.now().strftime("%d/%m/%Y")
         version_name = f"{version_prefix}-({current_date_str})"
         
-        # Salvar baseline
+        # 5. TENTAR SALVAR NO BANCO DE DADOS (AWS)
+        print(f"💾 Tentando salvar {version_name} na AWS...")
         success = save_baseline(empreendimento, version_name, baseline_data, current_date_str)
         
         if success:
-            # Marcar como não enviada para AWS
+            print(f"✅ Baseline {version_name} salva na AWS com sucesso!")
+            
+            # Se salvou na AWS com sucesso, garantimos que NÃO está na lista de "Não Enviados"
+            if 'unsent_baselines' in st.session_state:
+                if empreendimento in st.session_state.unsent_baselines:
+                    if version_name in st.session_state.unsent_baselines[empreendimento]:
+                        st.session_state.unsent_baselines[empreendimento].remove(version_name)
+            
+            return version_name
+            
+        else:
+            # 6. FALLBACK: Se falhou (sem internet/banco off), salva localmente
+            print(f"⚠️ Falha ao salvar na AWS. Salvando localmente para envio posterior.")
+            
+            # Salva no Cache Local (Session State)
+            if 'mock_baselines' not in st.session_state:
+                st.session_state.mock_baselines = {}
+            if empreendimento not in st.session_state.mock_baselines:
+                st.session_state.mock_baselines[empreendimento] = {}
+                
+            st.session_state.mock_baselines[empreendimento][version_name] = {
+                "date": current_date_str,
+                "data": baseline_data
+            }
+
+            # Adiciona à lista "Para Enviar" (unsent_baselines)
             if 'unsent_baselines' not in st.session_state:
                 st.session_state.unsent_baselines = {}
             
@@ -936,13 +995,10 @@ def take_gantt_baseline(df, empreendimento):
             if version_name not in st.session_state.unsent_baselines[empreendimento]:
                 st.session_state.unsent_baselines[empreendimento].append(version_name)
             
-            print(f"✅ Baseline {version_name} salva com sucesso!")
             return version_name
-        else:
-            raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
-        print(f"❌ Erro ao criar linha de base: {e}")
+        print(f"❌ Erro fatal ao criar linha de base: {e}")
         raise e
             
 
