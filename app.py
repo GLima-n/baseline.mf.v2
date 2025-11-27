@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #take_gantt_baseline
+from dateutil.relativedelta import relativedelta #function
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -2146,7 +2146,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
                
                 (function() {{
-                    // 1. Configuração
+                    // 1. Configuração e Elementos
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
@@ -2161,36 +2161,47 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     if (!container) return;
 
-                    // Limpeza
+                    // Limpeza de menus antigos para evitar duplicatas
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
                     if (oldToast) oldToast.remove();
 
-                    // 2. Criar Menu
+                    // 2. Criar Menu com DOIS botões
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
                     menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
+                    
                     menu.innerHTML = `
                         <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
                             <span>📸</span> <b>Criar Linha de Base</b>
                         </div>
+                        <div class="context-menu-item" id="btn-send-aws" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px; border-top:1px solid #eee;">
+                            <span>☁️</span> <b>Enviar p/ AWS</b>
+                        </div>
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast
+                    // 3. Criar Toast de Feedback
                     const toast = document.createElement('div');
                     toast.className = 'js-toast-loading';
                     toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
                     container.appendChild(toast);
 
-                    // 4. Listeners
+                    // 4. Listeners para Abrir/Fechar Menu
                     container.addEventListener('contextmenu', function(e) {{
+                        // Verifica se clicou na área do gráfico
                         if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
                             menu.style.display = 'block';
-                            menu.style.left = e.clientX + 'px';
-                            menu.style.top = e.clientY + 'px';
+                            
+                            // Lógica para manter o menu dentro da tela
+                            let x = e.clientX;
+                            let y = e.clientY;
+                            if (x + 160 > window.innerWidth) x -= 160;
+                            
+                            menu.style.left = x + 'px';
+                            menu.style.top = y + 'px';
                         }} else {{
                             menu.style.display = 'none';
                         }}
@@ -2202,13 +2213,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // --- 5. AÇÃO DO BOTÃO ---
-                    const btnCreate = menu.querySelector('#btn-create-baseline');
-                    
-                    btnCreate.addEventListener('click', function(e) {{
-                        e.stopPropagation();
-                        e.preventDefault();
-
+                    // --- FUNÇÃO AUXILIAR: Obter Nome e URL ---
+                    function getActionData() {{
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -2217,50 +2223,54 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
-                        menu.style.display = 'none';
-                        toast.style.display = 'block';
-                        toast.style.backgroundColor = "#2980b9";
-                        toast.innerHTML = `⏳ Processando <b>${{currentProjectName}}</b>...`;
-
-                        const encodedProject = encodeURIComponent(currentProjectName);
-                        const timestamp = new Date().getTime();
-                        
-                        // --- CORREÇÃO DA URL (REFERRER) ---
-                        // Isso pega a URL real (https://...) e ignora o about:srcdoc
+                        // Lógica de URL Base
                         let baseUrl = document.referrer;
-                        
-                        // Fallback para ancestorOrigins (Chrome)
                         if (!baseUrl && window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0) {{
                             baseUrl = window.location.ancestorOrigins[0];
                         }}
-                        
-                        // Limpeza
                         if (baseUrl && baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-                        
-                        // Se falhar tudo, usamos string vazia (URL Relativa) que às vezes funciona
                         if (!baseUrl) baseUrl = "";
-
-                        const finalUrl = baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
-
-                        console.log("🚀 URL Iframe Gerada:", finalUrl);
                         
-                        // Disparo no Iframe (Seguro)
-                        if (iframe) {{
-                            iframe.src = finalUrl;
-                            
-                            // Feedback Manual
-                            setTimeout(() => {{
-                                toast.style.backgroundColor = "#27ae60";
-                                toast.innerHTML = `
-                                    <div style="display:flex; flex-direction:column; gap:5px;">
-                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                        <span style="font-size:12px;">Dados processados com sucesso.</span>
-                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 para ver a Baseline.</span>
-                                    </div>
-                                `;
-                                setTimeout(() => {{ toast.style.display = 'none'; }}, 10000);
-                            }}, 4000);
-                        }}
+                        return {{ name: currentProjectName, baseUrl: baseUrl }};
+                    }}
+
+                    // --- 5. AÇÃO: CRIAR BASELINE ---
+                    const btnCreate = menu.querySelector('#btn-create-baseline');
+                    btnCreate.addEventListener('click', function(e) {{
+                        e.stopPropagation(); e.preventDefault();
+                        menu.style.display = 'none';
+
+                        const data = getActionData();
+                        
+                        toast.style.display = 'block';
+                        toast.style.backgroundColor = "#2980b9";
+                        toast.innerHTML = `⏳ Criando Baseline: <b>${{data.name}}</b>...`;
+
+                        const encodedProject = encodeURIComponent(data.name);
+                        const timestamp = new Date().getTime();
+                        const finalUrl = data.baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+
+                        if (iframe) iframe.src = finalUrl;
+                    }});
+
+                    // --- 6. AÇÃO: ENVIAR PARA AWS (NOVO) ---
+                    const btnSendAws = menu.querySelector('#btn-send-aws');
+                    btnSendAws.addEventListener('click', function(e) {{
+                        e.stopPropagation(); e.preventDefault();
+                        menu.style.display = 'none';
+
+                        const data = getActionData();
+                        
+                        toast.style.display = 'block';
+                        toast.style.backgroundColor = "#e67e22"; // Cor Laranja
+                        toast.innerHTML = `☁️ Enviando p/ AWS: <b>${{data.name}}</b>...`;
+
+                        const encodedProject = encodeURIComponent(data.name);
+                        const timestamp = new Date().getTime();
+                        const finalUrl = data.baseUrl + `/?context_action=send_to_aws&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
+
+                        console.log("Enviando comando para AWS:", finalUrl);
+                        if (iframe) iframe.src = finalUrl;
                     }});
 
                 }})();
@@ -5899,56 +5909,71 @@ def verificar_implementacao_baseline():
     return True
 
 # --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
-if 'context_action' in st.query_params and st.query_params['context_action'] == 'take_baseline':
-    print("⚡ BLOCO EXECUTIVO ACIONADO PELO IFRAME")
-    
-    try:
-        # 1. Decodifica Parametros
-        qp = st.query_params
-        raw_emp = qp.get('empreendimento')
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        
-        print(f"🎯 Alvo: {empreendimento}")
+# Substitua o bloco final atual por este código completo:
 
-        # 2. Carrega Dados (Sessão nova isolada para o Iframe)
-        # Isso garante que o iframe tenha dados frescos para tirar a foto da baseline
-        df_exec = load_data()
-        
-        # 3. Executa Salvamento
-        if df_exec is not None and not df_exec.empty:
-            if empreendimento in df_exec['Empreendimento'].unique():
-                print("💾 Salvando baseline no MySQL...")
-                
-                # Chama a função de salvar (que já está definida no seu código)
-                v_name = take_gantt_baseline(df_exec, empreendimento)
-                
-                print(f"✅ SUCESSO ABSOLUTO: {v_name} salvo!")
-                
-                # Limpa para evitar reprocessamento e loop infinito
-                st.query_params.clear()
-                
-                # Feedback visual (aparecerá dentro do iframe invisível, mas útil para debug)
-                st.success(f"✅ Baseline {v_name} criada com sucesso!")
-                
-                # Pequeno delay para garantir que o banco processou antes do reload
-                time.sleep(1.5)
-                
-                # Força recarregamento para atualizar a UI principal
-                st.rerun()
-                
-            else:
-                print(f"❌ Erro: Projeto {empreendimento} não encontrado nos dados carregados.")
-                st.error(f"❌ Projeto {empreendimento} não encontrado.")
-        else:
-            print("❌ Erro: Dados vazios no background.")
-            st.error("❌ Dados vazios no background.")
+if 'context_action' in st.query_params:
+    action = st.query_params['context_action']
+    
+    # === AÇÃO 1: CRIAR BASELINE ===
+    if action == 'take_baseline':
+        print("⚡ AÇÃO: CRIAR BASELINE (Via Iframe)")
+        try:
+            qp = st.query_params
+            raw_emp = qp.get('empreendimento')
+            if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+            empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
             
-    except Exception as e:
-        print(f"❌ CRASH NO BACKGROUND: {e}")
-        import traceback
-        traceback.print_exc()
-        st.error(f"❌ Erro ao criar baseline: {e}")
+            # Carrega dados frescos
+            df_exec = load_data()
+            
+            if df_exec is not None and not df_exec.empty and empreendimento:
+                v_name = take_gantt_baseline(df_exec, empreendimento)
+                st.query_params.clear() # Limpa URL
+                st.success(f"✅ Baseline {v_name} criada com sucesso!")
+                time.sleep(1.5)
+                st.rerun()
+        except Exception as e:
+            print(f"❌ Erro ao criar baseline: {e}")
+            st.error(f"Erro: {e}")
+
+    # === AÇÃO 2: ENVIAR PARA AWS (NOVA) ===
+    elif action == 'send_to_aws':
+        print("⚡ AÇÃO: ENVIAR PARA AWS (Via Iframe)")
+        try:
+            qp = st.query_params
+            raw_emp = qp.get('empreendimento')
+            if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+            empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+
+            if empreendimento:
+                # 1. Tenta pegar a última pendente na sessão
+                unsent = st.session_state.get('unsent_baselines', {}).get(empreendimento, [])
+                
+                # 2. Se não tiver pendente na sessão, pega a última do banco/cache
+                if not unsent:
+                    baselines = load_baselines()
+                    if empreendimento in baselines and baselines[empreendimento]:
+                        # Pega a última chave (versão mais recente)
+                        unsent = [sorted(list(baselines[empreendimento].keys()))[-1]]
+
+                if unsent:
+                    version_to_send = unsent[-1] # Pega a última da lista
+                    print(f"☁️ Enviando versão: {version_to_send}")
+                    
+                    if send_to_aws(empreendimento, version_to_send):
+                        st.query_params.clear() # Limpa URL
+                        st.success(f"✅ Baseline {version_to_send} enviada para AWS!")
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Falha ao enviar {version_to_send}.")
+                else:
+                    st.warning("⚠️ Nenhuma baseline encontrada para envio.")
+                    st.query_params.clear()
+                    
+        except Exception as e:
+            print(f"❌ Erro ao enviar para AWS: {e}")
+            st.error(f"Erro: {e}")
 
 # ------------------------------------------------------------------
 
