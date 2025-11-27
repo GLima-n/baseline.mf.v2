@@ -4874,7 +4874,7 @@ with st.spinner("Carregando e processando dados..."):
                     showStatus('🔄 Criando linha de base...', 'status-creating');
                     showLoading();
                     
-                    const empreendimento = '{selected_empreendimento}';
+                    const empreendimento = '{{selected_empreendimento}}';
     const projectDataToSend = {{
         ...projectData[0],
         tasks: allTasks_baseData
@@ -4912,26 +4912,26 @@ with st.spinner("Carregando e processando dados..."):
         }}
     }})
     .catch(erro// Função para criar linha de base via iframe invisível (AGORA SEM DADOS NA URL)
-                function executeTakeBaseline() {
+                function executeTakeBaseline() {{
                     showStatus('🔄 Criando linha de base...', 'status-creating');
                     showLoading();
                     
-                    const empreendimento = '{selected_empreendimento}';
+                    const empreendimento = '{{selected_empreendimento}}';
                     
                     // A URL agora só contém o comando e o empreendimento, evitando o erro 414.
                     // O backend (Python) irá buscar os dados grandes na st.session_state.
                     const timestamp = new Date().getTime();
-                    const url = `?context_action=take_baseline_post&empreendimento=${empreendimento}&t=${timestamp}`;
+                    const url = `?context_action=take_baseline_post&empreendimento=${{empreendimento}}&t=${{timestamp}}`;
                     
                     // Usar iframe invisível para carregar a URL
                     hiddenIframe.src = url;
                     
                     // Quando o iframe terminar de carregar
-                    hiddenIframe.onload = function() {
+                    hiddenIframe.onload = function() {{
                         hideLoading();
                         showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
-                    }
-                }  // Forçar uma atualização suave após 1 segundo
+                    }}
+                }}  // Forçar uma atualização suave após 1 segundo
                         setTimeout(() => {{
                             // Disparar um evento customizado para atualizar a interface
                             const event = new Event('baselineCreated');
@@ -4940,7 +4940,6 @@ with st.spinner("Carregando e processando dados..."):
                     }};
                     
                     hideContextMenu();
-                }}
                 
                 // Event Listeners
                 if (ganttArea) {{
