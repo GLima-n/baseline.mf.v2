@@ -62,6 +62,118 @@ else:
     # Se falhar isso, nada funciona.
     st.stop()
 
+# --- COLAR LOGO APÓS OS IMPORTS E CONFIG DO BANCO ---
+
+def process_url_actions_early():
+    """
+    Processa ações da URL imediatamente ao iniciar o script.
+    """
+    # 1. Tenta pegar da URL atual
+    params = st.query_params
+    source = "URL"
+    
+    # 2. Se não tiver na URL, tenta pegar do snapshot (caso o Streamlit tenha recarregado e limpado)
+    if 'context_action' not in params and '_url_snapshot' in st.session_state:
+        params = st.session_state['_url_snapshot']
+        source = "SNAPSHOT"
+
+    # Se não tem ação nenhuma, sai
+    if 'context_action' not in params:
+        return
+
+    action = params['context_action']
+    print(f"🚀 PROCESSANDO AÇÃO [{source}]: {action}")
+
+    # Recupera o empreendimento
+    raw_emp = params.get('empreendimento')
+    if isinstance(raw_emp, list): raw_emp = raw_emp[0]
+    empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+
+    # === AÇÃO: ENVIAR PARA AWS ===
+    if action == 'send_to_aws' and empreendimento:
+        print(f"☁️ Iniciando envio para AWS: {empreendimento}")
+        
+        # Carrega baselines para garantir dados frescos
+        baselines = load_baselines()
+        
+        # Tenta achar a versão correta
+        version_to_send = None
+        
+        # Prioridade 1: Lista de não enviados
+        unsent = st.session_state.get('unsent_baselines', {}).get(empreendimento, [])
+        if unsent:
+            version_to_send = unsent[-1]
+            print(f"📌 Usando versão pendente: {version_to_send}")
+        
+        # Prioridade 2: Última versão disponível no banco/memória
+        elif empreendimento in baselines and baselines[empreendimento]:
+            all_versions = sorted(list(baselines[empreendimento].keys()))
+            version_to_send = all_versions[-1]
+            print(f"📌 Usando última versão existente: {version_to_send}")
+
+        if version_to_send:
+            try:
+                # Dados
+                dados = baselines[empreendimento][version_to_send]['data']
+                data_criacao = baselines[empreendimento][version_to_send]['date']
+                
+                # ENVIO
+                sucesso = save_baseline(empreendimento, version_to_send, dados, data_criacao)
+                
+                if sucesso:
+                    print("✅ SUCESSO AWS!")
+                    st.toast(f"✅ Baseline {version_to_send} salva na AWS!", icon="☁️")
+                    
+                    # Limpa pendência
+                    if empreendimento in st.session_state.get('unsent_baselines', {}):
+                        if version_to_send in st.session_state.unsent_baselines[empreendimento]:
+                            st.session_state.unsent_baselines[empreendimento].remove(version_to_send)
+                else:
+                    print("❌ FALHA NO SAVE_BASELINE")
+                    st.toast("❌ Erro ao salvar no banco de dados.", icon="⚠️")
+            except Exception as e:
+                print(f"❌ ERRO CRÍTICO: {e}")
+                st.error(f"Erro no envio: {e}")
+        else:
+            print("⚠️ Nenhuma versão encontrada para enviar")
+            st.toast("Nenhuma baseline encontrada para enviar.", icon="⚠️")
+
+        # LIMPEZA FINAL (CRUCIAL)
+        st.query_params.clear()
+        if '_url_snapshot' in st.session_state:
+            del st.session_state['_url_snapshot']
+        
+        # Pequena pausa e rerun para limpar a URL visualmente
+        time.sleep(1)
+        st.rerun()
+
+    # === AÇÃO: CRIAR BASELINE ===
+    elif action == 'take_baseline' and empreendimento:
+        print(f"📸 Tirando baseline: {empreendimento}")
+        # Carrega dados APENAS se necessário (pois estamos no topo do script)
+        if 'df_data' not in st.session_state:
+            df_temp = load_data()
+        else:
+            df_temp = st.session_state.df_data
+            
+        if df_temp is not None and not df_temp.empty:
+            try:
+                v_name = take_gantt_baseline(df_temp, empreendimento)
+                print(f"✅ Baseline criada: {v_name}")
+                st.toast(f"Baseline {v_name} criada!", icon="📸")
+            except Exception as e:
+                print(f"❌ Erro ao criar baseline: {e}")
+                
+            # Limpeza
+            st.query_params.clear()
+            if '_url_snapshot' in st.session_state:
+                del st.session_state['_url_snapshot']
+            time.sleep(1)
+            st.rerun()
+
+# --- CHAMADA IMEDIATA (IMPORTANTE: FORA DE QUALQUER IF) ---
+process_url_actions_early()
+
 def log_debug(message):
     import os as debug_os
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -1052,10 +1164,6 @@ def process_context_menu_actions(df):
         # Decodifica o nome do empreendimento
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        # Limpar os parâmetros para evitar execução múltipla
-        # NOTA: No código de referência, isso é feito com st.query_params.clear()
-        # No seu código, a limpeza é feita no bloco executivo do iframe (linhas 5561-5562)
-        
         if action == 'take_baseline':
             if empreendimento:
                 try:
@@ -1074,37 +1182,6 @@ def process_context_menu_actions(df):
             else:
                 st.error("Empreendimento não especificado na ação de contexto.")
         
-        # Outras ações de contexto podem ser adicionadas aqui (ex: 'load_baseline')
-        
-        # O bloco executivo do iframe (linhas 5532-5572) no seu código já lida com a limpeza dos query_params
-        # e o salvamento em background, então esta função é mais para o feedback visual no app principal.
-        # No entanto, o código de referência sugere que esta função é chamada no app principal.
-        # Vamos manter a chamada no final do arquivo, como no código de referência.
-        
-        # Para garantir que o iframe não seja executado duas vezes (uma vez no app principal e outra no iframe),
-        # o código de referência usa o iframe para o salvamento em background.
-        # No seu código, o bloco executivo (linhas 5532-5572) já faz o salvamento em background.
-        # A função process_context_menu_actions no código de referência (linhas 260-270)
-        # é mais simples e apenas chama take_baseline.
-        # No seu código, o bloco executivo já lida com a ação de contexto.
-        # Vamos apenas garantir que a função create_gantt_context_menu_component está correta.
-        pass # Manter a lógica no bloco executivo do iframe, como já está no seu código.
-        
-        
-
-
-# O bloco executivo (linhas 5532-5572) no seu código já lida com a ação de contexto
-# acionada pelo iframe. A função process_context_menu_actions no código de referência
-# é mais simples e apenas chama take_baseline.
-# Vamos manter a lógica no bloco executivo do iframe, como já está no seu código,
-# e apenas adicionar a função create_gantt_context_menu_component e a chamada no final.
-# A função process_context_menu_actions do código de referência não é estritamente necessária
-# se o bloco executivo já faz o trabalho.
-
-# A função create_gantt_context_menu_component precisa do next_n.
-# Vamos calcular o next_n dentro da função, ou passá-lo como argumento.
-# Como o take_gantt_baseline já calcula, vamos replicar a lógica de cálculo de next_n
-# dentro de create_gantt_context_menu_component para exibir o nome correto no botão.
 
 def get_next_baseline_version(empreendimento):
     """Calcula o próximo número de versão da baseline."""
