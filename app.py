@@ -62,10 +62,6 @@ else:
     # Se falhar isso, nada funciona.
     st.stop()
 
-# --- COLAR LOGO APÓS OS IMPORTS E CONFIG DO BANCO ---
-
-# --- COLAR LOGO APÓS OS IMPORTS E CONFIG DO BANCO ---
-
 def process_url_actions_early():
     """
     Processa ações da URL imediatamente ao iniciar o script.
@@ -186,7 +182,6 @@ def log_debug(message):
     except:
         pass
 
-# Bloco original do usuário (mantido, mas a lógica principal será movida para process_context_menu_actions)
 if 'context_action' in st.query_params:
     # Salva uma cópia segura dos parâmetros na sessão
     st.session_state['_url_snapshot'] = dict(st.query_params)
@@ -671,47 +666,6 @@ def delete_baseline(empreendimento, version_name):
             return True
         return False
 
-# Adicione esta função temporária no início do seu arquivo, depois dos imports
-def diagnose_baseline_issues():
-    """Função temporária para diagnosticar problemas nas chamadas de baseline"""
-    import re
-    
-    # Lê o próprio arquivo
-    with open(__file__, 'r', encoding='utf-8') as f:
-        content = f.read()
-    
-    # Padrões para encontrar chamadas problemáticas
-    patterns = [
-        r'take_gantt_baseline\([^,]+,[^,]+,[^)]+\)',  # 3 argumentos
-        r'take_gantt_baseline\([^)]+\)',  # qualquer chamada
-    ]
-    
-    print("🔍 DIAGNÓSTICO DE CHAMADAS take_gantt_baseline:")
-    
-    for pattern in patterns:
-        matches = re.findall(pattern, content)
-        if matches:
-            print(f"📋 Padrão '{pattern}':")
-            for match in matches[:5]:  # Mostra apenas as primeiras 5
-                print(f"   → {match}")
-    
-    # Também procura na função process_context_menu_actions
-    if 'process_context_menu_actions' in content:
-        print("📍 Função process_context_menu_actions encontrada")
-        # Extrai essa função para análise
-        start = content.find('def process_context_menu_actions')
-        if start != -1:
-            end = content.find('\n\n', start)
-            if end == -1:
-                end = content.find('\ndef', start + 5)
-            if end != -1:
-                func_content = content[start:end]
-                if 'take_gantt_baseline' in func_content:
-                    print("❌ take_gantt_baseline encontrada em process_context_menu_actions")
-
-# Chame esta função uma vez
-diagnose_baseline_issues()
-
 # --- CÓDIGO MODIFICADO ---
 def converter_dados_para_gantt(df):
     if df.empty:
@@ -1150,40 +1104,7 @@ def send_to_aws(empreendimento, version_name):
         return True
     except Exception as e:
         st.error(f"Erro ao enviar para AWS: {e}")
-        return False
-
-def process_context_menu_actions(df):
-    """Processa ações do menu de contexto via query parameters"""
-    query_params = st.query_params
-    
-    if 'context_action' in query_params and 'empreendimento' in query_params:
-        action = query_params['context_action']
-        raw_emp = query_params['empreendimento']
-        
-        # O Streamlit pode retornar uma lista para query_params, garantimos que é uma string
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-        
-        # Decodifica o nome do empreendimento
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        
-        if action == 'take_baseline':
-            if empreendimento:
-                try:
-                    # A função take_gantt_baseline já existe no seu código (linha 696)
-                    v_name = take_gantt_baseline(df, empreendimento)
-                    st.success(f"Linha de base '{v_name}' criada com sucesso para {empreendimento}!")
-                    
-                    # Simular o envio para AWS (opcional, dependendo da sua implementação real)
-                    if send_to_aws(empreendimento, v_name):
-                        st.success(f"Linha de base '{v_name}' enviada para AWS com sucesso!")
-                    else:
-                        st.warning(f"Linha de base '{v_name}' salva localmente, mas falhou ao enviar para AWS.")
-                        
-                except Exception as e:
-                    st.error(f"Erro ao criar linha de base para {empreendimento}: {e}")
-            else:
-                st.error("Empreendimento não especificado na ação de contexto.")
-        
+        return False        
 
 def get_next_baseline_version(empreendimento):
     """Calcula o próximo número de versão da baseline."""
@@ -4768,14 +4689,6 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
 create_baselines_table()
 # 1. Log de Entrada
 log_debug("➡️ ENTRANDO NO MAIN")
-
-# 2. TENTA PROCESSAR AÇÃO IMEDIATAMENTE (Prioridade Total)
-try:
-    log_debug("📞 Chamando processador (Pré-Carga)...")
-    # Passamos None para forçar ele a carregar dados frescos se precisar
-    process_context_menu_actions(None)
-except Exception as e:
-    log_debug(f"❌ Crash ao chamar processador: {e}")
 
 # 3. Fluxo Normal da Aplicação
 create_baselines_table()
