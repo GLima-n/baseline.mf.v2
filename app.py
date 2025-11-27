@@ -294,83 +294,36 @@ def take_gantt_baseline_from_json(empreendimento, baseline_data_json, tipo_visua
 def process_context_menu_actions(df=None):
     query_params = st.query_params
     
-    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
-        # Lógica para o método GET (antigo)
-        # 1. Decodifica parâmetros
-        raw_emp = query_params.get('empreendimento', None)
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline_post':
+        # Lógica para o método POST (novo) - AGORA SEM PASSAR DADOS NA URL
+        # O frontend envia apenas o comando e o nome do empreendimento.
+        empreendimento = query_params.get('empreendimento', None)
         
-        raw_data = query_params.get('data', None)
-        baseline_data_json = None
-        if raw_data:
+        if empreendimento and 'gantt_data_to_save' in st.session_state:
             try:
-                decoded_data = urllib.parse.unquote(raw_data)
-                baseline_data_json = json.loads(decoded_data)
-            except Exception as e:
-                print(f"❌ Erro ao decodificar/parsear JSON da baseline (GET): {e}")
-                return
+                # Os dados grandes foram salvos na session_state antes de renderizar o HTML
+                baseline_data_json = st.session_state.gantt_data_to_save
+                
+                print(f"🔔 BACKEND (SESSION_STATE): Recebido comando para '{empreendimento}'")
 
-        print(f"🔔 BACKEND (GET): Recebido comando para '{empreendimento}'")
-
-        # 2. Executa Salvamento
-        if empreendimento and baseline_data_json:
-            try:
-                # Cria a baseline usando os dados recebidos diretamente do frontend
+                # 2. Executa Salvamento
                 version_name = take_gantt_baseline_from_json(empreendimento, baseline_data_json, "Gantt")
-                print(f"✅ FINALIZADO (GET): {version_name} criado e salvo no banco.")
+                print(f"✅ FINALIZADO (SESSION_STATE): {version_name} criado e salvo no banco.")
                 
-                # Limpa URL
+                # Limpa a session_state e a URL
+                del st.session_state.gantt_data_to_save
                 st.query_params.clear()
-                
+
             except Exception as e:
-                print(f"❌ Erro ao salvar baseline (GET): {e}")
+                print(f"❌ Erro ao salvar baseline (SESSION_STATE): {e}")
                 
         else:
-            print(f"❌ Erro (GET): Empreendimento não encontrado ou dados da baseline ausentes.")
-
-    elif 'context_action' in query_params and query_params['context_action'] == 'take_baseline_post':
-        # Lógica para o método POST (novo)
-        import sys
-        
-        try:
-            # Tenta ler o corpo da requisição POST
-            post_data_raw = sys.stdin.read()
-            if not post_data_raw:
-                print("❌ Erro (POST): Corpo da requisição vazio.")
-                return
-
-            # O corpo da requisição deve ser um JSON contendo 'empreendimento' e 'data'
-            post_data = json.loads(post_data_raw)
-            
-            empreendimento = post_data.get('empreendimento')
-            baseline_data_json = post_data.get('data')
-            
-            if not empreendimento or not baseline_data_json:
-                print("❌ Erro (POST): 'empreendimento' ou 'data' ausentes no corpo da requisição.")
-                return
-
-            print(f"🔔 BACKEND (POST): Recebido comando para '{empreendimento}'")
-
-            # 2. Executa Salvamento
-            # O baseline_data_json já deve ser o JSON de dados do Gantt
-            version_name = take_gantt_baseline_from_json(empreendimento, baseline_data_json, "Gantt")
-            print(f"✅ FINALIZADO (POST): {version_name} criado e salvo no banco.")
-            
-            # Limpa URL (embora em POST isso possa não ser estritamente necessário, é bom para consistência)
-            st.query_params.clear()
-
-        except json.JSONDecodeError:
-            print(f"❌ Erro (POST): Falha ao decodificar JSON do corpo da requisição: {post_data_raw[:100]}...")
-        except Exception as e:
-            print(f"❌ Erro ao processar requisição POST: {e}")
-        
-        # É crucial retornar algo ou encerrar a execução para evitar que o Streamlit continue
-        # o processamento normal, que pode levar a um loop ou erro.
-        # Como estamos dentro de uma função chamada pelo Streamlit, o simples retorno
-        # deve ser suficiente, mas em um ambiente de servidor puro, seria necessário
-        # enviar uma resposta HTTP 200. No Streamlit, a limpeza do query_params
-        # e o retorno são a melhor prática.
-        return
+            print(f"❌ Erro (SESSION_STATE): Empreendimento não encontrado ou dados da baseline ausentes na session_state.")
+    
+    # Removendo a lógica antiga de 'take_baseline' (GET) para forçar o uso da nova
+    # if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+    #     ... (lógica antiga)
+    #     pass
 
 
 # --- Funções do Novo Gráfico Gantt ---
@@ -1095,6 +1048,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         if not gantt_data_base:
             st.warning("Nenhum dado disponível para exibir.")
             return
+        
+        # --- SALVAR DADOS GRANDES NA SESSION STATE ANTES DE RENDERIZAR O HTML ---
+        # Isso permite que o backend acesse os dados após o rerun acionado pelo JS,
+        # sem precisar passar os dados na URL.
+        if gantt_data_base and gantt_data_base[0]:
+            st.session_state.gantt_data_to_save = gantt_data_base[0]
 
         # --- Prepara opções de filtro ---
         filter_options = {
@@ -4945,29 +4904,27 @@ with st.spinner("Carregando e processando dados..."):
             showStatus('❌ Erro ao criar linha de base. Verifique o console.', 'status-error');
         }}
     }})
-    .catch(error => {{
-        console.error("Erro de rede ao enviar requisição POST:", error);
-        hideLoading();
-        showStatus('❌ Erro de rede ao criar linha de base. Verifique o console.', 'status-error');
-    }});
+    .catch(erro// Função para criar linha de base via iframe invisível (AGORA SEM DADOS NA URL)
+                function executeTakeBaseline() {{
+                    showStatus('🔄 Criando linha de base...', 'status-creating');
+                    showLoading();
+                    
+                    const empreendimento = '{selected_empreendimento}';
+                    
+                    // A URL agora só contém o comando e o empreendimento, evitando o erro 414.
+                    // O backend (Python) irá buscar os dados grandes na st.session_state.
                     const timestamp = new Date().getTime();
-                    const projectDataToSend = {{
-                        ...projectData[0],
-                        tasks: allTasks_baseData
-                    }};
-                    const projectDataString = JSON.stringify(projectDataToSend);
-                    const encodedData = encodeURIComponent(projectDataString);
-                    const url = `?context_action=take_baseline&empreendimento={selected_empreendimento}&t=${{timestamp}}&data=${{encodedData}}`;
+                    const url = `?context_action=take_baseline_post&empreendimento=${empreendimento}&t=${{timestamp}}`;
                     
                     // Usar iframe invisível para carregar a URL
-                    // hiddenIframe.src = url; (Removido o uso do iframe)
+                    hiddenIframe.src = url;
                     
                     // Quando o iframe terminar de carregar
-                    // hiddenIframe.onload = function() {{ (Removido o uso do iframe){{
+                    hiddenIframe.onload = function() {{
                         hideLoading();
-                        // showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success'); (Removido o uso do iframe)
-                        
-                        // Forçar uma atualização suave após 1 segundo
+                        showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
+                    }}
+                }}  // Forçar uma atualização suave após 1 segundo
                         setTimeout(() => {{
                             // Disparar um evento customizado para atualizar a interface
                             const event = new Event('baselineCreated');
@@ -4976,8 +4933,7 @@ with st.spinner("Carregando e processando dados..."):
                     }};
                     
                     hideContextMenu();
-                }}
-                
+
                 // Event Listeners
                 if (ganttArea) {{
                     ganttArea.addEventListener('contextmenu', function(e) {{
