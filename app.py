@@ -4926,9 +4926,9 @@ with st.spinner("Carregando e processando dados..."):
     // Envia a requisição via fetch (método POST)
     fetch(actionUrl, {{
         method: 'POST',
-        headers: {
+        headers: {{
             'Content-Type': 'application/json'
-        },
+        }},
         body: postBody
     }})
     .then(response => {{
