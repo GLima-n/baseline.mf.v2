@@ -4598,7 +4598,14 @@ with st.spinner("Carregando e processando dados..."):
                     if st.button("📸 Criar Linha de Base", use_container_width=True):
                         if selected_empreendimento_baseline:
                             try:
-                                version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
+                                # 1. Converte os dados do DataFrame para o formato JSON do Gantt
+                                gantt_data_list = converter_dados_para_gantt(df_data[df_data['Empreendimento'] == selected_empreendimento_baseline].copy())
+                                if gantt_data_list:
+                                    gantt_data_json = gantt_data_list[0]
+                                    # 2. Salva a baseline usando a função que aceita JSON
+                                    version_name = take_gantt_baseline_from_json(selected_empreendimento_baseline, gantt_data_json, tipo_visualizacao)
+                                else:
+                                    raise ValueError("Não foi possível gerar os dados do Gantt para o empreendimento selecionado.")
                                 st.success(f"✅ {version_name} criado!")
                                 st.rerun()
                             except Exception as e:
@@ -4905,26 +4912,26 @@ with st.spinner("Carregando e processando dados..."):
         }}
     }})
     .catch(erro// Função para criar linha de base via iframe invisível (AGORA SEM DADOS NA URL)
-                function executeTakeBaseline() {{
+                function executeTakeBaseline() {
                     showStatus('🔄 Criando linha de base...', 'status-creating');
                     showLoading();
                     
-                    const empreendimento = '{{selected_empreendimento}}';
+                    const empreendimento = '{selected_empreendimento}';
                     
                     // A URL agora só contém o comando e o empreendimento, evitando o erro 414.
                     // O backend (Python) irá buscar os dados grandes na st.session_state.
                     const timestamp = new Date().getTime();
-                    const url = `?context_action=take_baseline_post&empreendimento=${{empreendimento}}&t=${{timestamp}}`;
+                    const url = `?context_action=take_baseline_post&empreendimento=${empreendimento}&t=${timestamp}`;
                     
                     // Usar iframe invisível para carregar a URL
                     hiddenIframe.src = url;
                     
                     // Quando o iframe terminar de carregar
-                    hiddenIframe.onload = function() {{
+                    hiddenIframe.onload = function() {
                         hideLoading();
                         showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
-                    }}
-                }}  // Forçar uma atualização suave após 1 segundo
+                    }
+                }  // Forçar uma atualização suave após 1 segundo
                         setTimeout(() => {{
                             // Disparar um evento customizado para atualizar a interface
                             const event = new Event('baselineCreated');
@@ -4933,7 +4940,8 @@ with st.spinner("Carregando e processando dados..."):
                     }};
                     
                     hideContextMenu();
-
+                }}
+                
                 // Event Listeners
                 if (ganttArea) {{
                     ganttArea.addEventListener('contextmenu', function(e) {{
