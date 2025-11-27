@@ -210,6 +210,52 @@ def create_baselines_table():
         finally:
             conn.close()
 
+import streamlit.components.v1 as components
+
+def create_baseline_trigger_component():
+    """Cria um componente que pode receber mensagens do JavaScript"""
+    
+    # HTML e JavaScript para receber comandos de baseline
+    component_html = """
+    <script>
+    // Função para receber mensagens dos iframes
+    window.addEventListener('message', function(event) {
+        // Verifica se a mensagem é para criar baseline
+        if (event.data && event.data.type === 'STREAMLIT_CREATE_BASELINE') {
+            // Envia os dados para o Streamlit
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: event.data
+            }, '*');
+        }
+    });
+    
+    // Função global que os iframes podem chamar
+    window.streamlitBaseline = {
+        create: function(projectName) {
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: {
+                    type: 'CREATE_BASELINE',
+                    projectName: projectName,
+                    timestamp: new Date().getTime()
+                }
+            }, '*');
+        }
+    };
+    </script>
+    """
+    
+    # Cria o componente
+    component_value = components.html(
+        component_html,
+        height=0,
+        key="baseline_trigger_component"
+    )
+    
+    return component_value
+
+
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao="Gantt"):
     conn = get_db_connection()
     if conn:
@@ -1777,7 +1823,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- SOLUÇÃO PRÁTICA: IFRAME TEMPORÁRIO ---
+                // --- SOLUÇÃO GARANTIDA: USANDO FORM SUBMIT ---
                     (function() {{
                         const containerId = 'gantt-container-' + '{project["id"]}';
                         const container = document.getElementById(containerId);
@@ -1817,7 +1863,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }}, true);
 
-                        // --- AÇÃO DO BOTÃO COM IFRAME TEMPORÁRIO ---
+                        // --- AÇÃO DO BOTÃO COM FORM SUBMIT ---
                         const btnCreate = menu.querySelector('#btn-create-baseline');
                         
                         btnCreate.addEventListener('click', function(e) {{
@@ -1836,32 +1882,36 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             // 2. Feedback Visual
                             menu.style.display = 'none';
                             
-                            // 3. SOLUÇÃO: Cria um iframe temporário para disparar a URL
-                            const tempIframe = document.createElement('iframe');
-                            tempIframe.style.display = 'none';
-                            tempIframe.style.width = '0';
-                            tempIframe.style.height = '0';
-                            tempIframe.style.border = '0';
+                            // 3. SOLUÇÃO GARANTIDA: Cria um form e submete
+                            const form = document.createElement('form');
+                            form.method = 'GET';
+                            form.action = window.location.href.split('?')[0]; // URL base sem parâmetros
                             
-                            // Monta a URL com os parâmetros
-                            const baseUrl = window.location.href.split('?')[0];
-                            const novaUrl = `${{baseUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}&t=${{new Date().getTime()}}`;
+                            // Adiciona campos hidden com os parâmetros
+                            const taskInput = document.createElement('input');
+                            taskInput.type = 'hidden';
+                            taskInput.name = 'task';
+                            taskInput.value = 'save_baseline';
+                            form.appendChild(taskInput);
                             
-                            tempIframe.src = novaUrl;
-                            document.body.appendChild(tempIframe);
+                            const empInput = document.createElement('input');
+                            empInput.type = 'hidden';
+                            empInput.name = 'emp';
+                            empInput.value = currentProjectName;
+                            form.appendChild(empInput);
                             
-                            console.log('🚀 Iframe temporário criado com URL:', novaUrl);
+                            const timestampInput = document.createElement('input');
+                            timestampInput.type = 'hidden';
+                            timestampInput.name = 't';
+                            timestampInput.value = new Date().getTime();
+                            form.appendChild(timestampInput);
                             
-                            // Remove o iframe após um tempo
-                            setTimeout(() => {{
-                                if (document.body.contains(tempIframe)) {{
-                                    document.body.removeChild(tempIframe);
-                                    console.log('✅ Iframe temporário removido');
-                                }}
-                            }}, 2000);
+                            // Adiciona o form ao body e submete
+                            document.body.appendChild(form);
+                            form.submit();
                             
-                            // Feedback para o usuário
-                            alert(`✅ Comando enviado para criar baseline de: ${{currentProjectName}}\\n\\nA página será atualizada em instantes...`);
+                            console.log('✅ Form submetido para:', form.action);
+                            console.log('📤 Parâmetros:', {{ task: 'save_baseline', emp: currentProjectName }});
                         }});
                     }})();
                     function initGantt() {{
@@ -4425,46 +4475,51 @@ with st.spinner("Carregando e processando dados..."):
         st.session_state.df_data = df_data
         
         # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
+        # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
         query_params = st.query_params
         task = query_params.get("task")
         emp_alvo = query_params.get("emp")
-        
-        # DEBUG: Mostra os parâmetros recebidos
-        st.sidebar.write("🔍 Debug Parâmetros URL:")
-        st.sidebar.write(f"Task: {task}")
-        st.sidebar.write(f"Empreendimento: {emp_alvo}")
-        st.sidebar.write(f"DF Data vazio: {df_data.empty if df_data is not None else 'None'}")
+
+        # DEBUG FORÇADO - remova depois que funcionar
+        st.sidebar.markdown("### 🐛 DEBUG")
+        st.sidebar.write("Query params:", dict(query_params))
+        st.sidebar.write("Task:", task)
+        st.sidebar.write("Emp:", emp_alvo)
+        st.sidebar.write("DF carregado:", df_data is not None and not df_data.empty)
 
         if task == "save_baseline" and emp_alvo and df_data is not None:
-            st.sidebar.success("🎯 Comando de baseline detectado!")
+            st.sidebar.success("🎯 COMANDO RECEBIDO - PROCESSANDO BASELINE")
             
             try:
-                # DEBUG: Verifica se o empreendimento existe
-                empreendimentos_existentes = df_data['Empreendimento'].unique()
-                st.sidebar.write(f"📊 Empreendimentos no DF: {len(empreendimentos_existentes)}")
+                # Verifica se o empreendimento existe
+                empreendimentos = df_data['Empreendimento'].unique().tolist()
+                st.sidebar.write("Empreendimentos disponíveis:", empreendimentos[:5])  # Mostra os 5 primeiros
                 
-                if emp_alvo in empreendimentos_existentes:
-                    st.sidebar.success(f"✅ Empreendimento '{emp_alvo}' encontrado!")
+                if emp_alvo in empreendimentos:
+                    st.sidebar.success(f"✅ EMPREENDIMENTO ENCONTRADO: {emp_alvo}")
                     
-                    # Chama a função que você já criou, passando o DF atual
+                    # Chama a função de baseline
                     nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
+                    
+                    # Feedback
                     st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
                     st.success(f"Sucesso: Baseline criada para {emp_alvo}")
                     
-                    # DEBUG
-                    st.sidebar.success(f"🚀 Baseline '{nova_versao}' criada com sucesso!")
+                    # Limpa a URL
+                    st.query_params.clear()
+                    st.sidebar.info("🔄 URL limpa - recarregando...")
                     
+                    # Recarrega a página
+                    st.rerun()
                 else:
-                    st.error(f"❌ Empreendimento '{emp_alvo}' NÃO encontrado no DataFrame")
-                    st.sidebar.error(f"Empreendimento '{emp_alvo}' não encontrado. Disponíveis: {list(empreendimentos_existentes[:5])}...")
+                    st.error(f"❌ EMPREENDIMENTO NÃO ENCONTRADO: '{emp_alvo}'")
+                    st.sidebar.error(f"Disponíveis: {empreendimentos}")
                     
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
-                st.sidebar.error(f"❌ Erro: {e}")
-
-            # Limpa a URL para não ficar salvando em loop se der F5
-            st.query_params.clear()
-            st.sidebar.info("🔄 URL limpa - recarregue a página")
+                st.sidebar.error(f"💥 ERRO: {str(e)}")
+                import traceback
+                st.sidebar.code(traceback.format_exc())
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
