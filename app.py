@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #get_db_connection
+from dateutil.relativedelta import relativedelta #process_context_menu_actions
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -1755,20 +1755,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
                 // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
+                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                 (function() {{
                     // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
-                    // Garante iframe
-                    let iframe = document.getElementById('hidden-iframe');
-                    if (!iframe) {{
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'hidden-iframe';
-                        iframe.style.display = 'none';
-                        if(container) container.appendChild(iframe);
-                    }}
-
                     if (!container) return;
 
                     // Limpeza visual
@@ -1788,10 +1780,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast
+                    // 3. Criar Toast (opcional, para feedback)
                     const toast = document.createElement('div');
                     toast.className = 'js-toast-loading';
                     toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
+                    toast.innerHTML = "🔄 Redirecionando para salvar baseline...";
                     container.appendChild(toast);
 
                     // 4. Listeners
@@ -1812,14 +1805,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // --- 5. AÇÃO DO BOTÃO ---
+                    // --- 5. AÇÃO DO BOTÃO (SIMPLIFICADA) ---
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
                         e.stopPropagation();
                         e.preventDefault();
 
-                        // A. Nome do Projeto
+                        // 1. Pega o nome do projeto
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
@@ -1828,47 +1821,20 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
-                        // B. Feedback Visual (Laranja = Processando)
+                        // 2. Feedback Visual Rápido
                         menu.style.display = 'none';
                         toast.style.display = 'block';
-                        toast.style.backgroundColor = "#e67e22"; // Laranja
-                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
-                        // C. Montar URL CORRETA
-                        const encodedProject = encodeURIComponent(currentProjectName);
-                        const timestamp = new Date().getTime();
+                        // 3. O PULO DO GATO: Atualiza a URL do navegador principal
+                        // Isso força o Streamlit a rodar o script Python novamente.
+                        // Usamos 'encodeURIComponent' para garantir que espaços e acentos funcionem.
+                        const baseUrl = window.parent.location.href.split('?')[0];
+                        const novaUrl = `${{baseUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}`;
+
+                        console.log("🚀 Nova URL de comando:", novaUrl);
                         
-                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                        // Isso corrige o bug do "about:srcdoc"
-                        let baseUrl = document.referrer;
-                        if (!baseUrl || baseUrl === "") {{
-                             // Fallback raro
-                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
-                        }}
-                        // Remove barra final
-                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-
-                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
-
-                        console.log("🚀 URL Iframe:", finalUrl);
-                        
-                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
-                        if (iframe) iframe.src = finalUrl;
-
-                        // E. Feedback Final
-                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
-                        setTimeout(() => {{
-                            toast.style.backgroundColor = "#27ae60"; // Verde
-                            toast.innerHTML = `
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
-                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
-                                </div>
-                            `;
-                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
-                        }}, 4000);
+                        // Redireciona a página PAI (o app Streamlit) para essa nova URL com o comando
+                        window.parent.location.href = novaUrl;
                     }});
 
                 }})();
@@ -4423,6 +4389,7 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
     return df_filtered
 
 # --- Bloco Principal ---
+# --- Bloco Principal ---
 with st.spinner("Carregando e processando dados..."):
     # 1. Carrega os dados
     df_data = load_data()
@@ -4430,6 +4397,27 @@ with st.spinner("Carregando e processando dados..."):
     # 2. Verifica se carregou corretamente
     if df_data is not None:
         st.session_state.df_data = df_data
+        
+        # INÍCIO DA NOVA ABORDAGEM - PORTEIRO DE COMANDOS
+        # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
+        # Verifica se a URL tem ?task=save_baseline&emp=NOME_DO_PROJETO
+        query_params = st.query_params
+        task = query_params.get("task")
+        emp_alvo = query_params.get("emp")
+
+        if task == "save_baseline" and emp_alvo and df_data is not None:
+            # O Python recalcula os dados do zero usando o DF que ele já tem na memória
+            try:
+                # Chama a função que você já criou, passando o DF atual
+                # ATENÇÃO: Use "Gantt" ou o tipo de visualização padrão
+                nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
+                st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
+                st.success(f"Sucesso: Baseline criada para {emp_alvo}")
+            except Exception as e:
+                st.error(f"Erro ao salvar: {e}")
+
+            # Limpa a URL para não ficar salvando em loop se der F5
+            st.query_params.clear()
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
@@ -4442,7 +4430,7 @@ with st.spinner("Carregando e processando dados..."):
         # --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
         # Chamamos a função passando o df_data carregado AGORA.
         # Não confiamos apenas no session_state antigo.
-        process_context_menu_actions(df_data)
+        #process_context_menu_actions(df_data)
         # --------------------------------------
 
         with st.sidebar:
