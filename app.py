@@ -295,6 +295,7 @@ def process_context_menu_actions(df=None):
     query_params = st.query_params
     
     if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        # Lógica para o método GET (antigo)
         # 1. Decodifica parâmetros
         raw_emp = query_params.get('empreendimento', None)
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
@@ -306,26 +307,71 @@ def process_context_menu_actions(df=None):
                 decoded_data = urllib.parse.unquote(raw_data)
                 baseline_data_json = json.loads(decoded_data)
             except Exception as e:
-                print(f"❌ Erro ao decodificar/parsear JSON da baseline: {e}")
+                print(f"❌ Erro ao decodificar/parsear JSON da baseline (GET): {e}")
                 return
 
-        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
+        print(f"🔔 BACKEND (GET): Recebido comando para '{empreendimento}'")
 
         # 2. Executa Salvamento
         if empreendimento and baseline_data_json:
             try:
                 # Cria a baseline usando os dados recebidos diretamente do frontend
                 version_name = take_gantt_baseline_from_json(empreendimento, baseline_data_json, "Gantt")
-                print(f"✅ FINALIZADO: {version_name} criado e salvo no banco.")
+                print(f"✅ FINALIZADO (GET): {version_name} criado e salvo no banco.")
                 
                 # Limpa URL
                 st.query_params.clear()
                 
             except Exception as e:
-                print(f"❌ Erro ao salvar baseline: {e}")
+                print(f"❌ Erro ao salvar baseline (GET): {e}")
                 
         else:
-            print(f"❌ Erro: Empreendimento não encontrado ou dados da baseline ausentes.")
+            print(f"❌ Erro (GET): Empreendimento não encontrado ou dados da baseline ausentes.")
+
+    elif 'context_action' in query_params and query_params['context_action'] == 'take_baseline_post':
+        # Lógica para o método POST (novo)
+        import sys
+        
+        try:
+            # Tenta ler o corpo da requisição POST
+            post_data_raw = sys.stdin.read()
+            if not post_data_raw:
+                print("❌ Erro (POST): Corpo da requisição vazio.")
+                return
+
+            # O corpo da requisição deve ser um JSON contendo 'empreendimento' e 'data'
+            post_data = json.loads(post_data_raw)
+            
+            empreendimento = post_data.get('empreendimento')
+            baseline_data_json = post_data.get('data')
+            
+            if not empreendimento or not baseline_data_json:
+                print("❌ Erro (POST): 'empreendimento' ou 'data' ausentes no corpo da requisição.")
+                return
+
+            print(f"🔔 BACKEND (POST): Recebido comando para '{empreendimento}'")
+
+            # 2. Executa Salvamento
+            # O baseline_data_json já deve ser o JSON de dados do Gantt
+            version_name = take_gantt_baseline_from_json(empreendimento, baseline_data_json, "Gantt")
+            print(f"✅ FINALIZADO (POST): {version_name} criado e salvo no banco.")
+            
+            # Limpa URL (embora em POST isso possa não ser estritamente necessário, é bom para consistência)
+            st.query_params.clear()
+
+        except json.JSONDecodeError:
+            print(f"❌ Erro (POST): Falha ao decodificar JSON do corpo da requisição: {post_data_raw[:100]}...")
+        except Exception as e:
+            print(f"❌ Erro ao processar requisição POST: {e}")
+        
+        # É crucial retornar algo ou encerrar a execução para evitar que o Streamlit continue
+        # o processamento normal, que pode levar a um loop ou erro.
+        # Como estamos dentro de uma função chamada pelo Streamlit, o simples retorno
+        # deve ser suficiente, mas em um ambiente de servidor puro, seria necessário
+        # enviar uma resposta HTTP 200. No Streamlit, a limpeza do query_params
+        # e o retorno são a melhor prática.
+        return
+
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -4857,12 +4903,53 @@ with st.spinner("Carregando e processando dados..."):
                     }}, 3000);
                 }}
                 
-                // Função para criar linha de base via iframe invisível
+                // Função para criar linha de base via fetch POST
                 function executeTakeBaseline() {{
                     showStatus('🔄 Criando linha de base...', 'status-creating');
                     showLoading();
                     
-                    // Criar URL com parâmetros para o Streamlit processar
+                    const empreendimento = '{selected_empreendimento}';
+    const projectDataToSend = {{
+        ...projectData[0],
+        tasks: allTasks_baseData
+    }};
+    
+    // Dados a serem enviados no corpo da requisição POST
+    const postBody = JSON.stringify({{
+        empreendimento: empreendimento,
+        data: projectDataToSend
+    }});
+    
+    // URL de ação (sem os dados na query string)
+    const actionUrl = `?context_action=take_baseline_post`;
+    
+    // Envia a requisição via fetch (método POST)
+    fetch(actionUrl, {{
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: postBody
+    }})
+    .then(response => {{
+        // Se a resposta for OK (200), o Streamlit fará o rerun
+        if (response.ok) {{
+            console.log("Requisição POST enviada com sucesso. Esperando Streamlit Rerun.");
+            // O Streamlit fará o rerun e o backend processará a ação
+            // A mensagem de sucesso será exibida após o rerun.
+            hideLoading();
+            showStatus('✅ Linha de base criada! O Streamlit está recarregando...', 'status-success');
+        }} else {{
+            console.error("Erro ao enviar requisição POST:", response.statusText);
+            hideLoading();
+            showStatus('❌ Erro ao criar linha de base. Verifique o console.', 'status-error');
+        }}
+    }})
+    .catch(error => {{
+        console.error("Erro de rede ao enviar requisição POST:", error);
+        hideLoading();
+        showStatus('❌ Erro de rede ao criar linha de base. Verifique o console.', 'status-error');
+    }});
                     const timestamp = new Date().getTime();
                     const projectDataToSend = {{
                         ...projectData[0],
@@ -4873,12 +4960,12 @@ with st.spinner("Carregando e processando dados..."):
                     const url = `?context_action=take_baseline&empreendimento={selected_empreendimento}&t=${{timestamp}}&data=${{encodedData}}`;
                     
                     // Usar iframe invisível para carregar a URL
-                    hiddenIframe.src = url;
+                    // hiddenIframe.src = url; (Removido o uso do iframe)
                     
                     // Quando o iframe terminar de carregar
-                    hiddenIframe.onload = function() {{
+                    // hiddenIframe.onload = function() {{ (Removido o uso do iframe){{
                         hideLoading();
-                        showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
+                        // showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success'); (Removido o uso do iframe)
                         
                         // Forçar uma atualização suave após 1 segundo
                         setTimeout(() => {{
