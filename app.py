@@ -4080,6 +4080,51 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
         )
 
 # O restante do código Streamlit...
+
+def processar_query_params(df_data, tipo_visualizacao):
+    """Processa os parâmetros de URL para ações como criar baseline."""
+    try:
+        # Tenta usar a nova API (Streamlit >= 1.28.0)
+        query_params = st.query_params
+    except AttributeError:
+        # Fallback para a API antiga
+        query_params = st.experimental_get_query_params()
+
+    if 'context_action' in query_params:
+        action = query_params['context_action'][0]
+        empreendimento = query_params.get('empreendimento', [None])[0]
+        
+        if action == 'take_baseline' and empreendimento:
+            try:
+                # O tipo_visualizacao será o valor padrão, pois o selectbox ainda não foi renderizado.
+                # A função take_gantt_baseline usará o estado atual do df_data.
+                version_name = take_gantt_baseline(df_data, empreendimento, tipo_visualizacao)
+                
+                # Define o estado para exibir a mensagem de sucesso
+                st.session_state.context_menu_success = f"✅ Linha de Base '{version_name}' criada para {empreendimento}!"
+                st.session_state.show_context_success = True
+                
+                # Limpa os query params para evitar re-execução
+                try:
+                    # Tenta usar a nova API (Streamlit >= 1.28.0)
+                    del st.query_params['context_action']
+                    del st.query_params['empreendimento']
+                except AttributeError:
+                    # Fallback para a API antiga
+                    query_params_copy = st.experimental_get_query_params()
+                    if 'context_action' in query_params_copy: del query_params_copy['context_action']
+                    if 'empreendimento' in query_params_copy: del query_params_copy['empreendimento']
+                    st.experimental_set_query_params(**query_params_copy)
+                
+                # Força o rerun para atualizar a interface sem o query param
+                st.rerun()
+                
+            except Exception as e:
+                st.session_state.context_menu_error = f"❌ Erro ao criar baseline para {empreendimento}: {e}"
+                st.session_state.show_context_error = True
+                
+    return df_data, tipo_visualizacao
+
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
 
 # Tente executar a tela de boas-vindas. Se os arquivos não existirem, apenas pule.
