@@ -4911,27 +4911,11 @@ with st.spinner("Carregando e processando dados..."):
             showStatus('❌ Erro ao criar linha de base. Verifique o console.', 'status-error');
         }}
     }})
-    .catch(erro// Função para criar linha de base via iframe invisível (AGORA SEM DADOS NA URL)
-                function executeTakeBaseline() {{
-                    showStatus('🔄 Criando linha de base...', 'status-creating');
-                    showLoading();
-                    
-                    const empreendimento = '{{selected_empreendimento}}';
-                    
-                    // A URL agora só contém o comando e o empreendimento, evitando o erro 414.
-                    // O backend (Python) irá buscar os dados grandes na st.session_state.
-                    const timestamp = new Date().getTime();
-                    const url = `?context_action=take_baseline_post&empreendimento=${{empreendimento}}&t=${{timestamp}}`;
-                    
-                    // Usar iframe invisível para carregar a URL
-                    hiddenIframe.src = url;
-                    
-                    // Quando o iframe terminar de carregar
-                    hiddenIframe.onload = function() {{
-                        hideLoading();
-                        showStatus('✅ Linha de base criada! Verifique a barra lateral para enviar para AWS.', 'status-success');
-                    }}
-                }}  // Forçar uma atualização suave após 1 segundo
+    .catch(erro => {{
+            console.error("Erro na requisição fetch:", erro);
+            hideLoading();
+            showStatus('❌ Erro de rede ao criar linha de base.', 'status-error');
+        }});
                         setTimeout(() => {{
                             // Disparar um evento customizado para atualizar a interface
                             const event = new Event('baselineCreated');
@@ -4940,6 +4924,7 @@ with st.spinner("Carregando e processando dados..."):
                     }};
                     
                     hideContextMenu();
+            
                 
                 // Event Listeners
                 if (ganttArea) {{
