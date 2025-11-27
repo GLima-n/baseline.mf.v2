@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_context_menu_actions
+from dateutil.relativedelta import relativedelta #take_gantt_baseline
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -691,11 +691,15 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
     """Cria uma linha de base do estado atual do Gantt"""
     
     try:
+        st.sidebar.info(f"🛠️ Iniciando take_gantt_baseline para: {empreendimento}")
+        
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
+        st.sidebar.write(f"📋 Linhas encontradas para {empreendimento}: {len(df_empreendimento)}")
+        
         if df_empreendimento.empty:
-            st.error(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
+            st.error(f"❌ Nenhum dado encontrado para o empreendimento: {empreendimento}")
             raise Exception("Nenhum dado encontrado para o empreendimento selecionado")
         
         # Preparar dados para baseline com validação
@@ -777,27 +781,21 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
         current_date_str = datetime.now().strftime("%d/%m/%Y")
         version_name = f"{version_prefix}-({current_date_str})"
         
+        # DEBUG: Mostra informações antes de salvar
+        st.sidebar.write(f"💾 Preparando para salvar baseline com {len(baseline_data['tasks'])} tasks")
+        
         # Salvar baseline
         success = save_baseline(empreendimento, version_name, baseline_data, current_date_str, tipo_visualizacao)
         
         if success:
-            # Marcar como não enviada para AWS
-            if 'unsent_baselines' not in st.session_state:
-                st.session_state.unsent_baselines = {}
-            
-            if empreendimento not in st.session_state.unsent_baselines:
-                st.session_state.unsent_baselines[empreendimento] = []
-            
-            if version_name not in st.session_state.unsent_baselines[empreendimento]:
-                st.session_state.unsent_baselines[empreendimento].append(version_name)
-            
-            st.success(f"Linha de base {version_name} salva com sucesso!")
+            st.sidebar.success(f"💾 Baseline '{version_name}' salva no banco!")
             return version_name
         else:
+            st.sidebar.error("❌ Falha ao salvar baseline no banco!")
             raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
-        st.error(f"Erro ao criar linha de base: {e}")
+        st.sidebar.error(f"💥 Erro em take_gantt_baseline: {e}")
         raise
 def debug_baseline_system():
     """Função para debug do sistema de baselines"""
@@ -1779,84 +1777,93 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- SOLUÇÃO CORRIGIDA: Comunicação via Parent-Child ---
-                (function() {{
-                    const containerId = 'gantt-container-' + '{project["id"]}';
-                    const container = document.getElementById(containerId);
-                    
-                    if (!container) return;
+                // --- SOLUÇÃO PRÁTICA: IFRAME TEMPORÁRIO ---
+                    (function() {{
+                        const containerId = 'gantt-container-' + '{project["id"]}';
+                        const container = document.getElementById(containerId);
+                        
+                        if (!container) return;
 
-                    // Limpeza visual
-                    const oldMenu = container.querySelector('#context-menu');
-                    if (oldMenu) oldMenu.remove();
+                        // Limpeza visual
+                        const oldMenu = container.querySelector('#context-menu');
+                        if (oldMenu) oldMenu.remove();
 
-                    // Criar Menu
-                    const menu = document.createElement('div');
-                    menu.id = 'context-menu';
-                    menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
-                    menu.innerHTML = `
-                        <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                            <span>📸</span> <b>Criar Linha de Base</b>
-                        </div>
-                    `;
-                    container.appendChild(menu);
+                        // Criar Menu
+                        const menu = document.createElement('div');
+                        menu.id = 'context-menu';
+                        menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
+                        menu.innerHTML = `
+                            <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
+                                <span>📸</span> <b>Criar Linha de Base</b>
+                            </div>
+                        `;
+                        container.appendChild(menu);
 
-                    // Listeners do menu
-                    container.addEventListener('contextmenu', function(e) {{
-                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                        // Listeners do menu
+                        container.addEventListener('contextmenu', function(e) {{
+                            if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                                e.preventDefault();
+                                menu.style.display = 'block';
+                                menu.style.left = e.clientX + 'px';
+                                menu.style.top = e.clientY + 'px';
+                            }} else {{
+                                menu.style.display = 'none';
+                            }}
+                        }});
+
+                        document.addEventListener('click', function(e) {{
+                            if (menu.style.display === 'block' && !menu.contains(e.target)) {{
+                                menu.style.display = 'none';
+                            }}
+                        }}, true);
+
+                        // --- AÇÃO DO BOTÃO COM IFRAME TEMPORÁRIO ---
+                        const btnCreate = menu.querySelector('#btn-create-baseline');
+                        
+                        btnCreate.addEventListener('click', function(e) {{
+                            e.stopPropagation();
                             e.preventDefault();
-                            menu.style.display = 'block';
-                            menu.style.left = e.clientX + 'px';
-                            menu.style.top = e.clientY + 'px';
-                        }} else {{
+
+                            // 1. Pega o nome do projeto
+                            let currentProjectName = "Desconhecido";
+                            if (typeof projectData !== 'undefined' && projectData.length > 0) {{
+                                currentProjectName = projectData[0].name;
+                            }} else {{
+                                const titleEl = container.querySelector('.project-title-row span');
+                                if (titleEl) currentProjectName = titleEl.textContent;
+                            }}
+
+                            // 2. Feedback Visual
                             menu.style.display = 'none';
-                        }}
-                    }});
-
-                    document.addEventListener('click', function(e) {{
-                        if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                            menu.style.display = 'none';
-                        }}
-                    }}, true);
-
-                    // --- SOLUÇÃO: Usando window.parent.postMessage ---
-                    const btnCreate = menu.querySelector('#btn-create-baseline');
-                    
-                    btnCreate.addEventListener('click', function(e) {{
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        // 1. Pega o nome do projeto
-                        let currentProjectName = "Desconhecido";
-                        if (typeof projectData !== 'undefined' && projectData.length > 0) {{
-                            currentProjectName = projectData[0].name;
-                        }} else {{
-                            const titleEl = container.querySelector('.project-title-row span');
-                            if (titleEl) currentProjectName = titleEl.textContent;
-                        }}
-
-                        // 2. Feedback Visual
-                        menu.style.display = 'none';
-                        
-                        // 3. SOLUÇÃO: Envia mensagem para o parent (Streamlit)
-                        const message = {{
-                            type: 'CREATE_BASELINE',
-                            projectName: currentProjectName,
-                            timestamp: new Date().getTime()
-                        }};
-                        
-                        console.log('📤 Enviando mensagem para parent:', message);
-                        window.parent.postMessage(message, '*');
-                    }});
-
-                    // 4. Escuta por respostas do parent (opcional, para feedback)
-                    window.addEventListener('message', function(event) {{
-                        if (event.data.type === 'BASELINE_CREATED') {{
-                            console.log('✅ Baseline criada com sucesso:', event.data);
-                            // Poderia mostrar um toast de sucesso aqui
-                        }}
-                    }});
-                }})();
+                            
+                            // 3. SOLUÇÃO: Cria um iframe temporário para disparar a URL
+                            const tempIframe = document.createElement('iframe');
+                            tempIframe.style.display = 'none';
+                            tempIframe.style.width = '0';
+                            tempIframe.style.height = '0';
+                            tempIframe.style.border = '0';
+                            
+                            // Monta a URL com os parâmetros
+                            const baseUrl = window.location.href.split('?')[0];
+                            const novaUrl = `${{baseUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}&t=${{new Date().getTime()}}`;
+                            
+                            tempIframe.src = novaUrl;
+                            document.body.appendChild(tempIframe);
+                            
+                            console.log('🚀 Iframe temporário criado com URL:', novaUrl);
+                            
+                            // Remove o iframe após um tempo
+                            setTimeout(() => {{
+                                if (document.body.contains(tempIframe)) {{
+                                    document.body.removeChild(tempIframe);
+                                    console.log('✅ Iframe temporário removido');
+                                }}
+                            }}, 2000);
+                            
+                            // Feedback para o usuário
+                            alert(`✅ Comando enviado para criar baseline de: ${{currentProjectName}}\\n\\nA página será atualizada em instantes...`);
+                        }});
+                    }})();
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -4413,10 +4420,7 @@ with st.spinner("Carregando e processando dados..."):
     # 1. Carrega os dados
     df_data = load_data()
     
-    # 2. Configura o listener de mensagens
-    setup_baseline_message_listener()
-    
-    # 3. Verifica se carregou corretamente
+    # 2. Verifica se carregou corretamente
     if df_data is not None:
         st.session_state.df_data = df_data
         
@@ -4424,26 +4428,43 @@ with st.spinner("Carregando e processando dados..."):
         query_params = st.query_params
         task = query_params.get("task")
         emp_alvo = query_params.get("emp")
+        
+        # DEBUG: Mostra os parâmetros recebidos
+        st.sidebar.write("🔍 Debug Parâmetros URL:")
+        st.sidebar.write(f"Task: {task}")
+        st.sidebar.write(f"Empreendimento: {emp_alvo}")
+        st.sidebar.write(f"DF Data vazio: {df_data.empty if df_data is not None else 'None'}")
 
-        # Também verifica mensagens do JavaScript
-        js_message = st.session_state.get('js_baseline_message')
-        if js_message:
-            emp_alvo = js_message['projectName']
-            task = 'save_baseline'
-            # Limpa a mensagem após processar
-            st.session_state.js_baseline_message = None
-
-        if task == 'save_baseline' and emp_alvo and df_data is not None:
+        if task == "save_baseline" and emp_alvo and df_data is not None:
+            st.sidebar.success("🎯 Comando de baseline detectado!")
+            
             try:
-                nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
-                st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
-                st.success(f"Sucesso: Baseline criada para {emp_alvo}")
+                # DEBUG: Verifica se o empreendimento existe
+                empreendimentos_existentes = df_data['Empreendimento'].unique()
+                st.sidebar.write(f"📊 Empreendimentos no DF: {len(empreendimentos_existentes)}")
+                
+                if emp_alvo in empreendimentos_existentes:
+                    st.sidebar.success(f"✅ Empreendimento '{emp_alvo}' encontrado!")
+                    
+                    # Chama a função que você já criou, passando o DF atual
+                    nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
+                    st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
+                    st.success(f"Sucesso: Baseline criada para {emp_alvo}")
+                    
+                    # DEBUG
+                    st.sidebar.success(f"🚀 Baseline '{nova_versao}' criada com sucesso!")
+                    
+                else:
+                    st.error(f"❌ Empreendimento '{emp_alvo}' NÃO encontrado no DataFrame")
+                    st.sidebar.error(f"Empreendimento '{emp_alvo}' não encontrado. Disponíveis: {list(empreendimentos_existentes[:5])}...")
+                    
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
-            
-            # Limpa a URL para não ficar salvando em loop
-            if 'task' in st.query_params:
-                st.query_params.clear()
+                st.sidebar.error(f"❌ Erro: {e}")
+
+            # Limpa a URL para não ficar salvando em loop se der F5
+            st.query_params.clear()
+            st.sidebar.info("🔄 URL limpa - recarregue a página")
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
