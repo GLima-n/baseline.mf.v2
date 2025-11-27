@@ -944,6 +944,31 @@ def padronizar_etapa(etapa_str):
     etapa_limpa = str(etapa_str).strip().upper()
     return mapeamento_etapas_usuario.get(etapa_limpa, etapa_limpa)
 
+def setup_baseline_message_listener():
+    """Configura o listener para mensagens do JavaScript"""
+    # Lê mensagens do componente HTML
+    if 'baseline_messages' not in st.session_state:
+        st.session_state.baseline_messages = []
+    
+    # Componente para receber mensagens
+    components.html(
+        """
+        <script>
+        // Escuta por mensagens dos iframes filhos
+        window.addEventListener('message', function(event) {
+            if (event.data.type === 'CREATE_BASELINE') {
+                // Encaminha a mensagem para o Streamlit
+                window.parent.postMessage({
+                    type: 'STREAMLIT_BASELINE_COMMAND',
+                    projectName: event.data.projectName,
+                    timestamp: event.data.timestamp
+                }, '*');
+            }
+        });
+        </script>
+        """,
+        height=0
+    )
 
 # --- Funções de Filtragem e Ordenação ---
 def filtrar_etapas_nao_concluidas_func(df):
@@ -1754,10 +1779,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
+                // --- SOLUÇÃO CORRIGIDA: Comunicação via Parent-Child ---
                 (function() {{
-                    // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
@@ -1766,10 +1789,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // Limpeza visual
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
-                    const oldToast = container.querySelector('.js-toast-loading');
-                    if (oldToast) oldToast.remove();
 
-                    // 2. Criar Menu
+                    // Criar Menu
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
                     menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
@@ -1780,14 +1801,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast (opcional, para feedback)
-                    const toast = document.createElement('div');
-                    toast.className = 'js-toast-loading';
-                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
-                    toast.innerHTML = "🔄 Redirecionando para salvar baseline...";
-                    container.appendChild(toast);
-
-                    // 4. Listeners
+                    // Listeners do menu
                     container.addEventListener('contextmenu', function(e) {{
                         if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
@@ -1805,7 +1819,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // --- 5. AÇÃO DO BOTÃO (SIMPLIFICADA) ---
+                    // --- SOLUÇÃO: Usando window.parent.postMessage ---
                     const btnCreate = menu.querySelector('#btn-create-baseline');
                     
                     btnCreate.addEventListener('click', function(e) {{
@@ -1821,22 +1835,27 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
-                        // 2. Feedback Visual Rápido
+                        // 2. Feedback Visual
                         menu.style.display = 'none';
-                        toast.style.display = 'block';
-
-                        // 3. O PULO DO GATO: Atualiza a URL do navegador principal
-                        // Isso força o Streamlit a rodar o script Python novamente.
-                        // Usamos 'encodeURIComponent' para garantir que espaços e acentos funcionem.
-                        const baseUrl = window.parent.location.href.split('?')[0];
-                        const novaUrl = `${{baseUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}`;
-
-                        console.log("🚀 Nova URL de comando:", novaUrl);
                         
-                        // Redireciona a página PAI (o app Streamlit) para essa nova URL com o comando
-                        window.parent.location.href = novaUrl;
+                        // 3. SOLUÇÃO: Envia mensagem para o parent (Streamlit)
+                        const message = {{
+                            type: 'CREATE_BASELINE',
+                            projectName: currentProjectName,
+                            timestamp: new Date().getTime()
+                        }};
+                        
+                        console.log('📤 Enviando mensagem para parent:', message);
+                        window.parent.postMessage(message, '*');
                     }});
 
+                    // 4. Escuta por respostas do parent (opcional, para feedback)
+                    window.addEventListener('message', function(event) {{
+                        if (event.data.type === 'BASELINE_CREATED') {{
+                            console.log('✅ Baseline criada com sucesso:', event.data);
+                            // Poderia mostrar um toast de sucesso aqui
+                        }}
+                    }});
                 }})();
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
@@ -4394,30 +4413,37 @@ with st.spinner("Carregando e processando dados..."):
     # 1. Carrega os dados
     df_data = load_data()
     
-    # 2. Verifica se carregou corretamente
+    # 2. Configura o listener de mensagens
+    setup_baseline_message_listener()
+    
+    # 3. Verifica se carregou corretamente
     if df_data is not None:
         st.session_state.df_data = df_data
         
-        # INÍCIO DA NOVA ABORDAGEM - PORTEIRO DE COMANDOS
         # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
-        # Verifica se a URL tem ?task=save_baseline&emp=NOME_DO_PROJETO
         query_params = st.query_params
         task = query_params.get("task")
         emp_alvo = query_params.get("emp")
 
-        if task == "save_baseline" and emp_alvo and df_data is not None:
-            # O Python recalcula os dados do zero usando o DF que ele já tem na memória
+        # Também verifica mensagens do JavaScript
+        js_message = st.session_state.get('js_baseline_message')
+        if js_message:
+            emp_alvo = js_message['projectName']
+            task = 'save_baseline'
+            # Limpa a mensagem após processar
+            st.session_state.js_baseline_message = None
+
+        if task == 'save_baseline' and emp_alvo and df_data is not None:
             try:
-                # Chama a função que você já criou, passando o DF atual
-                # ATENÇÃO: Use "Gantt" ou o tipo de visualização padrão
                 nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
                 st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
                 st.success(f"Sucesso: Baseline criada para {emp_alvo}")
             except Exception as e:
                 st.error(f"Erro ao salvar: {e}")
-
-            # Limpa a URL para não ficar salvando em loop se der F5
-            st.query_params.clear()
+            
+            # Limpa a URL para não ficar salvando em loop
+            if 'task' in st.query_params:
+                st.query_params.clear()
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
