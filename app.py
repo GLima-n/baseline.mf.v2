@@ -239,13 +239,13 @@ def save_baseline(empreendimento, version_name, baseline_data, created_date, tip
         print("❌ FALHA CONEXÃO: Não foi possível conectar para salvar.")
         return False
     
-def take_baseline(df, empreendimento):
+def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
     # 1. Filtra o DataFrame atual
     df_emp = df[df['Empreendimento'] == empreendimento].copy()
 
     # 2. Define o nome da nova versão (ex: P1, P2...)
-    # (Adicione aqui a lógica de contagem de versões existente no exemplo)
-    version_name = "P_NOVA" # Exemplo simplificado
+    now = datetime.now()
+    version_name = f"Baseline {now.strftime('%Y%m%d_%H%M%S')}"
 
     # 3. Prepara os dados para salvar (Snapshot)
     # Aqui você define o que quer salvar. No exemplo, ele salva Inicio/Fim.
@@ -258,7 +258,34 @@ def take_baseline(df, empreendimento):
         })
 
     # 4. Salva no banco
-    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"))
+    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"), tipo_visualizacao)
+    return version_name
+
+def take_gantt_baseline_from_json(empreendimento, baseline_data_json, tipo_visualizacao):
+    """Cria uma nova linha de base para o empreendimento, usando os dados JSON recebidos do frontend."""
+    
+    # 1. Gera o nome da versão
+    now = datetime.now()
+    version_name = f"Baseline {now.strftime('%Y%m%d_%H%M%S')}"
+    
+    # 2. Extrai apenas a lista de tasks do JSON
+    tasks_data = baseline_data_json.get('tasks', [])
+    
+    # 3. Prepara os dados para salvar (usando os campos do JS)
+    baseline_data = []
+    for task in tasks_data:
+        # Os dados do JS já estão formatados como queremos
+        baseline_data.append({
+            "tarefa": task.get('name'), # O nome da tarefa/empreendimento
+            "inicio_previsto": task.get('start_previsto'),
+            "termino_previsto": task.get('end_previsto'),
+            "inicio_real": task.get('start_real'),
+            "termino_real": task.get('end_real_original_raw') or task.get('end_real'),
+            "progress": task.get('progress')
+        })
+
+    # 4. Salva no banco
+    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"), tipo_visualizacao)
     return version_name
 
 # --- Processar ações do menu de contexto (BACKEND ROBUSTO) ---
@@ -272,42 +299,33 @@ def process_context_menu_actions(df=None):
         raw_emp = query_params.get('empreendimento', None)
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
-
-        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
-        if df is None or df.empty:
-            print("⚠️ Sessão Iframe. Carregando dados...")
+        raw_data = query_params.get('data', None)
+        baseline_data_json = None
+        if raw_data:
             try:
-                df = load_data() # Sua função de carregar Excel/SQL
+                decoded_data = urllib.parse.unquote(raw_data)
+                baseline_data_json = json.loads(decoded_data)
             except Exception as e:
-                print(f"❌ Erro load_data: {e}")
+                print(f"❌ Erro ao decodificar/parsear JSON da baseline: {e}")
                 return
 
-        # 3. Executa Salvamento
-        if empreendimento and df is not None:
-            try:
-                # Cria a baseline (usa sua função take_gantt_baseline existente)
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ FINALIZADO: {version_name} criado.")
-                # Limpa URL
-                st.query_params.clear()
-            except Exception as e:
-                print(f"❌ Erro take_gantt_baseline: {e}")
+        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
 
-        # 4. Executa a criação
-        if empreendimento and df is not None and not df.empty:
+        # 2. Executa Salvamento
+        if empreendimento and baseline_data_json:
             try:
-                # Cria e Salva no MySQL
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
+                # Cria a baseline usando os dados recebidos diretamente do frontend
+                version_name = take_gantt_baseline_from_json(empreendimento, baseline_data_json, "Gantt")
+                print(f"✅ FINALIZADO: {version_name} criado e salvo no banco.")
                 
-                # Limpa params para não repetir na próxima carga
+                # Limpa URL
                 st.query_params.clear()
                 
             except Exception as e:
                 print(f"❌ Erro ao salvar baseline: {e}")
+                
         else:
-            print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
+            print(f"❌ Erro: Empreendimento não encontrado ou dados da baseline ausentes.")
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -1849,7 +1867,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
                         // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
+                        const projectDataToSend = {{
+                            ...projectData[0],
+                            tasks: allTasks_baseData
+                        }};
+                        const projectDataString = JSON.stringify(projectDataToSend);
+                        const encodedData = encodeURIComponent(projectDataString);
+
+                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}&data=${{encodedData}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}&data=${{encodedData}}`;
 
                         console.log("🚀 URL Iframe:", finalUrl);
                         
@@ -4839,7 +4864,13 @@ with st.spinner("Carregando e processando dados..."):
                     
                     // Criar URL com parâmetros para o Streamlit processar
                     const timestamp = new Date().getTime();
-                    const url = `?context_action=take_baseline&empreendimento={selected_empreendimento}&t=${{timestamp}}`;
+                    const projectDataToSend = {{
+                        ...projectData[0],
+                        tasks: allTasks_baseData
+                    }};
+                    const projectDataString = JSON.stringify(projectDataToSend);
+                    const encodedData = encodeURIComponent(projectDataString);
+                    const url = `?context_action=take_baseline&empreendimento={selected_empreendimento}&t=${{timestamp}}&data=${{encodedData}}`;
                     
                     // Usar iframe invisível para carregar a URL
                     hiddenIframe.src = url;
