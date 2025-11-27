@@ -5936,44 +5936,89 @@ if 'context_action' in st.query_params:
             print(f"❌ Erro ao criar baseline: {e}")
             st.error(f"Erro: {e}")
 
-    # === AÇÃO 2: ENVIAR PARA AWS (NOVA) ===
+    # === AÇÃO 2: ENVIAR PARA AWS (MODIFICADO COM DEBUG) ===
     elif action == 'send_to_aws':
-        print("⚡ AÇÃO: ENVIAR PARA AWS (Via Iframe)")
+        print("⚡ AÇÃO: ENVIAR PARA AWS (Iniciando...)")
         try:
             qp = st.query_params
             raw_emp = qp.get('empreendimento')
             if isinstance(raw_emp, list): raw_emp = raw_emp[0]
             empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
 
-            if empreendimento:
-                # 1. Tenta pegar a última pendente na sessão
-                unsent = st.session_state.get('unsent_baselines', {}).get(empreendimento, [])
-                
-                # 2. Se não tiver pendente na sessão, pega a última do banco/cache
-                if not unsent:
-                    baselines = load_baselines()
-                    if empreendimento in baselines and baselines[empreendimento]:
-                        # Pega a última chave (versão mais recente)
-                        unsent = [sorted(list(baselines[empreendimento].keys()))[-1]]
+            print(f"🎯 Empreendimento alvo: {empreendimento}")
 
+            if empreendimento:
+                # 1. Carrega as baselines existentes (Memória ou Banco)
+                # IMPORTANTE: Carregamos de novo para garantir que temos o estado mais recente
+                baselines = load_baselines()
+                
+                # Debug: Mostra o que tem na memória para esse empreendimento
+                if empreendimento in baselines:
+                    versoes = list(baselines[empreendimento].keys())
+                    print(f"📚 Versões encontradas em memória: {versoes}")
+                else:
+                    print("⚠️ Nenhuma versão encontrada em memória para este empreendimento.")
+
+                # 2. Determina qual versão enviar
+                version_to_send = None
+                
+                # Tenta pegar da lista de pendentes primeiro
+                unsent = st.session_state.get('unsent_baselines', {}).get(empreendimento, [])
                 if unsent:
-                    version_to_send = unsent[-1] # Pega a última da lista
-                    print(f"☁️ Enviando versão: {version_to_send}")
+                    version_to_send = unsent[-1]
+                    print(f"📌 Selecionado via lista de pendentes: {version_to_send}")
+                
+                # Se não houver pendentes, pega a ÚLTIMA versão criada (Fallback)
+                elif empreendimento in baselines and baselines[empreendimento]:
+                    all_versions = sorted(list(baselines[empreendimento].keys()))
+                    # Lógica simples para pegar a última (P1, P2, P10...)
+                    # Idealmente ordenaria por data, mas alfabético funciona se for P01, P02...
+                    version_to_send = all_versions[-1] 
+                    print(f"📌 Selecionado via última versão disponível: {version_to_send}")
+
+                # 3. Executa o envio
+                if version_to_send:
+                    print(f"🚀 Tentando enviar {version_to_send} para AWS...")
                     
-                    if send_to_aws(empreendimento, version_to_send):
-                        st.query_params.clear() # Limpa URL
-                        st.success(f"✅ Baseline {version_to_send} enviada para AWS!")
-                        time.sleep(1.5)
+                    # Recupera os dados brutos da baseline
+                    dados_baseline = baselines[empreendimento][version_to_send]['data']
+                    data_criacao = baselines[empreendimento][version_to_send]['date']
+                    
+                    # Força o salvamento
+                    sucesso = save_baseline(empreendimento, version_to_send, dados_baseline, data_criacao)
+                    
+                    if sucesso:
+                        print("✅ SUCESSO: Dados persistidos na AWS!")
+                        st.query_params.clear()
+                        
+                        # Feedback visual forte
+                        st.markdown(f"""
+                        <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:5px; text-align:center; margin-bottom:10px;">
+                            ✅ <b>Sucesso!</b> Baseline {version_to_send} salva na AWS.
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Remove da lista de pendentes se estiver lá
+                        if empreendimento in st.session_state.get('unsent_baselines', {}):
+                            if version_to_send in st.session_state.unsent_baselines[empreendimento]:
+                                st.session_state.unsent_baselines[empreendimento].remove(version_to_send)
+                        
+                        time.sleep(2) # Espera o usuário ler
                         st.rerun()
                     else:
-                        st.error(f"❌ Falha ao enviar {version_to_send}.")
+                        print("❌ FALHA: save_baseline retornou False.")
+                        st.error(f"Falha ao salvar {version_to_send} no banco de dados.")
                 else:
-                    st.warning("⚠️ Nenhuma baseline encontrada para envio.")
-                    st.query_params.clear()
+                    print("❌ ERRO: Nenhuma versão identificada para envio.")
+                    st.error("Não foi possível encontrar uma linha de base para enviar.")
+            else:
+                print("❌ ERRO: Empreendimento não identificado na URL.")
                     
         except Exception as e:
-            print(f"❌ Erro ao enviar para AWS: {e}")
-            st.error(f"Erro: {e}")
+            print(f"❌ CRASH GERAL NO ENVIO: {e}")
+            import traceback
+            traceback.print_exc()
+            st.error(f"Erro crítico no envio: {e}")
 
 # ------------------------------------------------------------------
 
