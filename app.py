@@ -4909,12 +4909,12 @@ with st.spinner("Carregando e processando dados..."):
                     showStatus('🔄 Criando linha de base...', 'status-creating');
                     showLoading();
                     
-                    const empreendimento = '{selected_empreendimento}';
+                    const empreendimento = '{{selected_empreendimento}}';
                     
                     // A URL agora só contém o comando e o empreendimento, evitando o erro 414.
                     // O backend (Python) irá buscar os dados grandes na st.session_state.
                     const timestamp = new Date().getTime();
-                    const url = `?context_action=take_baseline_post&empreendimento=${empreendimento}&t=${{timestamp}}`;
+                    const url = `?context_action=take_baseline_post&empreendimento=${{empreendimento}}&t=${{timestamp}}`;
                     
                     // Usar iframe invisível para carregar a URL
                     hiddenIframe.src = url;
