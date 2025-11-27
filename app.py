@@ -64,6 +64,8 @@ else:
 
 # --- COLAR LOGO APÓS OS IMPORTS E CONFIG DO BANCO ---
 
+# --- COLAR LOGO APÓS OS IMPORTS E CONFIG DO BANCO ---
+
 def process_url_actions_early():
     """
     Processa ações da URL imediatamente ao iniciar o script.
@@ -5894,119 +5896,6 @@ def verificar_implementacao_baseline():
     
     st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
-
-# --- BLOCO EXECUTIVO (SALVAMENTO EM BACKGROUND) ---
-# Substitua o bloco final atual por este código completo:
-
-if 'context_action' in st.query_params:
-    action = st.query_params['context_action']
-    
-    # === AÇÃO 1: CRIAR BASELINE ===
-    if action == 'take_baseline':
-        print("⚡ AÇÃO: CRIAR BASELINE (Via Iframe)")
-        try:
-            qp = st.query_params
-            raw_emp = qp.get('empreendimento')
-            if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-            empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-            
-            # Carrega dados frescos
-            df_exec = load_data()
-            
-            if df_exec is not None and not df_exec.empty and empreendimento:
-                v_name = take_gantt_baseline(df_exec, empreendimento)
-                st.query_params.clear() # Limpa URL
-                st.success(f"✅ Baseline {v_name} criada com sucesso!")
-                time.sleep(1.5)
-                st.rerun()
-        except Exception as e:
-            print(f"❌ Erro ao criar baseline: {e}")
-            st.error(f"Erro: {e}")
-
-    # === AÇÃO 2: ENVIAR PARA AWS (MODIFICADO COM DEBUG) ===
-    elif action == 'send_to_aws':
-        print("⚡ AÇÃO: ENVIAR PARA AWS (Iniciando...)")
-        try:
-            qp = st.query_params
-            raw_emp = qp.get('empreendimento')
-            if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-            empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-
-            print(f"🎯 Empreendimento alvo: {empreendimento}")
-
-            if empreendimento:
-                # 1. Carrega as baselines existentes (Memória ou Banco)
-                # IMPORTANTE: Carregamos de novo para garantir que temos o estado mais recente
-                baselines = load_baselines()
-                
-                # Debug: Mostra o que tem na memória para esse empreendimento
-                if empreendimento in baselines:
-                    versoes = list(baselines[empreendimento].keys())
-                    print(f"📚 Versões encontradas em memória: {versoes}")
-                else:
-                    print("⚠️ Nenhuma versão encontrada em memória para este empreendimento.")
-
-                # 2. Determina qual versão enviar
-                version_to_send = None
-                
-                # Tenta pegar da lista de pendentes primeiro
-                unsent = st.session_state.get('unsent_baselines', {}).get(empreendimento, [])
-                if unsent:
-                    version_to_send = unsent[-1]
-                    print(f"📌 Selecionado via lista de pendentes: {version_to_send}")
-                
-                # Se não houver pendentes, pega a ÚLTIMA versão criada (Fallback)
-                elif empreendimento in baselines and baselines[empreendimento]:
-                    all_versions = sorted(list(baselines[empreendimento].keys()))
-                    # Lógica simples para pegar a última (P1, P2, P10...)
-                    # Idealmente ordenaria por data, mas alfabético funciona se for P01, P02...
-                    version_to_send = all_versions[-1] 
-                    print(f"📌 Selecionado via última versão disponível: {version_to_send}")
-
-                # 3. Executa o envio
-                if version_to_send:
-                    print(f"🚀 Tentando enviar {version_to_send} para AWS...")
-                    
-                    # Recupera os dados brutos da baseline
-                    dados_baseline = baselines[empreendimento][version_to_send]['data']
-                    data_criacao = baselines[empreendimento][version_to_send]['date']
-                    
-                    # Força o salvamento
-                    sucesso = save_baseline(empreendimento, version_to_send, dados_baseline, data_criacao)
-                    
-                    if sucesso:
-                        print("✅ SUCESSO: Dados persistidos na AWS!")
-                        st.query_params.clear()
-                        
-                        # Feedback visual forte
-                        st.markdown(f"""
-                        <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:5px; text-align:center; margin-bottom:10px;">
-                            ✅ <b>Sucesso!</b> Baseline {version_to_send} salva na AWS.
-                        </div>
-                        """, unsafe_allow_html=True)
-                        
-                        # Remove da lista de pendentes se estiver lá
-                        if empreendimento in st.session_state.get('unsent_baselines', {}):
-                            if version_to_send in st.session_state.unsent_baselines[empreendimento]:
-                                st.session_state.unsent_baselines[empreendimento].remove(version_to_send)
-                        
-                        time.sleep(2) # Espera o usuário ler
-                        st.rerun()
-                    else:
-                        print("❌ FALHA: save_baseline retornou False.")
-                        st.error(f"Falha ao salvar {version_to_send} no banco de dados.")
-                else:
-                    print("❌ ERRO: Nenhuma versão identificada para envio.")
-                    st.error("Não foi possível encontrar uma linha de base para enviar.")
-            else:
-                print("❌ ERRO: Empreendimento não identificado na URL.")
-                    
-        except Exception as e:
-            print(f"❌ CRASH GERAL NO ENVIO: {e}")
-            import traceback
-            traceback.print_exc()
-            st.error(f"Erro crítico no envio: {e}")
-
 # ------------------------------------------------------------------
 
 # No final do arquivo, antes do if __name__:
@@ -6020,12 +5909,5 @@ if __name__ == "__main__":
     if df_data is not None:
         # Salva na sessão
         st.session_state.df_data = df_data
-        
-        # --- EXECUTA AÇÃO DO IFRAME AQUI ---
-        # A lógica de processamento de ação de contexto está no bloco executivo (linhas 5532-5572)
-        # e é acionada pelo iframe que recarrega a página.
-        # A função process_context_menu_actions do código de referência não é necessária aqui.
-        # -----------------------------------
-
     else:
         st.error("❌ Não foi possível carregar ou gerar os dados.")
