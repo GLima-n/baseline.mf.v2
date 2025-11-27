@@ -11,7 +11,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #function
+from dateutil.relativedelta import relativedelta #process_context_menu_actions
 import streamlit.components.v1 as components
 from streamlit.components.v1 import html # Adicionado para o iframe  
 import json
@@ -221,96 +221,6 @@ def create_baselines_table():
             print(f"Erro ao criar tabela: {e}")
         finally:
             conn.close()
-    
-def process_context_menu_actions(df=None):
-    """Processa ações do menu de contexto via query parameters - VERSÃO CORRIGIDA"""
-    
-    # 1. Coleta as duas fontes possíveis de dados
-    params_url = dict(st.query_params)
-    params_snap = st.session_state.get('_url_snapshot', {})
-    
-    # Log para vermos o que está disponível na memória
-    log_debug(f"🔍 DIAGNÓSTICO ESTADO: URL={params_url} | SNAPSHOT={params_snap}")
-
-    # 2. Decide qual usar (Prioridade: URL Atual > Snapshot)
-    params = {}
-    origem = "NENHUMA"
-
-    # Se a URL atual tem o comando, usa ela
-    if params_url.get('context_action') == 'take_baseline':
-        params = params_url
-        origem = "URL_VIVA"
-    # Se não, mas o snapshot tem o comando, usa ele
-    elif params_snap.get('context_action') == 'take_baseline':
-        params = params_snap
-        origem = "SNAPSHOT_SALVO"
-    
-    log_debug(f"🚀 Iniciando com fonte: {origem}")
-
-    # 3. Se não encontrou comando válido em lugar nenhum, sai
-    if not params:
-        log_debug("💤 Nenhuma ação encontrada nas fontes.")
-        return
-
-    # --- INÍCIO DA EXECUÇÃO ---
-    if params.get('context_action') == 'take_baseline':
-        log_debug("🔔 COMANDO VALIDADO! Processando...")
-        
-        # Recupera o empreendimento (trata lista ou string)
-        raw_emp = params.get('empreendimento')
-        if isinstance(raw_emp, list): raw_emp = raw_emp[0]
-        
-        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
-        log_debug(f"🎯 Alvo: {empreendimento}")
-
-        # 4. Garantia de Dados
-        if df is None or df.empty:
-            # Tenta carregar do session_state, que deve ser o df principal
-            if 'df_data' in st.session_state and not st.session_state.df_data.empty:
-                df = st.session_state.df_data
-                log_debug("📚 Dados carregados do session_state.")
-            else:
-                log_debug("⚠️ Carregando dados (Sessão Iframe/Nova)...")
-                try:
-                    # Assumindo que load_data() existe e carrega o DataFrame
-                    df = load_data()
-                    log_debug(f"📚 Dados carregados: {len(df)} linhas.")
-                except Exception as e:
-                    log_debug(f"❌ Erro fatal no load_data: {e}")
-                    return
-
-        # 5. Execução e Salvamento
-        if empreendimento and df is not None:
-            try:
-                log_debug("💾 Chamando take_gantt_baseline...")
-                
-                # ✅ CHAMADA CORRIGIDA: Apenas 2 argumentos
-                version_name = take_gantt_baseline(df, empreendimento)
-                
-                log_debug(f"✅ SUCESSO FINAL: {version_name} salvo no banco!")
-                
-                # Limpeza Completa e Rerun
-                if '_url_snapshot' in st.session_state:
-                    del st.session_state['_url_snapshot']
-                
-                st.query_params.clear()
-                st.cache_data.clear()
-                
-                # Feedback Visual na Sessão
-                st.session_state.context_menu_success = f"✅ Baseline {version_name} criada!"
-                st.session_state.show_context_success = True
-                
-                # Forçar atualização da interface
-                st.rerun()
-                
-            except Exception as e:
-                log_debug(f"❌ Erro no save: {e}")
-                import traceback
-                log_debug(traceback.format_exc())
-                
-                # Feedback de erro
-                st.session_state.context_menu_error = f"❌ Erro ao criar baseline: {e}"
-                st.session_state.show_context_error = True
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
