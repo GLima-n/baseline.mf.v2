@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #apply_baseline_to_dataframe
+from dateutil.relativedelta import relativedelta #DOMContentLoaded
 import streamlit.components.v1 as components  
 import json
 import random
@@ -278,11 +278,17 @@ def process_baseline_change():
         empreendimento = query_params.get('empreendimento', '')
         
         if baseline_name and empreendimento:
+            # Sempre limpar os parâmetros primeiro
+            st.query_params.clear()
+            
             if baseline_name == 'P0-(padrão)':
-                # Limpar baseline
-                st.session_state.current_baseline = None
-                st.session_state.current_baseline_data = None
-                st.session_state.current_empreendimento = None
+                # Limpar baseline da sessão
+                if 'current_baseline' in st.session_state:
+                    del st.session_state.current_baseline
+                if 'current_baseline_data' in st.session_state:
+                    del st.session_state.current_baseline_data
+                if 'current_empreendimento' in st.session_state:
+                    del st.session_state.current_empreendimento
             else:
                 # Carregar baseline selecionada
                 baseline_data = load_baseline_data(empreendimento, baseline_name)
@@ -291,9 +297,9 @@ def process_baseline_change():
                     st.session_state.current_baseline_data = baseline_data
                     st.session_state.current_empreendimento = empreendimento
             
-            # Limpar parâmetros
-            st.query_params.clear()
-
+            # Forçar rerun para atualizar a interface
+            st.rerun()
+            
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
     query_params = st.query_params
@@ -1833,14 +1839,28 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // Indicar visualmente qual baseline está ativa
                     document.addEventListener('DOMContentLoaded', function() {{
-                        const currentBaseline = '{baseline_name}';
-                        if (currentBaseline && currentBaseline !== 'None') {{
-                            const container = document.querySelector('.baseline-selector-container');
-                            if (container) {{
-                                container.style.background = '#f0f7ff';
-                                container.style.borderColor = '#3b82f6';
-                            }}
-                        }}
+                        const select = document.getElementById('baseline-select-{project['id']}');
+                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
+                        const empreendimento = '{primeiro_empreendimento}';
+                        
+                        select.addEventListener('change', function() {{
+                            const selectedBaseline = this.value;
+                            const timestamp = new Date().getTime();
+                            
+                            // Feedback visual
+                            select.disabled = true;
+                            select.style.opacity = '0.7';
+                            
+                            // Usar iframe para enviar o comando sem recarregar a página
+                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
+                            iframe.src = url;
+                            
+                            // Reativar após um tempo
+                            setTimeout(() => {{
+                                select.disabled = false;
+                                select.style.opacity = '1';
+                            }}, 1500);
+                        }});
                     }});
 
                     function toggleSubtasks(taskName) {{
