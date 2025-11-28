@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #applyFiltersAndRedraw
+from dateutil.relativedelta import relativedelta #atualizarSeletorBaseline
 import streamlit.components.v1 as components  
 import json
 import random
@@ -2430,84 +2430,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         monthHeader.innerHTML = monthHtml;
                     }}
 
-                     function atualizarSeletorBaseline(empreendimentoSelecionado) {{
-                        const selector = document.getElementById('baseline-selector-{project['id']}');
-                        const select = document.getElementById('baseline-select-{project['id']}');
-                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                        
-                        if (empreendimentoSelecionado && empreendimentoSelecionado !== 'Múltiplos') {{
-                            // Habilitar seletor
-                            selector.classList.remove('baseline-disabled');
-                            select.disabled = false;
-                            
-                            // Atualizar opções
-                            const baselines = baselinesPorEmpreendimento[empreendimentoSelecionado] || [];
-                            select.innerHTML = '<option value="P0-(padrão)">P0-(padrão)</option>' +
-                                baselines.map(b => `<option value="${{b}}">${{b}}</option>`).join('');
-                            
-                            // Atualizar info
-                            infoDiv.innerHTML = `<span class="empreendimento-atual">${{empreendimentoSelecionado}}</span><br>${{baselines.length}} baselines disponíveis`;
-                            
-                        }} else {{
-                            // Desabilitar seletor
-                            selector.classList.add('baseline-disabled');
-                            select.disabled = true;
-                            infoDiv.innerHTML = 'Filtre por 1 empreendimento';
-                        }}
-                    }}
                     
-                    // Função para mudar baseline
-                    function handleBaselineChange(selectedBaseline) {{
-                        const select = document.getElementById('baseline-select-{project['id']}');
-                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                        const empreendimentoAtual = infoDiv.querySelector('.empreendimento-atual')?.textContent;
-                        
-                        if (!empreendimentoAtual || select.disabled) return;
-                        
-                        // Feedback visual
-                        select.disabled = true;
-                        const originalText = infoDiv.innerHTML;
-                        infoDiv.innerHTML = 'Carregando...';
-                        
-                        // Enviar comando
-                        const timestamp = new Date().getTime();
-                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimentoAtual)}}&t=${{timestamp}}`;
-                        iframe.src = url;
-                        
-                        // Reativar após 1 segundo
-                        setTimeout(() => {{
-                            select.disabled = false;
-                            infoDiv.innerHTML = originalText;
-                        }}, 1000);
-                    }}
                     
-                    // Inicializar
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        const select = document.getElementById('baseline-select-{project['id']}');
-                        
-                        // Observar mudanças no filtro de empreendimento (se existir)
-                        // Esta parte depende de como seu filtro de empreendimento atual funciona
-                        // Vamos assumir que há um evento que dispara quando o filtro muda
-                        
-                        // Listener para mudanças no seletor de baseline
-                        if (select && !select.disabled) {{
-                            select.addEventListener('change', function() {{
-                                handleBaselineChange(this.value);
-                            }});
-                        }}
-                        
-                        // Expor função global para ser chamada pelo filtro de empreendimento
-                        window.atualizarBaselinePorEmpreendimento = function(empreendimento) {{
-                            atualizarSeletorBaseline(empreendimento);
-                        }};
-                    }});
-                    
-                    // Inicializar com o empreendimento atual
-                    setTimeout(() => {{
-                        atualizarSeletorBaseline(empreendimentoAtual);
-                    }}, 100);
-
                     function renderChart() {{
                         const chartBody = document.getElementById('chart-body-{project["id"]}');
                         const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
@@ -3090,7 +3014,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selVis = document.querySelector('input[name="filter-vis-{project['id']}"]:checked').value;
                             const selPulmao = document.querySelector('input[name="filter-pulmao-{project['id']}"]:checked').value;
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
-                            
 
                             console.log('Filtros aplicados:', {{
                                 setor: selSetorArray,
