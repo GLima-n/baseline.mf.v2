@@ -4260,23 +4260,33 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_data=None, baseline_name=None):
     """
     Decide qual Gantt gerar com base na seleção da etapa inicial.
-    
-    Args:
-        baseline_data: Dados da baseline a serem aplicados
-        baseline_name: Nome da baseline selecionada
     """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
-    # Aplicar baseline se fornecida
-    if baseline_data is not None:
+    # Aplicar baseline apenas se for específica para este empreendimento
+    primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
+    current_empreendimento = st.session_state.get('current_empreendimento')
+    
+    if (baseline_data is not None and 
+        baseline_name is not None and 
+        current_empreendimento == primeiro_empreendimento):
+        
         df = apply_baseline_to_dataframe(df, baseline_data)
-        # Adicionar indicador visual no título
-        if baseline_name:
-            st.info(f"📊 Visualizando: **{baseline_name}**")
+        
+        # Mostrar indicador de baseline ativa
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.info(f"Visualizando baseline: **{baseline_name}**")
+        with col2:
+            if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
+                st.session_state.current_baseline = None
+                st.session_state.current_baseline_data = None
+                st.session_state.current_empreendimento = None
+                st.rerun()
 
-    # A decisão do modo é baseada no parâmetro, não mais no conteúdo do DF
+    # A decisão do modo é baseada no parâmetro
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
 
     if is_consolidated_view:
@@ -4295,7 +4305,7 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            baseline_name=baseline_name  # Passar o nome da baseline para o gráfico
+            baseline_name=baseline_name
         )
 
 # O restante do código Streamlit...
@@ -5172,10 +5182,10 @@ with st.spinner("Carregando e processando dados..."):
         # A lógica de pulmão foi removida da sidebar, então não é mais aplicada aqui.
         tab1, tab2, tab3 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal", "Linhas de Base"])
 
-        with tab1:
+    with tab1:
             st.subheader("Gantt Comparativo")
             
-            # Processar mudança de baseline
+            # Processar mudança de baseline ANTES de qualquer renderização
             process_baseline_change()
             
             if df_para_exibir.empty:
@@ -5183,20 +5193,9 @@ with st.spinner("Carregando e processando dados..."):
             else:
                 df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
                 
-                # Aplicar baseline se existir
+                # Obter estado atual da baseline
                 current_baseline = st.session_state.get('current_baseline')
                 current_baseline_data = st.session_state.get('current_baseline_data')
-                
-                if current_baseline_data and st.session_state.get('current_empreendimento') == df_para_gantt["Empreendimento"].iloc[0]:
-                    df_para_gantt = apply_baseline_to_dataframe(df_para_gantt, current_baseline_data)
-                    st.info(f"Visualizando baseline: **{current_baseline}**")
-                    
-                    # Botão para voltar aos dados originais
-                    if st.button("Voltar para Dados Originais", key="clear_baseline"):
-                        st.session_state.current_baseline = None
-                        st.session_state.current_baseline_data = None
-                        st.session_state.current_empreendimento = None
-                        st.rerun()
                 
                 gerar_gantt(
                     df_para_gantt.copy(),
@@ -5378,7 +5377,7 @@ with st.spinner("Carregando e processando dados..."):
                     
                     st.markdown(tabela_estilizada.to_html(), unsafe_allow_html=True)
 
-        with tab2:
+    with tab2:
             st.subheader("Tabelão Horizontal")
             
             if df_detalhes.empty: # Usando df_detalhes
