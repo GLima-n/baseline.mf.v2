@@ -991,7 +991,35 @@ def calcular_variacao_termino(termino_real, termino_previsto):
         else: return "V: 0d", "#666666"
     else:
         return "V: -", "#666666"
-
+def debug_baseline_system():
+    """Função para debug do sistema de baselines"""
+    st.markdown("### 🔧 Debug do Sistema de Baselines")
+    
+    # Testar conexão com banco
+    conn = get_db_connection()
+    if conn:
+        st.success("✅ Conexão com banco de dados: OK")
+        conn.close()
+    else:
+        st.error("❌ Conexão com banco de dados: FALHA")
+    
+    # Verificar tabela
+    try:
+        baselines = load_baselines()
+        st.success(f"✅ Tabela de baselines: OK ({len(baselines)} empreendimentos com baselines)")
+        
+        # Mostrar todas as baselines disponíveis
+        for empreendimento, versions in baselines.items():
+            st.write(f"**{empreendimento}**: {list(versions.keys())}")
+            
+    except Exception as e:
+        st.error(f"❌ Tabela de baselines: FALHA - {e}")
+    
+    # Verificar session state
+    if 'unsent_baselines' in st.session_state:
+        st.success(f"✅ Session state: OK ({len(st.session_state.unsent_baselines)} empreendimentos não enviados)")
+    else:
+        st.error("❌ Session state: FALHA - unsent_baselines não encontrado")
 def calcular_porcentagem_correta(grupo):
     if "% concluído" not in grupo.columns: return 0.0
     porcentagens = grupo["% concluído"].astype(str).apply(converter_porcentagem)
@@ -1107,6 +1135,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             "grupos": ["Todos"] + sorted(list(GRUPOS.keys())),
             "etapas": ["Todas"] + ORDEM_ETAPAS_NOME_COMPLETO
         }
+            # DEBUG: Verificar dados
+        print(f"DEBUG gerar_gantt_por_projeto:")
+        print(f"  - DF vazio: {df.empty}")
+        if not df.empty:
+            print(f"  - Empreendimentos: {df['Empreendimento'].unique()}")
 
         # *** CORREÇÃO: USAR O PRIMEIRO PROJETO DA LISTA EM VEZ DE CRIAR "TODOS OS EMPREENDIMENTOS" ***
         if gantt_data_base:
@@ -1146,9 +1179,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if version_name in emp_baselines:
                     baselines_data[version_name] = emp_baselines[version_name]['data']
 
+        empreendimento_principal = ""
         baseline_options = []
-        if empreendimento_principal and empreendimento_principal != "Múltiplos":
-            baseline_options = get_baseline_options(empreendimento_principal)
+        
+        if not df.empty:
+            empreendimentos_no_grafico = df["Empreendimento"].unique()
+            empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
+            
+            # Obter baselines disponíveis
+            if empreendimento_principal != "Múltiplos":
+                baseline_options = get_baseline_options(empreendimento_principal)
+                print(f"DEBUG: Baseline options para {empreendimento_principal}: {baseline_options}")
         # Reduz o fator de multiplicação para evitar excesso de espaço
         altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
