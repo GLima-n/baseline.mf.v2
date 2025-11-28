@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #AÇÃO DIRETA
+from dateutil.relativedelta import relativedelta #get_db_connection
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -153,7 +153,7 @@ for grupo, etapas in GRUPOS.items():
         GRUPO_POR_ETAPA[etapa] = grupo
 
 SETOR_POR_ETAPA = {mapeamento_etapas_usuario.get(etapa, etapa): setor for setor, etapas in SETOR.items() for etapa in etapas}
-STREAMLIT_APP_URL = "https://baselinemfv2.streamlit.app" 
+
 
 # --- Configurações de Estilo ---
 class StyleConfig:
@@ -209,80 +209,6 @@ def create_baselines_table():
             print(f"Erro tabela: {e}")
         finally:
             conn.close()
-
-import streamlit.components.v1 as components
-
-import urllib.parse
-
-# Função para obter a URL base do app
-def get_streamlit_base_url():
-    try:
-        # Tenta obter a URL do contexto do Streamlit
-        from streamlit.runtime.scriptrunner import get_script_run_ctx
-        ctx = get_script_run_ctx()
-        if ctx and hasattr(ctx, 'request') and hasattr(ctx.request, 'url'):
-            url = ctx.request.url
-            # Remove query parameters para obter a base URL
-            base_url = url.split('?')[0]
-            return base_url
-    except:
-        pass
-    
-    # Fallback: constrói a URL base a partir do hostname
-    try:
-        import streamlit as st
-        # Para deployment na nuvem, tenta obter do session state
-        if 'streamlit_base_url' in st.session_state:
-            return st.session_state.streamlit_base_url
-    except:
-        pass
-    
-    # Último fallback: URL hardcoded (substitua pela sua)
-    return "https://baselinemfv2.streamlit.app"
-
-def create_baseline_trigger_component():
-    """Cria um componente que pode receber mensagens do JavaScript"""
-    
-    # HTML e JavaScript para receber comandos de baseline
-    component_html = """
-    <script>
-    // Função para receber mensagens dos iframes
-    window.addEventListener('message', function(event) {
-        // Verifica se a mensagem é para criar baseline
-        if (event.data && event.data.type === 'STREAMLIT_CREATE_BASELINE') {
-            // Envia os dados para o Streamlit
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: event.data
-            }, '*');
-        }
-    });
-    
-    // Função global que os iframes podem chamar
-    window.streamlitBaseline = {
-        create: function(projectName) {
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: {
-                    type: 'CREATE_BASELINE',
-                    projectName: projectName,
-                    timestamp: new Date().getTime()
-                }
-            }, '*');
-        }
-    };
-    </script>
-    """
-    
-    # Cria o componente
-    component_value = components.html(
-        component_html,
-        height=0,
-        key="baseline_trigger_component"
-    )
-    
-    return component_value
-
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao="Gantt"):
     conn = get_db_connection()
@@ -765,15 +691,11 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
     """Cria uma linha de base do estado atual do Gantt"""
     
     try:
-        st.sidebar.info(f"🛠️ Iniciando take_gantt_baseline para: {empreendimento}")
-        
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
-        st.sidebar.write(f"📋 Linhas encontradas para {empreendimento}: {len(df_empreendimento)}")
-        
         if df_empreendimento.empty:
-            st.error(f"❌ Nenhum dado encontrado para o empreendimento: {empreendimento}")
+            st.error(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
             raise Exception("Nenhum dado encontrado para o empreendimento selecionado")
         
         # Preparar dados para baseline com validação
@@ -855,21 +777,27 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
         current_date_str = datetime.now().strftime("%d/%m/%Y")
         version_name = f"{version_prefix}-({current_date_str})"
         
-        # DEBUG: Mostra informações antes de salvar
-        st.sidebar.write(f"💾 Preparando para salvar baseline com {len(baseline_data['tasks'])} tasks")
-        
         # Salvar baseline
         success = save_baseline(empreendimento, version_name, baseline_data, current_date_str, tipo_visualizacao)
         
         if success:
-            st.sidebar.success(f"💾 Baseline '{version_name}' salva no banco!")
+            # Marcar como não enviada para AWS
+            if 'unsent_baselines' not in st.session_state:
+                st.session_state.unsent_baselines = {}
+            
+            if empreendimento not in st.session_state.unsent_baselines:
+                st.session_state.unsent_baselines[empreendimento] = []
+            
+            if version_name not in st.session_state.unsent_baselines[empreendimento]:
+                st.session_state.unsent_baselines[empreendimento].append(version_name)
+            
+            st.success(f"Linha de base {version_name} salva com sucesso!")
             return version_name
         else:
-            st.sidebar.error("❌ Falha ao salvar baseline no banco!")
             raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
-        st.sidebar.error(f"💥 Erro em take_gantt_baseline: {e}")
+        st.error(f"Erro ao criar linha de base: {e}")
         raise
 def debug_baseline_system():
     """Função para debug do sistema de baselines"""
@@ -1016,31 +944,6 @@ def padronizar_etapa(etapa_str):
     etapa_limpa = str(etapa_str).strip().upper()
     return mapeamento_etapas_usuario.get(etapa_limpa, etapa_limpa)
 
-def setup_baseline_message_listener():
-    """Configura o listener para mensagens do JavaScript"""
-    # Lê mensagens do componente HTML
-    if 'baseline_messages' not in st.session_state:
-        st.session_state.baseline_messages = []
-    
-    # Componente para receber mensagens
-    components.html(
-        """
-        <script>
-        // Escuta por mensagens dos iframes filhos
-        window.addEventListener('message', function(event) {
-            if (event.data.type === 'CREATE_BASELINE') {
-                // Encaminha a mensagem para o Streamlit
-                window.parent.postMessage({
-                    type: 'STREAMLIT_BASELINE_COMMAND',
-                    projectName: event.data.projectName,
-                    timestamp: event.data.timestamp
-                }, '*');
-            }
-        });
-        </script>
-        """,
-        height=0
-    )
 
 # --- Funções de Filtragem e Ordenação ---
 def filtrar_etapas_nao_concluidas_func(df):
@@ -1089,7 +992,7 @@ def aplicar_ordenacao_final(df, empreendimentos_ordenados):
 
 
 # --- *** FUNÇÃO gerar_gantt_por_projeto MODIFICADA *** ---
-def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", streamlit_base_url=None):
+def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra=""):
         """
         Gera um único gráfico de Gantt com todos os projetos.
         """
@@ -1508,7 +1411,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <script id="grupos-gantt-data" type="application/json">{json.dumps(GRUPOS)}</script>
                 <script id="subetapas-data" type="application/json">{json.dumps(SUBETAPAS)}</script>
                 <div id="context-menu">
-                <div class="context-menu-item" id="btn-create-baseline-{project['id']}">📸 Criar Linha de Base</div>
+                <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
                 <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
             </div>
             
@@ -1851,15 +1754,30 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- SOLUÇÃO GARANTIDA: USANDO FORM SUBMIT ---
-                    // SOLUÇÃO ULTRA SIMPLES - SEM COMPLICAÇÕES
+                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                 (function() {{
+                    // 1. Configuração
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
                     
+                    // Garante iframe
+                    let iframe = document.getElementById('hidden-iframe');
+                    if (!iframe) {{
+                        iframe = document.createElement('iframe');
+                        iframe.id = 'hidden-iframe';
+                        iframe.style.display = 'none';
+                        if(container) container.appendChild(iframe);
+                    }}
+
                     if (!container) return;
 
-                    // Menu (código igual ao anterior...)
+                    // Limpeza visual
+                    const oldMenu = container.querySelector('#context-menu');
+                    if (oldMenu) oldMenu.remove();
+                    const oldToast = container.querySelector('.js-toast-loading');
+                    if (oldToast) oldToast.remove();
+
+                    // 2. Criar Menu
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
                     menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
@@ -1870,13 +1788,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     `;
                     container.appendChild(menu);
 
-                    // Listeners (código igual ao anterior...)
+                    // 3. Criar Toast
+                    const toast = document.createElement('div');
+                    toast.className = 'js-toast-loading';
+                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
+                    container.appendChild(toast);
+
+                    // 4. Listeners
                     container.addEventListener('contextmenu', function(e) {{
                         if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
                             menu.style.display = 'block';
                             menu.style.left = e.clientX + 'px';
                             menu.style.top = e.clientY + 'px';
+                        }} else {{
+                            menu.style.display = 'none';
                         }}
                     }});
 
@@ -1886,32 +1812,66 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}, true);
 
-                    // AÇÃO DIRETA - SEM COMPLICAÇÕES
-                    const btnCreate = menu.querySelector('#btn-create-baseline-' + '{project["id"]}');
-
+                    // --- 5. AÇÃO DO BOTÃO ---
+                    const btnCreate = menu.querySelector('#btn-create-baseline');
+                    
                     btnCreate.addEventListener('click', function(e) {{
                         e.stopPropagation();
                         e.preventDefault();
 
-                        // Pega o nome do projeto
+                        // A. Nome do Projeto
                         let currentProjectName = "Desconhecido";
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
+                        }} else {{
+                            const titleEl = container.querySelector('.project-title-row span');
+                            if (titleEl) currentProjectName = titleEl.textContent;
                         }}
 
+                        // B. Feedback Visual (Laranja = Processando)
                         menu.style.display = 'none';
-                        
-                        // URL HARDCODED - SUBSTITUA PELA SUA URL REAL
-                        const streamlitUrl = 'https://baselinemfv2.streamlit.app';
-                        const novaUrl = `${{streamlitUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}&t=${{new Date().getTime()}}`;
-                        
-                        console.log('🎯 Navegando para:', novaUrl);
-                        
-                        // Abre em nova aba - FUNCIONA SEMPRE
-                        window.open(novaUrl, '_blank');
-                        }});
-                    }})();
+                        toast.style.display = 'block';
+                        toast.style.backgroundColor = "#e67e22"; // Laranja
+                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
+                        // C. Montar URL CORRETA
+                        const encodedProject = encodeURIComponent(currentProjectName);
+                        const timestamp = new Date().getTime();
+                        
+                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
+                        // Isso corrige o bug do "about:srcdoc"
+                        let baseUrl = document.referrer;
+                        if (!baseUrl || baseUrl === "") {{
+                             // Fallback raro
+                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
+                        }}
+                        // Remove barra final
+                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
+                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
+
+                        console.log("🚀 URL Iframe:", finalUrl);
+                        
+                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
+                        if (iframe) iframe.src = finalUrl;
+
+                        // E. Feedback Final
+                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
+                        setTimeout(() => {{
+                            toast.style.backgroundColor = "#27ae60"; // Verde
+                            toast.innerHTML = `
+                                <div style="display:flex; flex-direction:column; gap:5px;">
+                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
+                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
+                                </div>
+                            `;
+                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
+                        }}, 4000);
+                    }});
+
+                }})();
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -4080,22 +4040,22 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     components.html(gantt_html, height=altura_gantt, scrolling=True)
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
-# Obtenha a URL base uma vez e armazene
-if 'streamlit_base_url' not in st.session_state:
-    st.session_state.streamlit_base_url = get_streamlit_base_url()
-
-streamlit_base_url = st.session_state.streamlit_base_url
-
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
-def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False, streamlit_base_url=None):
+def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False):
     """
     Decide qual Gantt gerar com base na seleção da etapa inicial.
+    
+    Args:
+        baseline_applied: Indica se uma baseline foi aplicada para modificar o título
     """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
+    # A decisão do modo é baseada no parâmetro, não mais no conteúdo do DF
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
+
+    # Modificar título se baseline foi aplicada
     titulo_extra = " (com Baseline)" if baseline_applied else ""
 
     if is_consolidated_view:
@@ -4105,63 +4065,21 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            etapa_selecionada_inicialmente
+            etapa_selecionada_inicialmente,
+            titulo_extra=titulo_extra  # Novo parâmetro
         )
     else:
+        # Agora gera apenas UM gráfico com todos os empreendimentos
         gerar_gantt_por_projeto(
             df, 
             tipo_visualizacao, 
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            titulo_extra=titulo_extra,
-            streamlit_base_url=streamlit_base_url  # ← ADICIONE ESTA LINHA
+            titulo_extra=titulo_extra  # Novo parâmetro
         )
 
-def processar_query_params(df_data, tipo_visualizacao):
-    """Processa os parâmetros de URL para ações como criar baseline."""
-    try:
-        # Tenta usar a nova API (Streamlit >= 1.28.0)
-        query_params = st.query_params
-    except AttributeError:
-        # Fallback para a API antiga
-        query_params = st.experimental_get_query_params()
-
-    if 'context_action' in query_params:
-        action = query_params['context_action'][0]
-        empreendimento = query_params.get('empreendimento', [None])[0]
-        
-        if action == 'take_baseline' and empreendimento:
-            try:
-                # O tipo_visualizacao será o valor padrão, pois o selectbox ainda não foi renderizado.
-                # A função take_gantt_baseline usará o estado atual do df_data.
-                version_name = take_gantt_baseline(df_data, empreendimento, tipo_visualizacao)
-                
-                # Define o estado para exibir a mensagem de sucesso
-                st.session_state.context_menu_success = f"✅ Linha de Base '{version_name}' criada para {empreendimento}!"
-                st.session_state.show_context_success = True
-                
-                # Limpa os query params para evitar re-execução
-                try:
-                    # Tenta usar a nova API (Streamlit >= 1.28.0)
-                    del st.query_params['context_action']
-                    del st.query_params['empreendimento']
-                except AttributeError:
-                    # Fallback para a API antiga
-                    query_params_copy = st.experimental_get_query_params()
-                    if 'context_action' in query_params_copy: del query_params_copy['context_action']
-                    if 'empreendimento' in query_params_copy: del query_params_copy['empreendimento']
-                    st.experimental_set_query_params(**query_params_copy)
-                
-                # Força o rerun para atualizar a interface sem o query param
-                st.rerun()
-                
-            except Exception as e:
-                st.session_state.context_menu_error = f"❌ Erro ao criar baseline para {empreendimento}: {e}"
-                st.session_state.show_context_error = True
-                
-    return df_data, tipo_visualizacao
-
+# O restante do código Streamlit...
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
 
 # Tente executar a tela de boas-vindas. Se os arquivos não existirem, apenas pule.
@@ -4460,7 +4378,6 @@ def filter_dataframe(df, ugb_filter, emp_filter, grupo_filter, setor_filter):
     return df_filtered
 
 # --- Bloco Principal ---
-# --- Bloco Principal ---
 with st.spinner("Carregando e processando dados..."):
     # 1. Carrega os dados
     df_data = load_data()
@@ -4468,53 +4385,6 @@ with st.spinner("Carregando e processando dados..."):
     # 2. Verifica se carregou corretamente
     if df_data is not None:
         st.session_state.df_data = df_data
-        
-        # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
-        # --- VERIFICADOR DE COMANDOS (O "Porteiro") ---
-        query_params = st.query_params
-        task = query_params.get("task")
-        emp_alvo = query_params.get("emp")
-
-        # DEBUG FORÇADO - remova depois que funcionar
-        st.sidebar.markdown("### 🐛 DEBUG")
-        st.sidebar.write("Query params:", dict(query_params))
-        st.sidebar.write("Task:", task)
-        st.sidebar.write("Emp:", emp_alvo)
-        st.sidebar.write("DF carregado:", df_data is not None and not df_data.empty)
-
-        if task == "save_baseline" and emp_alvo and df_data is not None:
-            st.sidebar.success("🎯 COMANDO RECEBIDO - PROCESSANDO BASELINE")
-            
-            try:
-                # Verifica se o empreendimento existe
-                empreendimentos = df_data['Empreendimento'].unique().tolist()
-                st.sidebar.write("Empreendimentos disponíveis:", empreendimentos[:5])  # Mostra os 5 primeiros
-                
-                if emp_alvo in empreendimentos:
-                    st.sidebar.success(f"✅ EMPREENDIMENTO ENCONTRADO: {emp_alvo}")
-                    
-                    # Chama a função de baseline
-                    nova_versao = take_gantt_baseline(df_data, emp_alvo, "Gantt")
-                    
-                    # Feedback
-                    st.toast(f"✅ Baseline '{nova_versao}' salva com sucesso!", icon="💾")
-                    st.success(f"Sucesso: Baseline criada para {emp_alvo}")
-                    
-                    # Limpa a URL
-                    st.query_params.clear()
-                    st.sidebar.info("🔄 URL limpa - recarregando...")
-                    
-                    # Recarrega a página
-                    st.rerun()
-                else:
-                    st.error(f"❌ EMPREENDIMENTO NÃO ENCONTRADO: '{emp_alvo}'")
-                    st.sidebar.error(f"Disponíveis: {empreendimentos}")
-                    
-            except Exception as e:
-                st.error(f"Erro ao salvar: {e}")
-                st.sidebar.error(f"💥 ERRO: {str(e)}")
-                import traceback
-                st.sidebar.code(traceback.format_exc())
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
         if 'show_context_success' not in st.session_state:
@@ -4527,7 +4397,7 @@ with st.spinner("Carregando e processando dados..."):
         # --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
         # Chamamos a função passando o df_data carregado AGORA.
         # Não confiamos apenas no session_state antigo.
-        #process_context_menu_actions(df_data)
+        process_context_menu_actions(df_data)
         # --------------------------------------
 
         with st.sidebar:
@@ -5083,13 +4953,13 @@ with st.spinner("Carregando e processando dados..."):
         # A lógica de pulmão foi removida da sidebar, então não é mais aplicada aqui.
         tab1, tab2 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal"])
         with tab1:
-            st.subheader("Gráfico de Gantt")
+            st.subheader("Gantt Comparativo")
             if df_para_exibir.empty:
                 st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
                 pass
             else:
                 df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
-        
+                        # ADICIONE ESTE COMPONENTE DE CONTEXTO
             if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
                 contexto_html = f"""
                 <style>
@@ -5117,18 +4987,17 @@ with st.spinner("Carregando e processando dados..."):
                 if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
                     
                     # --- AQUI: Cria o menu passando a variável correta ---
-                    streamlit_base_url = st.session_state.get('streamlit_base_url', 'https://baselinemfv2.streamlit.app')
-                
-                gerar_gantt(
-                    df_para_gantt.copy(),
-                    tipo_visualizacao, 
-                    filtrar_nao_concluidas,
-                    df_data, 
-                    pulmao_status, 
-                    pulmao_meses,
-                    selected_etapa_nome,
-                    streamlit_base_url=streamlit_base_url  # ← ADICIONE ESTE PARÂMETRO
-                )
+                    create_gantt_context_menu_component(selected_empreendimento_baseline)
+
+                    gerar_gantt(
+                        df_para_gantt.copy(),
+                        tipo_visualizacao, 
+                        filtrar_nao_concluidas,
+                        df_data, 
+                        pulmao_status, 
+                        pulmao_meses,
+                        selected_etapa_nome
+                    )
             
             st.markdown('<div id="visao-detalhada"></div>', unsafe_allow_html=True)
             st.subheader("Visão Detalhada por Empreendimento")
