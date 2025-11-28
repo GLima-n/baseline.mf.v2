@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #load_baselines
+from dateutil.relativedelta import relativedelta #applyFiltersAndRedraw
 import streamlit.components.v1 as components  
 import json
 import random
@@ -1182,16 +1182,25 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         empreendimento_principal = ""
         baseline_options = []
         
-        if not df.empty:
-            empreendimentos_no_grafico = df["Empreendimento"].unique()
-            empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
-            
-            # Obter baselines disponíveis
-            if empreendimento_principal != "Múltiplos":
-                baseline_options = get_baseline_options(empreendimento_principal)
-                print(f"DEBUG: Baseline options para {empreendimento_principal}: {baseline_options}")
-        # Reduz o fator de multiplicação para evitar excesso de espaço
-        altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
+        # Obter todos os empreendimentos disponíveis nos dados filtrados
+        todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
+        
+        # Determinar empreendimento atual baseado no filtro ou no primeiro da lista
+        empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
+        
+        # Obter baselines para o empreendimento atual (se for único)
+        baseline_options = []
+        if empreendimento_atual != "Múltiplos":
+            baseline_options = get_baseline_options(empreendimento_atual)
+        
+        # Preparar dados para o JavaScript
+        baselines_por_empreendimento = {}
+        for emp in todos_empreendimentos:
+            emp_baselines = get_baseline_options(emp)
+            if emp_baselines:
+                baselines_por_empreendimento[emp] = emp_baselines
+            # Reduz o fator de multiplicação para evitar excesso de espaço
+            altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
         # --- Geração do HTML ---
         gantt_html = f"""
@@ -1270,6 +1279,53 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .baseline-option.active {{
                         background: #3b82f6;
                         color: white;
+                    }}
+
+                    .baseline-selector-container {{
+                        position: absolute;
+                        top: 10px;
+                        right: 100px;
+                        z-index: 1000;
+                        background: {'#f0f7ff' if baseline_name else 'white'};
+                        border-radius: 6px;
+                        padding: 8px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+                        border: 1px solid {'#3b82f6' if baseline_name else '#ccc'};
+                        min-width: 240px;
+                        max-width: 300px;
+                    }}
+                    
+                    .baseline-selector-container select {{
+                        width: 100%;
+                        padding: 6px 8px;
+                        border: 1px solid #aaa;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        background: white;
+                        margin-bottom: 4px;
+                    }}
+                    
+                    .baseline-label {{
+                        font-size: 11px;
+                        color: #333;
+                        margin-bottom: 6px;
+                        font-weight: bold;
+                    }}
+                    
+                    .baseline-info {{
+                        font-size: 10px;
+                        color: #666;
+                        line-height: 1.3;
+                    }}
+                    
+                    .baseline-disabled {{
+                        background: #f5f5f5;
+                        opacity: 0.7;
+                    }}
+                    
+                    .empreendimento-atual {{
+                        font-weight: bold;
+                        color: #3b82f6;
                     }}
                     #context-menu {{
                         position: fixed; /* MUDANÇA: Fixed funciona melhor se estiver dentro do container */
@@ -1588,6 +1644,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
                 <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
             </div>
+            <div class="gantt-container" id="gantt-container-{project['id']}">
+            <!-- Seletor de Baseline DINÂMICO -->
+            <div class="baseline-selector-container {'' if empreendimento_atual != 'Múltiplos' else 'baseline-disabled'}" 
+                 id="baseline-selector-{project['id']}">
+                <div class="baseline-label">VERSÃO DO PROJETO</div>
+                <select id="baseline-select-{project['id']}" {"disabled" if empreendimento_atual == "Múltiplos" else ""}>
+                    <option value="P0-(padrão)">P0-(padrão)</option>
+                    {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
+                </select>
+                <div class="baseline-info" id="baseline-info-{project['id']}">
+                    {f"<span class='empreendimento-atual'>{empreendimento_atual}</span><br>{len(baseline_options)} baselines" if empreendimento_atual != "Múltiplos" else "Filtre por 1 empreendimento"}
+                </div>
+            </div>
             
             <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
             <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
@@ -1725,6 +1794,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                 <script>
                     // DEBUG: Verificar dados
+                    const todosEmpreendimentos = {json.dumps(todos_empreendimentos)};
+                    const baselinesPorEmpreendimento = {json.dumps(baselines_por_empreendimento)};
+                    const empreendimentoAtual = '{empreendimento_atual}';
+                    const baselineAtual = {json.dumps(baseline_name)};
                     const baselinesData = {json.dumps(baselines_data)};
                     const currentBaseline = {json.dumps(baseline_name)};
                     const projectName = {json.dumps(primeiro_empreendimento)};
@@ -2357,6 +2430,84 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         monthHeader.innerHTML = monthHtml;
                     }}
 
+                     function atualizarSeletorBaseline(empreendimentoSelecionado) {{
+                        const selector = document.getElementById('baseline-selector-{project['id']}');
+                        const select = document.getElementById('baseline-select-{project['id']}');
+                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
+                        
+                        if (empreendimentoSelecionado && empreendimentoSelecionado !== 'Múltiplos') {{
+                            // Habilitar seletor
+                            selector.classList.remove('baseline-disabled');
+                            select.disabled = false;
+                            
+                            // Atualizar opções
+                            const baselines = baselinesPorEmpreendimento[empreendimentoSelecionado] || [];
+                            select.innerHTML = '<option value="P0-(padrão)">P0-(padrão)</option>' +
+                                baselines.map(b => `<option value="${{b}}">${{b}}</option>`).join('');
+                            
+                            // Atualizar info
+                            infoDiv.innerHTML = `<span class="empreendimento-atual">${{empreendimentoSelecionado}}</span><br>${{baselines.length}} baselines disponíveis`;
+                            
+                        }} else {{
+                            // Desabilitar seletor
+                            selector.classList.add('baseline-disabled');
+                            select.disabled = true;
+                            infoDiv.innerHTML = 'Filtre por 1 empreendimento';
+                        }}
+                    }}
+                    
+                    // Função para mudar baseline
+                    function handleBaselineChange(selectedBaseline) {{
+                        const select = document.getElementById('baseline-select-{project['id']}');
+                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
+                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
+                        const empreendimentoAtual = infoDiv.querySelector('.empreendimento-atual')?.textContent;
+                        
+                        if (!empreendimentoAtual || select.disabled) return;
+                        
+                        // Feedback visual
+                        select.disabled = true;
+                        const originalText = infoDiv.innerHTML;
+                        infoDiv.innerHTML = 'Carregando...';
+                        
+                        // Enviar comando
+                        const timestamp = new Date().getTime();
+                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimentoAtual)}}&t=${{timestamp}}`;
+                        iframe.src = url;
+                        
+                        // Reativar após 1 segundo
+                        setTimeout(() => {{
+                            select.disabled = false;
+                            infoDiv.innerHTML = originalText;
+                        }}, 1000);
+                    }}
+                    
+                    // Inicializar
+                    document.addEventListener('DOMContentLoaded', function() {{
+                        const select = document.getElementById('baseline-select-{project['id']}');
+                        
+                        // Observar mudanças no filtro de empreendimento (se existir)
+                        // Esta parte depende de como seu filtro de empreendimento atual funciona
+                        // Vamos assumir que há um evento que dispara quando o filtro muda
+                        
+                        // Listener para mudanças no seletor de baseline
+                        if (select && !select.disabled) {{
+                            select.addEventListener('change', function() {{
+                                handleBaselineChange(this.value);
+                            }});
+                        }}
+                        
+                        // Expor função global para ser chamada pelo filtro de empreendimento
+                        window.atualizarBaselinePorEmpreendimento = function(empreendimento) {{
+                            atualizarSeletorBaseline(empreendimento);
+                        }};
+                    }});
+                    
+                    // Inicializar com o empreendimento atual
+                    setTimeout(() => {{
+                        atualizarSeletorBaseline(empreendimentoAtual);
+                    }}, 100);
+
                     function renderChart() {{
                         const chartBody = document.getElementById('chart-body-{project["id"]}');
                         const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
@@ -2939,6 +3090,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selVis = document.querySelector('input[name="filter-vis-{project['id']}"]:checked').value;
                             const selPulmao = document.querySelector('input[name="filter-pulmao-{project['id']}"]:checked').value;
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
+                            const empreendimentoFiltrado = // obter o empreendimento filtrado
+                            if (window.atualizarBaselinePorEmpreendimento) {{
+                                window.atualizarBaselinePorEmpreendimento(empreendimentoFiltrado);
 
                             console.log('Filtros aplicados:', {{
                                 setor: selSetorArray,
@@ -3094,7 +3248,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             console.error('Erro ao aplicar filtros:', error);
                             alert('Erro ao aplicar filtros: ' + error.message);
                         }}
-                    }}                    // DEBUG: Verificar se há dados antes de inicializar
+                    }}}}                    // DEBUG: Verificar se há dados antes de inicializar
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
                     
