@@ -3090,9 +3090,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selVis = document.querySelector('input[name="filter-vis-{project['id']}"]:checked').value;
                             const selPulmao = document.querySelector('input[name="filter-pulmao-{project['id']}"]:checked').value;
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
-                            const empreendimentoFiltrado = // obter o empreendimento filtrado
-                            if (window.atualizarBaselinePorEmpreendimento) {{
-                                window.atualizarBaselinePorEmpreendimento(empreendimentoFiltrado);
+                            
 
                             console.log('Filtros aplicados:', {{
                                 setor: selSetorArray,
@@ -3248,7 +3246,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             console.error('Erro ao aplicar filtros:', error);
                             alert('Erro ao aplicar filtros: ' + error.message);
                         }}
-                    }}}}                    // DEBUG: Verificar se há dados antes de inicializar
+                    }}                    // DEBUG: Verificar se há dados antes de inicializar
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
                     
