@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #process_baseline_change
+from dateutil.relativedelta import relativedelta #load_baselines
 import streamlit.components.v1 as components  
 import json
 import random
@@ -460,25 +460,40 @@ def load_baselines():
             query = "SELECT empreendimento, version_name, baseline_data, created_date, tipo_visualizacao FROM gantt_baselines ORDER BY created_at DESC"
             cursor.execute(query)
             results = cursor.fetchall()
+            
+            # DEBUG
+            print(f"DEBUG load_baselines: {len(results)} registros encontrados no banco")
+            
             for row in results:
                 empreendimento = row['empreendimento']
                 version_name = row['version_name']
+                
+                print(f"DEBUG: Carregando baseline - Empreendimento: {empreendimento}, Versão: {version_name}")
+                
                 if empreendimento not in baselines:
                     baselines[empreendimento] = {}
-                baseline_data = json.loads(row['baseline_data'])
-                baselines[empreendimento][version_name] = {
-                    "date": row['created_date'],
-                    "data": baseline_data,
-                    "tipo_visualizacao": row['tipo_visualizacao']
-                }
+                
+                try:
+                    baseline_data = json.loads(row['baseline_data'])
+                    baselines[empreendimento][version_name] = {
+                        "date": row['created_date'],
+                        "data": baseline_data,
+                        "tipo_visualizacao": row['tipo_visualizacao']
+                    }
+                except Exception as e:
+                    print(f"DEBUG: Erro ao carregar baseline {version_name}: {e}")
+                    continue
+                    
             return baselines
         except Error as e:
+            print(f"DEBUG: Erro no banco: {e}")
             return {}
         finally:
             if conn.is_connected():
                 cursor.close()
                 conn.close()
     else:
+        print("DEBUG: Usando mock_baselines")
         return st.session_state.get('mock_baselines', {})
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
@@ -897,10 +912,22 @@ def apply_baseline_to_dataframe(df, baseline_data):
 
 def get_baseline_options(empreendimento):
     """Retorna opções de baselines disponíveis para um empreendimento"""
+    if not empreendimento:
+        return []
+    
     baselines = load_baselines()
+    
+    # DEBUG: Mostrar o que está carregando
+    print(f"DEBUG: Buscando baselines para '{empreendimento}'")
+    print(f"DEBUG: Baselines carregadas: {list(baselines.keys())}")
+    
     if empreendimento in baselines:
-        return list(baselines[empreendimento].keys())
-    return []
+        options = list(baselines[empreendimento].keys())
+        print(f"DEBUG: Baselines encontradas para {empreendimento}: {options}")
+        return options
+    else:
+        print(f"DEBUG: Nenhuma baseline encontrada para {empreendimento}")
+        return []
 
 def send_to_aws(empreendimento, version_name):
     """Simula o envio de dados para AWS"""
