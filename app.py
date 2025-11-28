@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #get_db_connection
+from dateutil.relativedelta import relativedelta #contextMenu
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -173,141 +173,53 @@ class StyleConfig:
     def set_offset_variacao_termino(cls, novo_offset):
         cls.OFFSET_VARIACAO_TERMINO = novo_offset
 
-
-# --- Funções de Banco de Dados (VERSÃO ROBUSTA AWS) ---
-
-def get_db_connection():
-    if not DB_CONFIG: return None
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        return conn
-    except Error as e:
-        print(f"❌ Erro de Conexão MySQL: {e}") # Log no terminal
-        return None
-
-def create_baselines_table():
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            # Cria tabela garantindo coluna tipo_visualizacao
-            create_table_query = """
-            CREATE TABLE IF NOT EXISTS gantt_baselines (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                empreendimento VARCHAR(255) NOT NULL,
-                version_name VARCHAR(255) NOT NULL,
-                baseline_data JSON NOT NULL,
-                created_date VARCHAR(50) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                tipo_visualizacao VARCHAR(50) DEFAULT 'Gantt',
-                UNIQUE KEY unique_baseline (empreendimento, version_name)
-            )
-            """
-            cursor.execute(create_table_query)
-            conn.commit()
-        except Error as e:
-            print(f"Erro tabela: {e}")
-        finally:
-            conn.close()
-
-def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao="Gantt"):
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            baseline_json = json.dumps(baseline_data, ensure_ascii=False, default=str)
-            
-            # Query robusta com ON DUPLICATE KEY UPDATE
-            insert_query = """
-            INSERT INTO gantt_baselines (empreendimento, version_name, baseline_data, created_date, tipo_visualizacao)
-            VALUES (%s, %s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE 
-                baseline_data = VALUES(baseline_data), 
-                created_date = VALUES(created_date),
-                created_at = CURRENT_TIMESTAMP
-            """
-            cursor.execute(insert_query, (empreendimento, version_name, baseline_json, created_date, tipo_visualizacao))
-            conn.commit()
-            print(f"✅ SAVE AWS SUCESSO: {version_name}")
-            return True
-        except Error as e:
-            print(f"❌ ERRO SQL AWS: {e}")
-            return False
-        finally:
-            conn.close()
-    else:
-        print("❌ FALHA CONEXÃO: Não foi possível conectar para salvar.")
-        return False
-    
-def take_baseline(df, empreendimento):
-    # 1. Filtra o DataFrame atual
-    df_emp = df[df['Empreendimento'] == empreendimento].copy()
-
-    # 2. Define o nome da nova versão (ex: P1, P2...)
-    # (Adicione aqui a lógica de contagem de versões existente no exemplo)
-    version_name = "P_NOVA" # Exemplo simplificado
-
-    # 3. Prepara os dados para salvar (Snapshot)
-    # Aqui você define o que quer salvar. No exemplo, ele salva Inicio/Fim.
-    baseline_data = []
-    for _, row in df_emp.iterrows():
-        baseline_data.append({
-            "tarefa": row['Etapa'], # Ou o ID da tarefa se tiver
-            "inicio_previsto": row['Inicio_Real'].strftime('%Y-%m-%d') if pd.notna(row['Inicio_Real']) else None,
-            "termino_previsto": row['Termino_Real'].strftime('%Y-%m-%d') if pd.notna(row['Termino_Real']) else None
-        })
-
-    # 4. Salva no banco
-    save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"))
-    return version_name
-
-# --- Processar ações do menu de contexto (BACKEND ROBUSTO) ---
-# --- Processar ações do menu de contexto (DEBUG EXTREMO) ---
-# --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
-def process_context_menu_actions(df=None):
+# --- Processar ações do menu de contexto ---
+# --- Processar ações do menu de contexto (CORRIGIDO) ---
+def process_context_menu_actions(df):
+    """
+    Processa ações do menu de contexto via query parameters.
+    Recebe o DF carregado explicitamente para evitar erros.
+    """
     query_params = st.query_params
     
+    # Verifica se há uma ação de baseline pendente na URL
     if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
-        # 1. Decodifica parâmetros
+        
+        # Recupera os parâmetros da URL
         raw_emp = query_params.get('empreendimento', None)
+        
+        # --- CORREÇÃO DE URL: Decodifica espaços e acentos (ex: Projeto%20A -> Projeto A) ---
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
-
-        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
+        # Debug Visual: Mostra que o Python recebeu o comando
+        st.toast(f"⚙️ Processando comando para: {empreendimento}", icon="🔄")
+        print(f"DEBUG: Tentando criar baseline para '{empreendimento}'") # Olha no seu terminal/console
+        
         if df is None or df.empty:
-            print("⚠️ Sessão Iframe. Carregando dados...")
-            try:
-                df = load_data() # Sua função de carregar Excel/SQL
-            except Exception as e:
-                print(f"❌ Erro load_data: {e}")
-                return
+            st.error("Erro Crítico: Dados não carregados ao tentar criar baseline.")
+            return
 
-        # 3. Executa Salvamento
-        if empreendimento and df is not None:
+        if empreendimento:
             try:
-                # Cria a baseline (usa sua função take_gantt_baseline existente)
+                # Chama a função de criação passando o DF que recebemos como argumento
                 version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ FINALIZADO: {version_name} criado.")
-                # Limpa URL
-                st.query_params.clear()
-            except Exception as e:
-                print(f"❌ Erro take_gantt_baseline: {e}")
-
-        # 4. Executa a criação
-        if empreendimento and df is not None and not df.empty:
-            try:
-                # Cria e Salva no MySQL
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
                 
-                # Limpa params para não repetir na próxima carga
+                # Configura mensagens de sucesso
+                st.session_state.context_menu_success = f"✅ Baseline {version_name} criada com sucesso!"
+                st.session_state.show_context_success = True
+                
+                # Limpa a URL IMEDIATAMENTE para não ficar em loop
                 st.query_params.clear()
                 
+                # Força atualização imediata
+                st.rerun()
+                
             except Exception as e:
-                print(f"❌ Erro ao salvar baseline: {e}")
-        else:
-            print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
+                # Mostra o erro real na tela
+                st.error(f"❌ Erro ao processar baseline: {e}")
+                print(f"ERRO DEBUG: {e}")
+                # Limpa os parâmetros para destravar a tela
+                st.query_params.clear()
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -1754,121 +1666,89 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                 (function() {{
-                    // 1. Configuração
+                    // 1. Identificar o Container
+                    // O ID do container vem do Python, mas a lógica interna será dinâmica
                     const containerId = 'gantt-container-' + '{project["id"]}';
                     const container = document.getElementById(containerId);
-                    
-                    // Garante iframe
-                    let iframe = document.getElementById('hidden-iframe');
-                    if (!iframe) {{
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'hidden-iframe';
-                        iframe.style.display = 'none';
-                        if(container) container.appendChild(iframe);
-                    }}
+                    const iframe = document.getElementById('hidden-iframe');
 
                     if (!container) return;
 
-                    // Limpeza visual
+                    // 2. Limpeza de elementos antigos
                     const oldMenu = container.querySelector('#context-menu');
                     if (oldMenu) oldMenu.remove();
                     const oldToast = container.querySelector('.js-toast-loading');
                     if (oldToast) oldToast.remove();
 
-                    // 2. Criar Menu
+                    // 3. Criar o Menu
                     const menu = document.createElement('div');
                     menu.id = 'context-menu';
-                    menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
                     menu.innerHTML = `
-                        <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                            <span>📸</span> <b>Criar Linha de Base</b>
+                        <div class="context-menu-item" id="btn-create-baseline">
+                            <span>📸</span> Criar Linha de Base
                         </div>
                     `;
                     container.appendChild(menu);
 
-                    // 3. Criar Toast
+                    // 4. Criar o Toast
                     const toast = document.createElement('div');
                     toast.className = 'js-toast-loading';
-                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
+                    toast.textContent = "🔄 Processando...";
                     container.appendChild(toast);
 
-                    // 4. Listeners
+                    // 5. Listener de Context Menu
                     container.addEventListener('contextmenu', function(e) {{
-                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper')) {{
                             e.preventDefault();
-                            menu.style.display = 'block';
+                            
+                            // Posicionamento que funciona em Fullscreen
+                            menu.style.position = 'fixed'; 
                             menu.style.left = e.clientX + 'px';
                             menu.style.top = e.clientY + 'px';
+                            menu.style.display = 'block';
                         }} else {{
                             menu.style.display = 'none';
                         }}
                     }});
 
-                    document.addEventListener('click', function(e) {{
-                        if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                            menu.style.display = 'none';
-                        }}
+                    // 6. Fechar ao clicar fora
+                    document.addEventListener('click', function() {{
+                        menu.style.display = 'none';
                     }}, true);
 
-                    // --- 5. AÇÃO DO BOTÃO ---
+                    // 7. Ação do Botão (AQUI ESTÁ A CORREÇÃO DO NOME)
                     const btnCreate = menu.querySelector('#btn-create-baseline');
-                    
-                    btnCreate.addEventListener('click', function(e) {{
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        // A. Nome do Projeto
+                    btnCreate.addEventListener('click', function() {{
+                        
+                        // --- CORREÇÃO AQUI: ---
+                        // Em vez de pegar o nome fixo do Python ('{project["name"]}'),
+                        // pegamos a variável global JavaScript 'projectData' que atualiza quando você filtra.
                         let currentProjectName = "Desconhecido";
+                        
                         if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                             currentProjectName = projectData[0].name;
                         }} else {{
+                            // Fallback: Tenta ler do título visível na sidebar
                             const titleEl = container.querySelector('.project-title-row span');
                             if (titleEl) currentProjectName = titleEl.textContent;
                         }}
-
-                        // B. Feedback Visual (Laranja = Processando)
-                        menu.style.display = 'none';
+                        
+                        // Atualiza o texto do Toast dinamicamente
+                        toast.textContent = `🔄 Criando baseline para: ${{currentProjectName}}...`;
                         toast.style.display = 'block';
-                        toast.style.backgroundColor = "#e67e22"; // Laranja
-                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
-                        // C. Montar URL CORRETA
                         const encodedProject = encodeURIComponent(currentProjectName);
                         const timestamp = new Date().getTime();
                         
-                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                        // Isso corrige o bug do "about:srcdoc"
-                        let baseUrl = document.referrer;
-                        if (!baseUrl || baseUrl === "") {{
-                             // Fallback raro
-                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
-                        }}
-                        // Remove barra final
-                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+                        // Monta a URL para o Python processar
+                        // ATENÇÃO: Use duas chaves {{ }} apenas onde quer escapar do Python (nas variáveis JS)
+                        const url = `?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`;
 
-                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
+                        if (iframe) iframe.src = url;
 
-                        console.log("🚀 URL Iframe:", finalUrl);
-                        
-                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
-                        if (iframe) iframe.src = finalUrl;
-
-                        // E. Feedback Final
-                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
-                        setTimeout(() => {{
-                            toast.style.backgroundColor = "#27ae60"; // Verde
-                            toast.innerHTML = `
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
-                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
-                                </div>
-                            `;
-                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
-                        }}, 4000);
+                        // Esconde após 5s
+                        setTimeout(() => {{ toast.style.display = 'none'; }}, 5000);
                     }});
 
                 }})();
@@ -4383,7 +4263,9 @@ with st.spinner("Carregando e processando dados..."):
     df_data = load_data()
     
     # 2. Verifica se carregou corretamente
-    if df_data is not None:
+    if df_data is not None and not df_data.empty:
+        
+        # Salva na sessão para garantir disponibilidade global
         st.session_state.df_data = df_data
         
         # Inicializa variáveis de controle visual (prevenção de erro de chave)
