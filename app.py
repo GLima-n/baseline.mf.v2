@@ -10,7 +10,8 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #atualizarSeletorBaseline
+from dateutil.relativedelta import relativedelta #Dados para JavaScript
+
 import streamlit.components.v1 as components  
 import json
 import random
@@ -1644,19 +1645,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
                 <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
             </div>
-            <div class="gantt-container" id="gantt-container-{project['id']}">
-            <!-- Seletor de Baseline DINÂMICO -->
-            <div class="baseline-selector-container {'' if empreendimento_atual != 'Múltiplos' else 'baseline-disabled'}" 
-                 id="baseline-selector-{project['id']}">
-                <div class="baseline-label">VERSÃO DO PROJETO</div>
-                <select id="baseline-select-{project['id']}" {"disabled" if empreendimento_atual == "Múltiplos" else ""}>
-                    <option value="P0-(padrão)">P0-(padrão)</option>
-                    {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
-                </select>
-                <div class="baseline-info" id="baseline-info-{project['id']}">
-                    {f"<span class='empreendimento-atual'>{empreendimento_atual}</span><br>{len(baseline_options)} baselines" if empreendimento_atual != "Múltiplos" else "Filtre por 1 empreendimento"}
-                </div>
-            </div>
             
             <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
             <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
@@ -1794,10 +1782,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                 <script>
                     // DEBUG: Verificar dados
-                    const todosEmpreendimentos = {json.dumps(todos_empreendimentos)};
-                    const baselinesPorEmpreendimento = {json.dumps(baselines_por_empreendimento)};
-                    const empreendimentoAtual = '{empreendimento_atual}';
-                    const baselineAtual = {json.dumps(baseline_name)};
+                    
                     const baselinesData = {json.dumps(baselines_data)};
                     const currentBaseline = {json.dumps(baseline_name)};
                     const projectName = {json.dumps(primeiro_empreendimento)};
@@ -2430,8 +2415,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         monthHeader.innerHTML = monthHtml;
                     }}
 
-                    
-                    
                     function renderChart() {{
                         const chartBody = document.getElementById('chart-body-{project["id"]}');
                         const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
