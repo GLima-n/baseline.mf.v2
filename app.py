@@ -10,8 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #get_db_connection
-import traceback
+from dateutil.relativedelta import relativedelta #apply_baseline_to_dataframe
 import streamlit.components.v1 as components  
 import json
 import random
@@ -65,6 +64,13 @@ except Exception:
         'database': "mock_db",
         'port': 3306
     }
+
+if 'current_baseline' not in st.session_state:
+    st.session_state.current_baseline = None
+if 'current_baseline_data' not in st.session_state:
+    st.session_state.current_baseline_data = None
+if 'current_empreendimento' not in st.session_state:
+    st.session_state.current_empreendimento = None
 
 # --- ORDEM DAS ETAPAS (DEFINIDA PELO USUÁRIO) ---
 ORDEM_ETAPAS_GLOBAL = [
@@ -260,6 +266,33 @@ def take_baseline(df, empreendimento):
     # 4. Salva no banco
     save_baseline(empreendimento, version_name, baseline_data, datetime.now().strftime("%d/%m/%Y"))
     return version_name
+
+def process_baseline_change():
+    """
+    Processa mudanças de baseline via query parameters.
+    """
+    query_params = st.query_params
+    
+    if 'change_baseline' in query_params:
+        baseline_name = query_params['change_baseline']
+        empreendimento = query_params.get('empreendimento', '')
+        
+        if baseline_name and empreendimento:
+            if baseline_name == 'P0-(padrão)':
+                # Limpar baseline
+                st.session_state.current_baseline = None
+                st.session_state.current_baseline_data = None
+                st.session_state.current_empreendimento = None
+            else:
+                # Carregar baseline selecionada
+                baseline_data = load_baseline_data(empreendimento, baseline_name)
+                if baseline_data:
+                    st.session_state.current_baseline = baseline_name
+                    st.session_state.current_baseline_data = baseline_data
+                    st.session_state.current_empreendimento = empreendimento
+            
+            # Limpar parâmetros
+            st.query_params.clear()
 
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
@@ -839,7 +872,6 @@ def apply_baseline_to_dataframe(df, baseline_data):
     # Para cada task na baseline, atualizar as datas no DataFrame
     for task in baseline_data['tasks']:
         etapa = task['etapa']
-        etapa_nome_completo = task['etapa_nome_completo']
         
         # Encontrar a linha correspondente no DataFrame
         mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
@@ -854,7 +886,9 @@ def apply_baseline_to_dataframe(df, baseline_data):
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
             
-            # Manter dados reais atuais, apenas baseline afeta o previsto
+            # Atualizar percentual de conclusão
+            if 'percentual_concluido' in task:
+                df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
     
     return df_baseline
 
@@ -990,7 +1024,7 @@ def aplicar_ordenacao_final(df, empreendimentos_ordenados):
 
 
 # --- *** FUNÇÃO gerar_gantt_por_projeto MODIFICADA *** ---
-def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra=""):
+def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", baseline_name=None):
         """
         Gera um único gráfico de Gantt com todos os projetos.
         """
@@ -1017,7 +1051,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         ).reset_index()
 
         df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
-        
+        # Obter baselines disponíveis
+        primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
+        baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
         # Mapear o SETOR e GRUPO
         df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
         df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
@@ -1061,6 +1097,20 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         
         if titulo_extra:
             project["name"] += titulo_extra
+
+            # Obter baselines disponíveis para o primeiro empreendimento (assumindo que é o mesmo para todos no modo projeto único)
+        primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
+        baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
+        
+        # Preparar dados das baselines para JavaScript
+        baselines_data = {}
+        if primeiro_empreendimento and baseline_options:
+            baselines = load_baselines()
+            emp_baselines = baselines.get(primeiro_empreendimento, {})
+            for version_name in baseline_options:
+                if version_name in emp_baselines:
+                    baselines_data[version_name] = emp_baselines[version_name]['data']
+
         # Reduz o fator de multiplicação para evitar excesso de espaço
         altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
@@ -1094,6 +1144,54 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     
                    /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
+                   /* Novos estilos para seletor de baseline */
+                    .baseline-selector {{
+                        position: absolute;
+                        top: 60px;
+                        right: 50px;
+                        z-index: 100;
+                        background: rgba(255, 255, 255, 0.95);
+                        border-radius: 6px;
+                        padding: 10px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        border: 1px solid #e2e8f0;
+                        min-width: 200px;
+                    }}
+                    
+                    .baseline-selector select {{
+                        width: 100%;
+                        padding: 6px 8px;
+                        border: 1px solid #cbd5e0;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        background: white;
+                    }}
+                    
+                    .baseline-current {{
+                        background: #e6f3ff;
+                        padding: 4px 8px;
+                        border-radius: 4px;
+                        font-size: 11px;
+                        margin-bottom: 8px;
+                        border-left: 3px solid #3b82f6;
+                    }}
+                    
+                    .baseline-option {{
+                        padding: 6px 8px;
+                        cursor: pointer;
+                        border-radius: 3px;
+                        font-size: 12px;
+                        margin: 2px 0;
+                    }}
+                    
+                    .baseline-option:hover {{
+                        background: #f1f5f9;
+                    }}
+                    
+                    .baseline-option.active {{
+                        background: #3b82f6;
+                        color: white;
+                    }}
                     #context-menu {{
                         position: fixed; /* MUDANÇA: Fixed funciona melhor se estiver dentro do container */
                         background: white;
@@ -1402,7 +1500,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         height: 30px;
                         font-size: 13px;
                     }}
-
                 </style>
             </head>
             <body>
@@ -1432,7 +1529,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         </span>
                     </button>
                 </div>
-
+                <!-- Seletor de Baseline no Menu Flutuante -->
+                <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
+                    <div class="baseline-current" id="current-baseline-{project['id']}">
+                        {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
+                    </div>
+                    <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
+                        <option value="P0-(padrão)">P0-(padrão)</option>
+                        {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
+                    </select>
+                </div>
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                         <div class="filter-group">
                             <label for="filter-project-{project['id']}">Empreendimento</label>
@@ -1540,6 +1646,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                 <script>
                     // DEBUG: Verificar dados
+                    const baselinesData = {json.dumps(baselines_data)};
+                    const currentBaseline = {json.dumps(baseline_name)};
+                    const projectName = {json.dumps(primeiro_empreendimento)};
                     console.log('Inicializando Gantt para projeto:', '{project["name"]}');
                     
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
@@ -1586,7 +1695,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const year = String(d.getUTCFullYear()).slice(-2);
                         return `${{day}}/${{month}}/${{year}}`;
                     }};
-
+                    
                     function addMonths(dateStr, months) {{
                         if (!dateStr) return null;
                         const date = parseDate(dateStr);
@@ -1701,6 +1810,38 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         return tasksOrganizadas;
                     }}
+                    function handleBaselineChange(selectedBaseline) {{
+                        const empreendimento = '{primeiro_empreendimento}';
+                        const timestamp = new Date().getTime();
+                        
+                        // Usar navegação simples
+                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
+                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
+                        iframe.src = url;
+                        
+                        // Feedback visual
+                        const select = document.getElementById('baseline-select-{project['id']}');
+                        select.disabled = true;
+                        select.style.opacity = '0.7';
+                        
+                        // Reativar após um tempo
+                        setTimeout(() => {{
+                            select.disabled = false;
+                            select.style.opacity = '1';
+                        }}, 1000);
+                    }}
+                    
+                    // Indicar visualmente qual baseline está ativa
+                    document.addEventListener('DOMContentLoaded', function() {{
+                        const currentBaseline = '{baseline_name}';
+                        if (currentBaseline && currentBaseline !== 'None') {{
+                            const container = document.querySelector('.baseline-selector-container');
+                            if (container) {{
+                                container.style.background = '#f0f7ff';
+                                container.style.borderColor = '#3b82f6';
+                            }}
+                        }}
+                    }});
 
                     function toggleSubtasks(taskName) {{
                         const subtaskRows = document.querySelectorAll('.subtask-row[data-parent="' + taskName + '"]');
@@ -2214,6 +2355,63 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }}
                     }}
+                    // Função para alternar visibilidade do seletor de baseline
+                    function toggleBaselineSelector() {{
+                        const selector = document.getElementById('baseline-selector-{project['id']}');
+                        selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
+                    }}
+                    
+                    // Função para mudar baseline
+                    function changeBaseline(selectedBaseline) {{
+                        if (selectedBaseline === 'P0-(padrão)') {{
+                            // Recarregar página sem baseline
+                            window.location.href = window.location.pathname;
+                        }} else {{
+                            // Enviar comando para Streamlit aplicar a baseline selecionada
+                            const timestamp = new Date().getTime();
+                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(projectName)}}&t=${{timestamp}}`;
+                            
+                            // Mostrar loading
+                            showBaselineLoading();
+                            
+                            // Usar iframe para carregar a URL
+                            const iframe = document.getElementById('hidden-iframe');
+                            iframe.src = url;
+                        }}
+                    }}
+                    
+                    function showBaselineLoading() {{
+                        // Implementar visual de loading
+                        const currentElement = document.getElementById('current-baseline-{project['id']}');
+                        currentElement.textContent = 'Carregando...';
+                        currentElement.style.background = '#fff3cd';
+                    }}
+                    
+                    // Adicionar botão de baseline na toolbar
+                    function addBaselineButton() {{
+                        const toolbar = document.getElementById('gantt-toolbar-{project["id"]}');
+                        if (toolbar) {{
+                            const baselineBtn = document.createElement('button');
+                            baselineBtn.className = 'toolbar-btn';
+                            baselineBtn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg></span>';
+                            baselineBtn.title = 'Selecionar Baseline';
+                            baselineBtn.onclick = toggleBaselineSelector;
+                            toolbar.appendChild(baselineBtn);
+                        }}
+                    }}
+                    
+                    // Inicializar quando o DOM estiver pronto
+                    document.addEventListener('DOMContentLoaded', function() {{
+                        addBaselineButton();
+                        
+                        // Se há uma baseline ativa, destacar no seletor
+                        if (currentBaseline) {{
+                            const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
+                            if (dropdown) {{
+                                dropdown.value = currentBaseline;
+                            }}
+                        }}
+                    }});
 
                     function createBar(task, tipo) {{
                         const startDate = parseDate(tipo === 'previsto' ? task.start_previsto : task.start_real);
@@ -4039,16 +4237,24 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
-def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False):
+def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_data=None, baseline_name=None):
     """
     Decide qual Gantt gerar com base na seleção da etapa inicial.
     
     Args:
-        baseline_applied: Indica se uma baseline foi aplicada para modificar o título
+        baseline_data: Dados da baseline a serem aplicados
+        baseline_name: Nome da baseline selecionada
     """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
+
+    # Aplicar baseline se fornecida
+    if baseline_data is not None:
+        df = apply_baseline_to_dataframe(df, baseline_data)
+        # Adicionar indicador visual no título
+        if baseline_name:
+            st.info(f"📊 Visualizando: **{baseline_name}**")
 
     # A decisão do modo é baseada no parâmetro, não mais no conteúdo do DF
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
@@ -4063,13 +4269,13 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             etapa_selecionada_inicialmente
         )
     else:
-        # Agora gera apenas UM gráfico com todos os empreendimentos
         gerar_gantt_por_projeto(
             df, 
             tipo_visualizacao, 
             df_original_para_ordenacao, 
             pulmao_status, 
-            pulmao_meses
+            pulmao_meses,
+            baseline_name=baseline_name  # Passar o nome da baseline para o gráfico
         )
 
 # O restante do código Streamlit...
@@ -4948,53 +5154,43 @@ with st.spinner("Carregando e processando dados..."):
 
         with tab1:
             st.subheader("Gantt Comparativo")
+            
+            # Processar mudança de baseline
+            process_baseline_change()
+            
             if df_para_exibir.empty:
                 st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
-                pass
             else:
                 df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
-                        # ADICIONE ESTE COMPONENTE DE CONTEXTO
-            # if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
-            #     contexto_html = f"""
-            #     <style>
-            #     .gantt-context-area {{
-            #         padding: 10px;
-            #         margin: 10px 0;
-            #         border: 2px dashed #ddd;
-            #         border-radius: 5px;
-            #         background: #f9f9f9;
-            #         text-align: center;
-            #     }}
-            #     .context-info {{
-            #         font-size: 14px;
-            #         color: #666;
-            #     }}
-            #     </style>
-            #     <div class="gantt-context-area">
-            #         <div class="context-info">
-            #             💡 Use a sidebar para criar linhas de base do projeto <strong>{selected_empreendimento_baseline}</strong>
-            #         </div>
-            #     </div>
-            #     """
-            #     st.markdown(contexto_html, unsafe_allow_html=True)
-
-            #     if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
+                
+                # Aplicar baseline se existir
+                current_baseline = st.session_state.get('current_baseline')
+                current_baseline_data = st.session_state.get('current_baseline_data')
+                
+                if current_baseline_data and st.session_state.get('current_empreendimento') == df_para_gantt["Empreendimento"].iloc[0]:
+                    df_para_gantt = apply_baseline_to_dataframe(df_para_gantt, current_baseline_data)
+                    st.info(f"Visualizando baseline: **{current_baseline}**")
                     
-            #         # --- AQUI: Cria o menu passando a variável correta ---
-            #         create_gantt_context_menu_component(selected_empreendimento_baseline)
-
-                # NA TAB1, ATUALIZE A CHAMADA DO gerar_gantt:
-            gerar_gantt(
-                df_para_gantt.copy(),
-                tipo_visualizacao, 
-                filtrar_nao_concluidas,
-                df_data, 
-                pulmao_status, 
-                pulmao_meses,
-                selected_etapa_nome
-                # REMOVER baseline_applied SE EXISTIR
-            )
-        
+                    # Botão para voltar aos dados originais
+                    if st.button("Voltar para Dados Originais", key="clear_baseline"):
+                        st.session_state.current_baseline = None
+                        st.session_state.current_baseline_data = None
+                        st.session_state.current_empreendimento = None
+                        st.rerun()
+                
+                gerar_gantt(
+                    df_para_gantt.copy(),
+                    tipo_visualizacao, 
+                    filtrar_nao_concluidas,
+                    df_data, 
+                    pulmao_status, 
+                    pulmao_meses,
+                    selected_etapa_nome,
+                    baseline_data=current_baseline_data,
+                    baseline_name=current_baseline
+                )
+            # Botão para limpar baseline (se houver uma ativa)
+                                                                                                                                                      
             st.markdown('<div id="visao-detalhada"></div>', unsafe_allow_html=True)
             st.subheader("Visão Detalhada por Empreendimento")
 
@@ -5613,7 +5809,6 @@ def verificar_implementacao_baseline():
             st.error(f"❌ Função {func} não encontrada na implementação")
             return False
     
-    st.success("✅ Sistema de baselines implementado com sucesso!")
     return True
 
 # No final do arquivo, antes do if __name__:
