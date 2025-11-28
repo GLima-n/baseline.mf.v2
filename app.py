@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #STREAMLIT_BASE_URL
+from dateutil.relativedelta import relativedelta #AÇÃO DIRETA
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -1508,7 +1508,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <script id="grupos-gantt-data" type="application/json">{json.dumps(GRUPOS)}</script>
                 <script id="subetapas-data" type="application/json">{json.dumps(SUBETAPAS)}</script>
                 <div id="context-menu">
-                <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
+                <div class="context-menu-item" id="btn-create-baseline-{project['id']}">📸 Criar Linha de Base</div>
                 <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
             </div>
             
@@ -1887,8 +1887,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}, true);
 
                     // AÇÃO DIRETA - SEM COMPLICAÇÕES
-                    const btnCreate = menu.querySelector('#btn-create-baseline');
-                    
+                    const btnCreate = menu.querySelector('#btn-create-baseline-' + '{project["id"]}');
+
                     btnCreate.addEventListener('click', function(e) {{
                         e.stopPropagation();
                         e.preventDefault();
@@ -1909,8 +1909,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // Abre em nova aba - FUNCIONA SEMPRE
                         window.open(novaUrl, '_blank');
-                    }});
-                }})();
+                        }});
+                    }})();
+
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
