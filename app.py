@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #DOMContentLoaded
+from dateutil.relativedelta import relativedelta #process_baseline_change
 import streamlit.components.v1 as components  
 import json
 import random
@@ -273,32 +273,29 @@ def process_baseline_change():
     """
     query_params = st.query_params
     
-    if 'change_baseline' in query_params:
+    if 'change_baseline' in query_params and 'empreendimento' in query_params:
         baseline_name = query_params['change_baseline']
-        empreendimento = query_params.get('empreendimento', '')
+        empreendimento = query_params['empreendimento']
         
-        if baseline_name and empreendimento:
-            # Sempre limpar os parâmetros primeiro
-            st.query_params.clear()
-            
-            if baseline_name == 'P0-(padrão)':
-                # Limpar baseline da sessão
-                if 'current_baseline' in st.session_state:
-                    del st.session_state.current_baseline
-                if 'current_baseline_data' in st.session_state:
-                    del st.session_state.current_baseline_data
-                if 'current_empreendimento' in st.session_state:
-                    del st.session_state.current_empreendimento
-            else:
-                # Carregar baseline selecionada
-                baseline_data = load_baseline_data(empreendimento, baseline_name)
-                if baseline_data:
-                    st.session_state.current_baseline = baseline_name
-                    st.session_state.current_baseline_data = baseline_data
-                    st.session_state.current_empreendimento = empreendimento
-            
-            # Forçar rerun para atualizar a interface
-            st.rerun()
+        # Limpar os parâmetros IMEDIATAMENTE
+        st.query_params.clear()
+        
+        if baseline_name == 'P0-(padrão)':
+            # Limpar baseline apenas se for do mesmo empreendimento
+            current_emp = st.session_state.get('current_empreendimento')
+            if current_emp == empreendimento:
+                st.session_state.current_baseline = None
+                st.session_state.current_baseline_data = None
+                st.session_state.current_empreendimento = None
+                st.rerun()
+        else:
+            # Carregar baseline selecionada
+            baseline_data = load_baseline_data(empreendimento, baseline_name)
+            if baseline_data:
+                st.session_state.current_baseline = baseline_name
+                st.session_state.current_baseline_data = baseline_data
+                st.session_state.current_empreendimento = empreendimento
+                st.rerun()
             
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
@@ -1058,8 +1055,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
         df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
         # Obter baselines disponíveis
-        primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
-        baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
+        if not df.empty:
+                # Se estamos em visão consolidada por etapa, pode ter múltiplos empreendimentos
+                # Mas no modo projeto, geralmente temos um empreendimento principal
+                empreendimentos_no_grafico = df["Empreendimento"].unique()
+                empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
+        else:
+            empreendimento_principal = ""
         # Mapear o SETOR e GRUPO
         df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
         df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
@@ -1117,6 +1119,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if version_name in emp_baselines:
                     baselines_data[version_name] = emp_baselines[version_name]['data']
 
+        baseline_options = []
+        if empreendimento_principal and empreendimento_principal != "Múltiplos":
+            baseline_options = get_baseline_options(empreendimento_principal)
         # Reduz o fator de multiplicação para evitar excesso de espaço
         altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
@@ -1841,25 +1846,39 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     document.addEventListener('DOMContentLoaded', function() {{
                         const select = document.getElementById('baseline-select-{project['id']}');
                         const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                        const empreendimento = '{primeiro_empreendimento}';
+                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
+                        const empreendimento = '{empreendimento_principal}';
+                        
+                        // Só permitir mudança se houver um empreendimento específico
+                        if (empreendimento === 'Múltiplos' || !empreendimento) {{
+                            select.disabled = true;
+                            select.title = 'Selecione um empreendimento específico para ver baselines';
+                            infoDiv.innerHTML = 'Selecione um empreendimento específico';
+                            infoDiv.style.color = '#ff6b6b';
+                        }}
                         
                         select.addEventListener('change', function() {{
+                            if (empreendimento === 'Múltiplos' || !empreendimento) return;
+                            
                             const selectedBaseline = this.value;
-                            const timestamp = new Date().getTime();
                             
                             // Feedback visual
+                            const originalText = infoDiv.innerHTML;
+                            infoDiv.innerHTML = 'Carregando...';
+                            infoDiv.style.color = '#3b82f6';
                             select.disabled = true;
-                            select.style.opacity = '0.7';
                             
-                            // Usar iframe para enviar o comando sem recarregar a página
+                            // Usar iframe para enviar o comando
+                            const timestamp = new Date().getTime();
                             const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
                             iframe.src = url;
                             
-                            // Reativar após um tempo
+                            // Timeout para reativar
                             setTimeout(() => {{
                                 select.disabled = false;
-                                select.style.opacity = '1';
-                            }}, 1500);
+                                infoDiv.innerHTML = originalText;
+                                infoDiv.style.color = '#888';
+                            }}, 2000);
                         }});
                     }});
 
@@ -4265,26 +4284,34 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
-    # Aplicar baseline apenas se for específica para este empreendimento
-    primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
+    # Determinar qual empreendimento está sendo visualizado
+    empreendimentos_no_df = df["Empreendimento"].unique()
+    empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
+    
     current_empreendimento = st.session_state.get('current_empreendimento')
     
-    if (baseline_data is not None and 
+    # Aplicar baseline apenas se for específica para este empreendimento
+    should_apply_baseline = (
+        baseline_data is not None and 
         baseline_name is not None and 
-        current_empreendimento == primeiro_empreendimento):
-        
+        current_empreendimento == empreendimento_visualizado and
+        empreendimento_visualizado != "Múltiplos"
+    )
+    
+    if should_apply_baseline:
         df = apply_baseline_to_dataframe(df, baseline_data)
         
         # Mostrar indicador de baseline ativa
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.info(f"Visualizando baseline: **{baseline_name}**")
-        with col2:
-            if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
-                st.session_state.current_baseline = None
-                st.session_state.current_baseline_data = None
-                st.session_state.current_empreendimento = None
-                st.rerun()
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.info(f"**Visualizando:** {baseline_name} | **Projeto:** {empreendimento_visualizado}")
+            with col2:
+                if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
+                    st.session_state.current_baseline = None
+                    st.session_state.current_baseline_data = None
+                    st.session_state.current_empreendimento = None
+                    st.rerun()
 
     # A decisão do modo é baseada no parâmetro
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
@@ -4305,9 +4332,8 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            baseline_name=baseline_name
+            baseline_name=baseline_name if should_apply_baseline else None
         )
-
 # O restante do código Streamlit...
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
 
@@ -5183,31 +5209,43 @@ with st.spinner("Carregando e processando dados..."):
         tab1, tab2, tab3 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal", "Linhas de Base"])
 
     with tab1:
-            st.subheader("Gantt Comparativo")
+        st.subheader("Gantt Comparativo")
+        
+        # Processar mudança de baseline PRIMEIRO
+        process_baseline_change()
+        
+        if df_para_exibir.empty:
+            st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
+        else:
+            df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
             
-            # Processar mudança de baseline ANTES de qualquer renderização
-            process_baseline_change()
+            # Obter estado atual da baseline
+            current_baseline = st.session_state.get('current_baseline')
+            current_baseline_data = st.session_state.get('current_baseline_data')
             
-            if df_para_exibir.empty:
-                st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
+            # Verificar se a baseline atual pertence a algum empreendimento no gráfico
+            current_emp = st.session_state.get('current_empreendimento')
+            empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
+            
+            # Só passar a baseline se pertencer a um empreendimento no gráfico atual
+            if current_emp and current_emp in empreendimentos_no_grafico:
+                baseline_to_use = current_baseline
+                baseline_data_to_use = current_baseline_data
             else:
-                df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
-                
-                # Obter estado atual da baseline
-                current_baseline = st.session_state.get('current_baseline')
-                current_baseline_data = st.session_state.get('current_baseline_data')
-                
-                gerar_gantt(
-                    df_para_gantt.copy(),
-                    tipo_visualizacao, 
-                    filtrar_nao_concluidas,
-                    df_data, 
-                    pulmao_status, 
-                    pulmao_meses,
-                    selected_etapa_nome,
-                    baseline_data=current_baseline_data,
-                    baseline_name=current_baseline
-                )
+                baseline_to_use = None
+                baseline_data_to_use = None
+            
+            gerar_gantt(
+                df_para_gantt.copy(),
+                tipo_visualizacao, 
+                filtrar_nao_concluidas,
+                df_data, 
+                pulmao_status, 
+                pulmao_meses,
+                selected_etapa_nome,
+                baseline_data=baseline_data_to_use,
+                baseline_name=baseline_to_use
+            )
             # Botão para limpar baseline (se houver uma ativa)
                                                                                                                                                       
             st.markdown('<div id="visao-detalhada"></div>', unsafe_allow_html=True)
