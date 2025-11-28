@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #take_gantt_baseline
+from dateutil.relativedelta import relativedelta #STREAMLIT_BASE_URL
 import traceback
 import streamlit.components.v1 as components  
 import json
@@ -153,7 +153,7 @@ for grupo, etapas in GRUPOS.items():
         GRUPO_POR_ETAPA[etapa] = grupo
 
 SETOR_POR_ETAPA = {mapeamento_etapas_usuario.get(etapa, etapa): setor for setor, etapas in SETOR.items() for etapa in etapas}
-
+STREAMLIT_APP_URL = "https://baselinemfv2.streamlit.app" 
 
 # --- Configurações de Estilo ---
 class StyleConfig:
@@ -211,6 +211,34 @@ def create_baselines_table():
             conn.close()
 
 import streamlit.components.v1 as components
+
+import urllib.parse
+
+# Função para obter a URL base do app
+def get_streamlit_base_url():
+    try:
+        # Tenta obter a URL do contexto do Streamlit
+        from streamlit.runtime.scriptrunner import get_script_run_ctx
+        ctx = get_script_run_ctx()
+        if ctx and hasattr(ctx, 'request') and hasattr(ctx.request, 'url'):
+            url = ctx.request.url
+            # Remove query parameters para obter a base URL
+            base_url = url.split('?')[0]
+            return base_url
+    except:
+        pass
+    
+    # Fallback: constrói a URL base a partir do hostname
+    try:
+        import streamlit as st
+        # Para deployment na nuvem, tenta obter do session state
+        if 'streamlit_base_url' in st.session_state:
+            return st.session_state.streamlit_base_url
+    except:
+        pass
+    
+    # Último fallback: URL hardcoded (substitua pela sua)
+    return "https://baselinemfv2.streamlit.app"
 
 def create_baseline_trigger_component():
     """Cria um componente que pode receber mensagens do JavaScript"""
@@ -1061,7 +1089,7 @@ def aplicar_ordenacao_final(df, empreendimentos_ordenados):
 
 
 # --- *** FUNÇÃO gerar_gantt_por_projeto MODIFICADA *** ---
-def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra=""):
+def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", streamlit_base_url=None):
         """
         Gera um único gráfico de Gantt com todos os projetos.
         """
@@ -1824,96 +1852,65 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
                 // --- SOLUÇÃO GARANTIDA: USANDO FORM SUBMIT ---
-                    (function() {{
-                        const containerId = 'gantt-container-' + '{project["id"]}';
-                        const container = document.getElementById(containerId);
-                        
-                        if (!container) return;
+                    // SOLUÇÃO ULTRA SIMPLES - SEM COMPLICAÇÕES
+                (function() {{
+                    const containerId = 'gantt-container-' + '{project["id"]}';
+                    const container = document.getElementById(containerId);
+                    
+                    if (!container) return;
 
-                        // Limpeza visual
-                        const oldMenu = container.querySelector('#context-menu');
-                        if (oldMenu) oldMenu.remove();
+                    // Menu (código igual ao anterior...)
+                    const menu = document.createElement('div');
+                    menu.id = 'context-menu';
+                    menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
+                    menu.innerHTML = `
+                        <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
+                            <span>📸</span> <b>Criar Linha de Base</b>
+                        </div>
+                    `;
+                    container.appendChild(menu);
 
-                        // Criar Menu
-                        const menu = document.createElement('div');
-                        menu.id = 'context-menu';
-                        menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
-                        menu.innerHTML = `
-                            <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                                <span>📸</span> <b>Criar Linha de Base</b>
-                            </div>
-                        `;
-                        container.appendChild(menu);
-
-                        // Listeners do menu
-                        container.addEventListener('contextmenu', function(e) {{
-                            if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
-                                e.preventDefault();
-                                menu.style.display = 'block';
-                                menu.style.left = e.clientX + 'px';
-                                menu.style.top = e.clientY + 'px';
-                            }} else {{
-                                menu.style.display = 'none';
-                            }}
-                        }});
-
-                        document.addEventListener('click', function(e) {{
-                            if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                                menu.style.display = 'none';
-                            }}
-                        }}, true);
-
-                        // --- AÇÃO DO BOTÃO COM FORM SUBMIT ---
-                        const btnCreate = menu.querySelector('#btn-create-baseline');
-                        
-                        btnCreate.addEventListener('click', function(e) {{
-                            e.stopPropagation();
+                    // Listeners (código igual ao anterior...)
+                    container.addEventListener('contextmenu', function(e) {{
+                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                             e.preventDefault();
+                            menu.style.display = 'block';
+                            menu.style.left = e.clientX + 'px';
+                            menu.style.top = e.clientY + 'px';
+                        }}
+                    }});
 
-                            // 1. Pega o nome do projeto
-                            let currentProjectName = "Desconhecido";
-                            if (typeof projectData !== 'undefined' && projectData.length > 0) {{
-                                currentProjectName = projectData[0].name;
-                            }} else {{
-                                const titleEl = container.querySelector('.project-title-row span');
-                                if (titleEl) currentProjectName = titleEl.textContent;
-                            }}
-
-                            // 2. Feedback Visual
+                    document.addEventListener('click', function(e) {{
+                        if (menu.style.display === 'block' && !menu.contains(e.target)) {{
                             menu.style.display = 'none';
-                            
-                            // 3. SOLUÇÃO GARANTIDA: Cria um form e submete
-                            const form = document.createElement('form');
-                            form.method = 'GET';
-                            form.action = window.location.href.split('?')[0]; // URL base sem parâmetros
-                            
-                            // Adiciona campos hidden com os parâmetros
-                            const taskInput = document.createElement('input');
-                            taskInput.type = 'hidden';
-                            taskInput.name = 'task';
-                            taskInput.value = 'save_baseline';
-                            form.appendChild(taskInput);
-                            
-                            const empInput = document.createElement('input');
-                            empInput.type = 'hidden';
-                            empInput.name = 'emp';
-                            empInput.value = currentProjectName;
-                            form.appendChild(empInput);
-                            
-                            const timestampInput = document.createElement('input');
-                            timestampInput.type = 'hidden';
-                            timestampInput.name = 't';
-                            timestampInput.value = new Date().getTime();
-                            form.appendChild(timestampInput);
-                            
-                            // Adiciona o form ao body e submete
-                            document.body.appendChild(form);
-                            form.submit();
-                            
-                            console.log('✅ Form submetido para:', form.action);
-                            console.log('📤 Parâmetros:', {{ task: 'save_baseline', emp: currentProjectName }});
-                        }});
-                    }})();
+                        }}
+                    }}, true);
+
+                    // AÇÃO DIRETA - SEM COMPLICAÇÕES
+                    const btnCreate = menu.querySelector('#btn-create-baseline');
+                    
+                    btnCreate.addEventListener('click', function(e) {{
+                        e.stopPropagation();
+                        e.preventDefault();
+
+                        // Pega o nome do projeto
+                        let currentProjectName = "Desconhecido";
+                        if (typeof projectData !== 'undefined' && projectData.length > 0) {{
+                            currentProjectName = projectData[0].name;
+                        }}
+
+                        menu.style.display = 'none';
+                        
+                        // URL HARDCODED - SUBSTITUA PELA SUA URL REAL
+                        const streamlitUrl = 'https://baselinemfv2.streamlit.app';
+                        const novaUrl = `${{streamlitUrl}}?task=save_baseline&emp=${{encodeURIComponent(currentProjectName)}}&t=${{new Date().getTime()}}`;
+                        
+                        console.log('🎯 Navegando para:', novaUrl);
+                        
+                        // Abre em nova aba - FUNCIONA SEMPRE
+                        window.open(novaUrl, '_blank');
+                    }});
+                }})();
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -4082,22 +4079,22 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     components.html(gantt_html, height=altura_gantt, scrolling=True)
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
+# Obtenha a URL base uma vez e armazene
+if 'streamlit_base_url' not in st.session_state:
+    st.session_state.streamlit_base_url = get_streamlit_base_url()
+
+streamlit_base_url = st.session_state.streamlit_base_url
+
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
-def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False):
+def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_applied=False, streamlit_base_url=None):
     """
     Decide qual Gantt gerar com base na seleção da etapa inicial.
-    
-    Args:
-        baseline_applied: Indica se uma baseline foi aplicada para modificar o título
     """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
-    # A decisão do modo é baseada no parâmetro, não mais no conteúdo do DF
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
-
-    # Modificar título se baseline foi aplicada
     titulo_extra = " (com Baseline)" if baseline_applied else ""
 
     if is_consolidated_view:
@@ -4107,21 +4104,18 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            etapa_selecionada_inicialmente,
-            titulo_extra=titulo_extra  # Novo parâmetro
+            etapa_selecionada_inicialmente
         )
     else:
-        # Agora gera apenas UM gráfico com todos os empreendimentos
         gerar_gantt_por_projeto(
             df, 
             tipo_visualizacao, 
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            titulo_extra=titulo_extra  # Novo parâmetro
+            titulo_extra=titulo_extra,
+            streamlit_base_url=streamlit_base_url  # ← ADICIONE ESTA LINHA
         )
-
-# O restante do código Streamlit...
 
 def processar_query_params(df_data, tipo_visualizacao):
     """Processa os parâmetros de URL para ações como criar baseline."""
@@ -5088,13 +5082,13 @@ with st.spinner("Carregando e processando dados..."):
         # A lógica de pulmão foi removida da sidebar, então não é mais aplicada aqui.
         tab1, tab2 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal"])
         with tab1:
-            st.subheader("Gantt Comparativo")
+            st.subheader("Gráfico de Gantt")
             if df_para_exibir.empty:
                 st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
                 pass
             else:
                 df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
-                        # ADICIONE ESTE COMPONENTE DE CONTEXTO
+        
             if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
                 contexto_html = f"""
                 <style>
@@ -5122,17 +5116,18 @@ with st.spinner("Carregando e processando dados..."):
                 if not df_para_exibir.empty and 'selected_empreendimento_baseline' in locals() and selected_empreendimento_baseline:
                     
                     # --- AQUI: Cria o menu passando a variável correta ---
-                    create_gantt_context_menu_component(selected_empreendimento_baseline)
-
-                    gerar_gantt(
-                        df_para_gantt.copy(),
-                        tipo_visualizacao, 
-                        filtrar_nao_concluidas,
-                        df_data, 
-                        pulmao_status, 
-                        pulmao_meses,
-                        selected_etapa_nome
-                    )
+                    streamlit_base_url = st.session_state.get('streamlit_base_url', 'https://baselinemfv2.streamlit.app')
+                
+                gerar_gantt(
+                    df_para_gantt.copy(),
+                    tipo_visualizacao, 
+                    filtrar_nao_concluidas,
+                    df_data, 
+                    pulmao_status, 
+                    pulmao_meses,
+                    selected_etapa_nome,
+                    streamlit_base_url=streamlit_base_url  # ← ADICIONE ESTE PARÂMETRO
+                )
             
             st.markdown('<div id="visao-detalhada"></div>', unsafe_allow_html=True)
             st.subheader("Visão Detalhada por Empreendimento")
