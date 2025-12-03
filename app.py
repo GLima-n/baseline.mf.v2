@@ -4486,7 +4486,7 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             pulmao_status, 
             pulmao_meses,
             baseline_name=baseline_name,
-            baseline_data=baseline_data if should_apply_baseline else None
+
         )
 # O restante do código Streamlit...
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
