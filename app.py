@@ -452,6 +452,7 @@ def create_baselines_table():
         if 'mock_baselines' not in st.session_state:
             st.session_state.mock_baselines = {}
 
+@st.cache_data(ttl=3600)
 def load_baselines():
     conn = get_db_connection()
     if conn:
@@ -475,6 +476,8 @@ def load_baselines():
                     baselines[empreendimento] = {}
                 
                 try:
+                    # O Streamlit cache_data não lida bem com objetos mutáveis como st.session_state
+                    # Vamos garantir que o retorno seja um dicionário simples
                     baseline_data = json.loads(row['baseline_data'])
                     baselines[empreendimento][version_name] = {
                         "date": row['created_date'],
@@ -498,6 +501,8 @@ def load_baselines():
         return st.session_state.get('mock_baselines', {})
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
+    # Invalida o cache de baselines para que a nova seja carregada
+    load_baselines.clear()
     conn = get_db_connection()
     if conn:
         try:
@@ -555,6 +560,8 @@ def save_baseline(empreendimento, version_name, baseline_data, created_date, tip
         return True
 
 def delete_baseline(empreendimento, version_name):
+    # Invalida o cache de baselines
+    load_baselines.clear()
     conn = get_db_connection()
     if conn:
         try:
@@ -738,6 +745,8 @@ def converter_dados_para_gantt(df):
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
 def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
+    # Invalida o cache de baselines
+    load_baselines.clear()
     """Cria uma linha de base do estado atual do Gantt"""
     
     try:
@@ -5840,51 +5849,11 @@ with st.spinner("Carregando e processando dados..."):
             st.info("Nenhum empreendimento disponível")
             st.stop()
 
-        # Lógica de Sincronização: Tenta obter o empreendimento principal selecionado no filtro (selected_emp)
-        default_emp_index = 0
-        selected_emp_from_main_filter = None
-        if 'selected_emp' in st.session_state and st.session_state.selected_emp:
-            emp_value = st.session_state.selected_emp
-            if isinstance(emp_value, list) and emp_value:
-                selected_emp_from_main_filter = emp_value[0]
-            elif isinstance(emp_value, str):
-                selected_emp_from_main_filter = emp_value
-        
-        # Se houver um empreendimento selecionado no filtro principal, tentamos usá-lo como padrão
-        if selected_emp_from_main_filter and selected_emp_from_main_filter in empreendimentos_baseline:
-            default_emp_index = empreendimentos_baseline.index(selected_emp_from_main_filter)
-        
-        # Se o usuário não interagiu com este selectbox, usamos o valor do filtro principal
-        if 'baseline_emp_tab3' not in st.session_state:
-            selected_empreendimento_baseline = st.selectbox(
-                "Empreendimento",
-                empreendimentos_baseline,
-                index=default_emp_index,
-                key="baseline_emp_tab3"
-            )
-        else:
-            # Se o usuário já interagiu, mantemos o valor selecionado, mas garantimos que ele seja um dos disponíveis
-            current_value = st.session_state.baseline_emp_tab3
-            if current_value not in empreendimentos_baseline:
-                # Se o valor selecionado não estiver mais disponível (filtro principal mudou), voltamos para o padrão
-                selected_empreendimento_baseline = st.selectbox(
-                    "Empreendimento",
-                    empreendimentos_baseline,
-                    index=default_emp_index,
-                    key="baseline_emp_tab3"
-                )
-            else:
-                # Mantemos o valor selecionado pelo usuário
-                selected_empreendimento_baseline = st.selectbox(
-                    "Empreendimento",
-                    empreendimentos_baseline,
-                    index=empreendimentos_baseline.index(current_value),
-                    key="baseline_emp_tab3"
-                )
-        
-        # Atualizar o estado da sessão com o empreendimento selecionado na tab3
-        # Isso é crucial para que a lógica de baseline na tab1 (Gantt) saiba qual empreendimento está sendo gerenciado.
-        st.session_state.current_empreendimento = selected_empreendimento_baseline
+        selected_empreendimento_baseline = st.selectbox(
+            "Empreendimento",
+            empreendimentos_baseline,
+            key="baseline_emp_tab3"
+        )
         
         # Criação de nova baseline
         with st.container(border=True):
