@@ -5839,12 +5839,46 @@ with st.spinner("Carregando e processando dados..."):
         if not empreendimentos_baseline:
             st.info("Nenhum empreendimento disponível")
             st.stop()
-
+        
+        # Sincronizar com o empreendimento principal selecionado (selected_emp)
+        # selected_emp é o filtro principal da sidebar.
+        
+        default_emp_index = 0
+        # O filtro principal é 'selected_emp' que é um multiselect, mas o gráfico Gantt é por projeto.
+        # Assumimos que o primeiro empreendimento selecionado no filtro principal é o que deve ser exibido por padrão aqui.
+        
+        # Tentativa de obter o empreendimento principal selecionado (selected_emp)
+        selected_emp_from_main_filter = None
+        if 'selected_emp' in st.session_state and st.session_state.selected_emp:
+            emp_value = st.session_state.selected_emp
+            if isinstance(emp_value, list) and emp_value:
+                selected_emp_from_main_filter = emp_value[0]
+            elif isinstance(emp_value, str):
+                selected_emp_from_main_filter = emp_value
+        
+        # Se houver um empreendimento selecionado no filtro principal, tentamos usá-lo como padrão
+        if selected_emp_from_main_filter and selected_emp_from_main_filter in empreendimentos_baseline:
+            default_emp_index = empreendimentos_baseline.index(selected_emp_from_main_filter)
+        
+        # Se o empreendimento atual da baseline estiver em session_state e for válido, tentamos usá-lo como padrão
+        # Isso garante que a tab mantenha o estado se o usuário a visitou antes.
+        if 'current_empreendimento' in st.session_state and st.session_state.current_empreendimento in empreendimentos_baseline:
+            default_emp_index = empreendimentos_baseline.index(st.session_state.current_empreendimento)
+        
+        # Se o empreendimento principal selecionado for diferente do current_empreendimento, 
+        # o current_empreendimento deve ser atualizado para o empreendimento principal selecionado.
+        # No entanto, o st.selectbox fará isso automaticamente.
+        
         selected_empreendimento_baseline = st.selectbox(
             "Empreendimento",
             empreendimentos_baseline,
+            index=default_emp_index,
             key="baseline_emp_tab3"
         )
+        
+        # Atualizar o estado da sessão com o empreendimento selecionado na tab3
+        # Isso é crucial para que a lógica de baseline na tab1 (Gantt) saiba qual empreendimento está sendo gerenciado.
+        st.session_state.current_empreendimento = selected_empreendimento_baseline
         
         # Criação de nova baseline
         with st.container(border=True):
