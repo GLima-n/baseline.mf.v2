@@ -764,8 +764,8 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 task = {
                     'etapa': row.get('Etapa', ''),
                     'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
-                    'inicio_previsto': row.get('Inicio_Real'),
-                    'termino_previsto': row.get('Termino_Real'),
+                    'inicio_previsto': None,
+                    'termino_previsto': None,
                     'inicio_real': None,
                     'termino_real': None,
                     'percentual_concluido': row.get('% concluído', 0),
@@ -776,8 +776,8 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 
                 # Converter datas para string com tratamento seguro
                 date_fields = {
-                    'inicio_previsto': 'Inicio_Real',
-                    'termino_previsto': 'Termino_Real', 
+                    'inicio_previsto': 'Inicio_Prevista',
+                    'termino_previsto': 'Termino_Prevista', 
                     'inicio_real': 'Inicio_Real',
                     'termino_real': 'Termino_Real'
                 }
@@ -4485,8 +4485,7 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             df_original_para_ordenacao, 
             pulmao_status, 
             pulmao_meses,
-            baseline_name=baseline_name,
-
+            baseline_name=baseline_name if should_apply_baseline else None
         )
 # O restante do código Streamlit...
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
