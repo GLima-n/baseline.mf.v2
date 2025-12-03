@@ -11,7 +11,6 @@ import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
 from dateutil.relativedelta import relativedelta #createBar
-
 import streamlit.components.v1 as components  
 import json
 import random
@@ -2658,24 +2657,24 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         const bar = document.createElement('div'); 
-                        bar.className = `gantt-bar ${tipo}`;
+                        bar.className = 'gantt-bar ' + tipo;
                         const coresSetor = coresPorSetor[task.setor] || coresPorSetor['Não especificado'] || {{previsto: '#cccccc', real: '#888888'}};
                         bar.style.backgroundColor = tipo === 'previsto' ? coresSetor.previsto : coresSetor.real;
-                        bar.style.left = `${{left}}px`; 
-                        bar.style.width = `${{width}}px`;
+                        bar.style.left = left + 'px'; 
+                        bar.style.width = width + 'px';
                         
                         // *** MODIFICAÇÃO: Adicionar classe de baseline se estiver em modo baseline ***
                         const isBaselineMode = projectData[0].current_baseline && projectData[0].current_baseline !== 'P0-(padrão)';
                         if (tipo === 'previsto' && isBaselineMode) {{
                             bar.classList.add('baseline');
-                            bar.title = `Baseline: ${{projectData[0].current_baseline}}\nClique para detalhes`;
+                            bar.title = 'Baseline: ' + projectData[0].current_baseline + '\\nClique para detalhes';
                         }}
                         
                         // Adicionar rótulo apenas se houver espaço suficiente
                         if (width > 40) {{
                             const barLabel = document.createElement('span'); 
                             barLabel.className = 'bar-label'; 
-                            barLabel.textContent = `${{task.name}} (${{task.progress}}%)`; 
+                            barLabel.textContent = task.name + ' (' + task.progress + '%)'; 
                             bar.appendChild(barLabel);
                         }}
                         
@@ -2684,11 +2683,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         return bar;
                     }}
                     function updateProjectTitle() {{
-                        const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
+                        const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{{project["id"]}} .project-title-row span');
                         if (projectTitle) {{
                             const isBaselineMode = projectData[0].current_baseline && projectData[0].current_baseline !== 'P0-(padrão)';
                             if (isBaselineMode) {{
-                                projectTitle.textContent = `${{projectData[0].name}} 📅 [${{projectData[0].current_baseline}}]`;
+                                projectTitle.textContent = projectData[0].name + ' 📅 [' + projectData[0].current_baseline + ']';
                                 projectTitle.style.color = '#3b82f6';
                             }} else {{
                                 projectTitle.textContent = projectData[0].name;
@@ -3258,7 +3257,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionMetaLine();
                             updateProjectTitle();
                             updateProjectTitle();
-                            
+
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
                             alert('Erro ao aplicar filtros: ' + error.message);
