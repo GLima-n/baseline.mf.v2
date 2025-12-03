@@ -1180,7 +1180,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if version_name in emp_baselines:
                     baselines_data[version_name] = emp_baselines[version_name]['data']
 
-	        #// A variável `baseline_options` já foi populada corretamente acima (linha 1172)        # com as opções do `primeiro_empreendimento`.
+	        # A variável `baseline_options` já foi populada corretamente acima (linha 1172)
+	        # com as opções do `primeiro_empreendimento`.
 	        # A seção abaixo estava sobrescrevendo `baseline_options` com uma lista vazia
 	        # ou com as opções do `empreendimento_atual` (que é o mesmo que `primeiro_empreendimento`
 	        # no modo projeto único), mas o principal problema é a redefinição de `baseline_options`
@@ -1657,6 +1658,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             </head>
             <body>
                 <script id="grupos-gantt-data" type="application/json">{json.dumps(GRUPOS)}</script>
+                <script id="all-baselines-data" type="application/json">{json.dumps(baselines_por_empreendimento)}</script>
                 <script id="subetapas-data" type="application/json">{json.dumps(SUBETAPAS)}</script>
                 <div id="context-menu">
                 <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
@@ -1687,7 +1689,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="baseline-current" id="current-baseline-{project['id']}">
                         {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                     </div>
-                    <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
+                    <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value, '{empreendimento_principal}')">
                         <option value="P0-(padrão)">P0-(padrão)</option>
                         {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                     </select>
@@ -1990,7 +1992,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const select = document.getElementById('baseline-select-{project['id']}');
                         const iframe = document.getElementById('hidden-iframe-{project['id']}');
                         const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                        const empreendimento = '{empreendimento_atual}';                     
+                        const empreendimento = '{empreendimento_principal}';
+                        
                         // Só permitir mudança se houver um empreendimento específico
                         if (empreendimento === 'Múltiplos' || !empreendimento) {{
                             select.disabled = true;
@@ -2012,8 +2015,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             
                             // Usar iframe para enviar o comando
                             const timestamp = new Date().getTime();
-                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
-                            iframe.src = url;
+                          const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;                           iframe.src = url;
                             
                             // Timeout para reativar
                             setTimeout(() => {{
@@ -2074,6 +2076,40 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
+                    // --- CORREÇÃO BASELINE: Atualiza o seletor de baseline ao mudar o empreendimento ---
+                    const allBaselines = JSON.parse(document.getElementById('all-baselines-data').textContent);
+                    const currentEmpreendimento = '{empreendimento_principal}';
+                    const baselineSelect = document.getElementById('baseline-dropdown-{project['id']}');
+                    const currentBaselineDiv = document.getElementById('current-baseline-{project['id']}');
+                    
+                    function updateBaselineOptions(empName) {{
+                        // Limpa opções existentes
+                        baselineSelect.innerHTML = '';
+                        
+                        // Adiciona opção padrão
+                        const defaultOption = document.createElement('option');
+                        defaultOption.value = 'P0-(padrão)';
+                        defaultOption.textContent = 'P0 - (Padrão)';
+                        baselineSelect.appendChild(defaultOption);
+                        
+                        // Adiciona baselines do empreendimento
+                        const options = allBaselines[empName] || [];
+                        options.forEach(baselineName => {{
+                            const option = document.createElement('option');
+                            option.value = baselineName;
+                            option.textContent = baselineName;
+                            baselineSelect.appendChild(option);
+                        }});
+                        
+                        // Tenta selecionar a baseline atual
+                        const currentBaselineName = currentBaselineDiv.textContent.replace('Baseline: ', '').trim();
+                        if (currentBaselineName !== 'P0-(padrão)') {{
+                            baselineSelect.value = currentBaselineName;
+                        }}
+                    }}
+                    
+                    // Chama a função ao carregar
+                    updateBaselineOptions(currentEmpreendimento);
                 // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                 (function() {{
                     // 1. Configuração
@@ -2543,7 +2579,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     // Função para mudar baseline
-                    function changeBaseline(selectedBaseline) {{
+                    function changeBaseline(selectedBaseline, empreendimento) {{
                         if (selectedBaseline === 'P0-(padrão)') {{
                             // Recarregar página sem baseline
                             window.location.href = window.location.pathname;
@@ -4431,14 +4467,6 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
     empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
     
     current_empreendimento = st.session_state.get('current_empreendimento')
-    
-    # NOVO: Se o empreendimento visualizado mudou, limpar o estado da baseline
-    if current_empreendimento and current_empreendimento != empreendimento_visualizado:
-        st.session_state.current_baseline = None
-        st.session_state.current_baseline_data = None
-        st.session_state.current_empreendimento = None
-        # Não é necessário st.rerun() aqui, pois o Streamlit já vai re-executar
-        # com o novo filtro e a baseline será None na próxima execução.
     
     # Aplicar baseline apenas se for específica para este empreendimento
     should_apply_baseline = (
