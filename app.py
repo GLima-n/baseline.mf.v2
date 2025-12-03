@@ -765,9 +765,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                     'etapa': row.get('Etapa', ''),
                     'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
                     'inicio_previsto': None,
-                    'termino_previsto': None,
-                    'inicio_real': None,
-                    'termino_real': None,
+'termino_previsto': None,
                     'percentual_concluido': row.get('% concluído', 0),
                     'setor': row.get('SETOR', ''),
                     'grupo': row.get('GRUPO', ''),
@@ -776,10 +774,8 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 
                 # Converter datas para string com tratamento seguro
                 date_fields = {
-                    'inicio_previsto': 'Inicio_Real', # MUDANÇA: Salva o Real como Previsto da baseline
-                    'termino_previsto': 'Termino_Real', # MUDANÇA: Salva o Real como Previsto da baseline
-                    'inicio_real': 'Inicio_Real', # Mantém o Real para referência, se necessário
-                    'termino_real': 'Termino_Real' # Mantém o Real para referência, se necessário
+                    'inicio_previsto': 'Inicio_Real',
+                    'termino_previsto': 'Termino_Real', 
                 }
                 
                 for task_field, df_field in date_fields.items():
@@ -899,11 +895,16 @@ def apply_baseline_to_dataframe(df, baseline_data):
         if mask.any():
             idx = df_baseline[mask].index[0]
             
-            # Atualizar datas previstas da baseline
+            # Atualizar datas previstas da baseline com os dados da baseline (que agora são as datas Reais do snapshot)
             if task['inicio_previsto']:
                 df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
+            
+            # Garantir que as datas Reais (Inicio_Real e Termino_Real) não sejam alteradas
+            # Elas permanecem como estão no df original, refletindo a realidade atual.
+            # O gráfico de Gantt usará Inicio_Prevista/Termino_Prevista para a barra "Previsto" (baseline)
+            # e Inicio_Real/Termino_Real para a barra "Real" (dinâmica).
             
             # Atualizar percentual de conclusão
             if 'percentual_concluido' in task:
@@ -1083,7 +1084,7 @@ def aplicar_ordenacao_final(df, empreendimentos_ordenados):
 
 
 # --- *** FUNÇÃO gerar_gantt_por_projeto MODIFICADA *** ---
-def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", baseline_data=None, baseline_name=None):
+def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", baseline_name=None):
         """
         Gera um único gráfico de Gantt com todos os projetos.
         """
@@ -4937,129 +4938,6 @@ with st.spinner("Carregando e processando dados..."):
             pulmao_meses = 0
             tipo_visualizacao = "Ambos"  
 
-	        # --- SEÇÃO DE BASELINES (MOVIDA PARA FORA DA SIDEBAR) ---
-	        #     st.markdown("---")
-	        #     st.markdown("### 📊 Linhas de Base")
-	
-	        #     # Seleção de empreendimento para baseline
-	        #     empreendimentos_baseline = df_data['Empreendimento'].unique().tolist() if not df_data.empty else []
-	
-	        #     # CORREÇÃO: Inicializar a variável selected_empreendimento_baseline
-	        #     selected_empreendimento_baseline = None
-	
-	        #     if empreendimentos_baseline:
-	        #         selected_empreendimento_baseline = st.selectbox(
-	        #             "Empreendimento para Baseline",
-	        #             empreendimentos_baseline,
-	        #             key="baseline_emp"
-	        #         )
-	                
-	        #         # NOVO: Seletor para aplicar baseline no gráfico
-	        #         baseline_options = get_baseline_options(selected_empreendimento_baseline)
-	        #         if baseline_options:
-	        #             selected_baseline = st.selectbox(
-	        #                 "Aplicar Baseline no Gráfico",
-	        #                 ["Nenhuma"] + baseline_options,
-	        #                 key="apply_baseline"
-	        #             )
-	                    
-	        #             # Aplicar baseline se selecionada
-	        #             if selected_baseline != "Nenhuma":
-	        #                 baseline_data = load_baseline_data(selected_empreendimento_baseline, selected_baseline)
-	        #                 if baseline_data:
-	        #                     # AQUI A LÓGICA DE APLICAÇÃO É MOVIDA PARA FORA DA SIDEBAR
-	        #                     # PARA GARANTIR QUE O DF SEJA ATUALIZADO ANTES DE SER USADO
-	        #                     # NO GRÁFICO PRINCIPAL.
-	        #                     st.session_state.current_baseline = selected_baseline
-	        #                     st.session_state.current_baseline_data = baseline_data
-	        #                     st.session_state.current_empreendimento = selected_empreendimento_baseline
-	        #                     st.success(f"✅ Baseline {selected_baseline} selecionada!")
-	        #                 else:
-	        #                     st.error(f"❌ Erro ao carregar dados da baseline {selected_baseline}.")
-	        #             else:
-	        #                 # Limpar baseline se "Nenhuma" for selecionada
-	        #                 st.session_state.current_baseline = None
-	        #                 st.session_state.current_baseline_data = None
-	        #                 st.session_state.current_empreendimento = None
-	        #                 
-	        #         # Botão para criar baseline
-	        #         col1, col2 = st.columns([3, 1])
-	        #         with col1:
-	        #             if st.button("📸 Criar Linha de Base", use_container_width=True):
-	        #                 if selected_empreendimento_baseline:
-	        #                     try:
-	        #                         version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
-	        #                         st.success(f"✅ {version_name} criado!")
-	        #                         st.rerun()
-	        #                     except Exception as e:
-	        #                         st.error(f"❌ Erro: {e}")
-	        #                 else:
-	        #                     st.warning("Selecione um empreendimento")
-	                
-	        #         # ... (restante do código existente de gerenciamento de baselines)
-	            
-	        #     # Linhas de base não enviadas
-	        #     st.markdown("#### ☁️ Para Enviar")
-	            
-	        #     baselines = load_baselines()
-	        #     unsent_baselines = st.session_state.get('unsent_baselines', {})
-	            
-	        #     # CORREÇÃO: Verificar se selected_empreendimento_baseline está definido
-	        #     if selected_empreendimento_baseline:
-	        #         emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
-	                
-	        #         if emp_unsent:
-	        #             st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando envio")
-                    
-        #             for version_name in emp_unsent[:3]:  # Mostrar apenas 3 primeiras
-        #                 col1, col2, col3 = st.columns([3, 1, 1])
-        #                 with col1:
-        #                     st.write(f"`{version_name}`")
-        #                 with col2:
-        #                     if st.button("☁️", key=f"send_{version_name}"):
-        #                         if send_to_aws(selected_empreendimento_baseline, version_name):
-        #                             st.success(f"✅ {version_name} enviado!")
-        #                             st.rerun()
-        #                 with col3:
-        #                     if st.button("🗑️", key=f"del_unsent_{version_name}"):
-        #                         if delete_baseline(selected_empreendimento_baseline, version_name):
-        #                             if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
-        #                                 st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-        #                             st.success(f"✅ {version_name} deletado!")
-        #                             st.rerun()
-        #         else:
-        #             st.info("📭 Nenhuma linha de base aguardando envio")
-                
-        #         # Todas as linhas de base
-        #         st.markdown("#### 💾 Todas as Linhas de Base")
-                
-        #         emp_baselines = baselines.get(selected_empreendimento_baseline, {})
-        #         if emp_baselines:
-        #             # Mostrar apenas as 5 mais recentes
-        #             for version_name in sorted(emp_baselines.keys())[:5]:
-        #                 is_unsent = version_name in emp_unsent
-                        
-        #                 col1, col2 = st.columns([3, 1])
-        #                 with col1:
-        #                     if is_unsent:
-        #                         st.write(f"`{version_name}` ⏳")
-        #                     else:
-        #                         st.write(f"`{version_name}` ✅")
-        #                 with col2:
-        #                     if st.button("🗑️", key=f"del_all_{version_name}"):
-        #                         if delete_baseline(selected_empreendimento_baseline, version_name):
-        #                             if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
-        #                                 st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-        #                             st.success(f"✅ {version_name} deletado!")
-        #                             st.rerun()
-                    
-        #             if len(emp_baselines) > 5:
-        #                 st.info(f"... e mais {len(emp_baselines) - 5} linhas de base")
-        #         else:
-        #             st.info("Nenhuma linha de base criada")
-        #     else:
-        #         st.warning("Selecione um empreendimento para gerenciar baselines")
-
             # --- Menu de Contexto para Gantt ---
             def create_gantt_context_menu_component(selected_empreendimento):
                 """Cria o componente do menu de contexto para o gráfico Gantt"""
@@ -5392,26 +5270,23 @@ with st.spinner("Carregando e processando dados..."):
             current_emp = st.session_state.get('current_empreendimento')
             empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
             
-            # 1. Aplicar a baseline SELECIONADA ao DataFrame que será usado no Gantt
-            df_gantt_final = df_para_gantt.copy()
-            
-            if current_emp and current_emp in empreendimentos_no_grafico and current_baseline_data:
-                # A função apply_baseline_to_dataframe irá substituir Inicio_Prevista/Termino_Prevista
-                # pelas datas salvas na baseline (que são as datas Reais daquele momento).
-                df_gantt_final = apply_baseline_to_dataframe(df_gantt_final, current_baseline_data)
+            # Só passar a baseline se pertencer a um empreendimento no gráfico atual
+            if current_emp and current_emp in empreendimentos_no_grafico:
                 baseline_to_use = current_baseline
+                baseline_data_to_use = current_baseline_data
             else:
                 baseline_to_use = None
+                baseline_data_to_use = None
             
             gerar_gantt(
-                df_gantt_final, # Passa o DF com as datas Previstas (baseline) ou atuais (sem baseline)
+                df_para_gantt.copy(),
                 tipo_visualizacao, 
                 filtrar_nao_concluidas,
                 df_data, 
                 pulmao_status, 
                 pulmao_meses,
                 selected_etapa_nome,
-                baseline_data=None, # Não precisamos mais passar os dados da baseline separadamente
+                baseline_data=baseline_data_to_use,
                 baseline_name=baseline_to_use
             )
             # Botão para limpar baseline (se houver uma ativa)
