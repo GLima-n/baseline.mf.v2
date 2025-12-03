@@ -10,7 +10,8 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #apply_baseline_to_dataframe
+from dateutil.relativedelta import relativedelta #handleBaselineChange
+
 import streamlit.components.v1 as components  
 import json
 import random
@@ -737,9 +738,8 @@ def converter_dados_para_gantt(df):
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
 def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
-    """
-    Cria uma linha de base onde o PREVISTO da baseline é igual ao REAL do momento.
-    """
+    """Cria uma linha de base do estado atual do Gantt"""
+    
     try:
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
@@ -748,7 +748,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             st.error(f"Nenhum dado encontrado para o empreendimento: {empreendimento}")
             raise Exception("Nenhum dado encontrado para o empreendimento selecionado")
         
-        # Estrutura do JSON
+        # Preparar dados para baseline com validação
         baseline_data = {
             'empreendimento': empreendimento,
             'tipo_visualizacao': tipo_visualizacao,
@@ -757,45 +757,55 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             'tasks': []
         }
         
+        # Converter tasks para formato serializável com validação
+        task_count = 0
         for _, row in df_empreendimento.iterrows():
             try:
-                # --- LÓGICA CRÍTICA: REAL VIRA PREVISTO ---
-                
-                # 1. Definir Início: Pega o REAL atual. Se não tiver começado, pega o PREVISTO atual.
-                data_inicio_snapshot = row.get('Inicio_Real')
-                if pd.isna(data_inicio_snapshot):
-                    data_inicio_snapshot = row.get('Inicio_Prevista')
-                
-                # 2. Definir Término: Pega o REAL atual. Se não tiver acabado, pega o PREVISTO atual.
-                data_termino_snapshot = row.get('Termino_Real')
-                if pd.isna(data_termino_snapshot):
-                    data_termino_snapshot = row.get('Termino_Prevista')
-
-                # Salva no JSON nos campos 'previsto'
                 task = {
                     'etapa': row.get('Etapa', ''),
-                    # Aqui garantimos que a barra prevista da baseline será igual à realidade deste momento
-                    'inicio_previsto': data_inicio_snapshot.strftime("%Y-%m-%d") if pd.notna(data_inicio_snapshot) else None,
-                    'termino_previsto': data_termino_snapshot.strftime("%Y-%m-%d") if pd.notna(data_termino_snapshot) else None,
-                    
-                    # Não precisamos salvar o Real nem % no JSON para visualização, 
-                    # pois queremos comparar o Previsto Congelado vs Real Atual Dinâmico
+                    'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
+                    'inicio_previsto': None,
+                    'termino_previsto': None,
                     'inicio_real': None,
                     'termino_real': None,
-                    'percentual_concluido': 0, 
-                    
-                    # Metadados para manter as cores e grupos funcionando
+                    'percentual_concluido': row.get('% concluído', 0),
                     'setor': row.get('SETOR', ''),
                     'grupo': row.get('GRUPO', ''),
                     'ugb': row.get('UGB', '')
                 }
                 
-                baseline_data['tasks'].append(task)
+                # Converter datas para string com tratamento seguro
+                date_fields = {
+                    'inicio_previsto': 'Inicio_Prevista',
+                    'termino_previsto': 'Termino_Prevista', 
+                    'inicio_real': 'Inicio_Real',
+                    'termino_real': 'Termino_Real'
+                }
                 
-            except Exception:
+                for task_field, df_field in date_fields.items():
+                    date_val = row.get(df_field)
+                    if date_val is not None and pd.notna(date_val):
+                        if hasattr(date_val, 'strftime'):
+                            task[task_field] = date_val.strftime("%Y-%m-%d")
+                        else:
+                            # Tentar converter para datetime se não for
+                            try:
+                                parsed_date = pd.to_datetime(date_val)
+                                task[task_field] = parsed_date.strftime("%Y-%m-%d")
+                            except:
+                                task[task_field] = None
+                
+                baseline_data['tasks'].append(task)
+                task_count += 1
+                
+            except Exception as task_error:
+                st.warning(f"Erro ao processar task {task_count}: {task_error}")
                 continue
         
-        # --- BLOCO DE SALVAMENTO NO BANCO/STATE (Mantido igual) ---
+        if task_count == 0:
+            raise Exception("Nenhuma task válida encontrada para salvar")
+        
+        # Gerar nome da versão
         existing_baselines = load_baselines()
         empreendimento_baselines = existing_baselines.get(empreendimento, {})
         existing_versions = [k for k in empreendimento_baselines.keys() if k.startswith('P') and k.split('-')[0][1:].isdigit()]
@@ -805,28 +815,40 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             max_n = 0
             for version_name in existing_versions:
                 try:
-                    n = int(version_name.split('-')[0][1:])
-                    if n > max_n: max_n = n
-                except: continue
+                    n_str = version_name.split('-')[0][1:]
+                    n = int(n_str)
+                    if n > max_n:
+                        max_n = n
+                except ValueError:
+                    continue
             next_n = max_n + 1
         
+        version_prefix = f"P{next_n}"
         current_date_str = datetime.now().strftime("%d/%m/%Y")
-        version_name = f"P{next_n}-({current_date_str})"
+        version_name = f"{version_prefix}-({current_date_str})"
         
+        # Salvar baseline
         success = save_baseline(empreendimento, version_name, baseline_data, current_date_str, tipo_visualizacao)
         
         if success:
-            if 'unsent_baselines' not in st.session_state: st.session_state.unsent_baselines = {}
-            if empreendimento not in st.session_state.unsent_baselines: st.session_state.unsent_baselines[empreendimento] = []
-            if version_name not in st.session_state.unsent_baselines[empreendimento]: st.session_state.unsent_baselines[empreendimento].append(version_name)
+            # Marcar como não enviada para AWS
+            if 'unsent_baselines' not in st.session_state:
+                st.session_state.unsent_baselines = {}
+            
+            if empreendimento not in st.session_state.unsent_baselines:
+                st.session_state.unsent_baselines[empreendimento] = []
+            
+            if version_name not in st.session_state.unsent_baselines[empreendimento]:
+                st.session_state.unsent_baselines[empreendimento].append(version_name)
+            
+            st.success(f"Linha de base {version_name} salva com sucesso!")
             return version_name
         else:
-            raise Exception("Falha ao salvar linha de base")
+            raise Exception("Falha ao salvar linha de base no banco de dados")
             
     except Exception as e:
         st.error(f"Erro ao criar linha de base: {e}")
         raise
-
 def debug_baseline_system():
     """Função para debug do sistema de baselines"""
     st.markdown("### 🔧 Debug do Sistema de Baselines")
@@ -860,42 +882,32 @@ def load_baseline_data(empreendimento, version_name):
     return None
 
 def apply_baseline_to_dataframe(df, baseline_data):
-    """
-    Substitui as datas PREVISTAS do DataFrame atual pelas datas salvas na Baseline.
-    O 'Real' continua sendo o do DataFrame original (dinâmico).
-    """
+    """Aplica os dados da baseline ao DataFrame principal"""
     if not baseline_data or 'tasks' not in baseline_data:
         return df
     
-    # Cria uma cópia para não alterar os dados originais na memória permanentemente
     df_baseline = df.copy()
     
-    # Dicionário para acesso rápido às datas da baseline
-    # Chave: Etapa -> Valor: {inicio, termino}
-    baseline_map = {
-        t['etapa']: {
-            'inicio': t['inicio_previsto'], 
-            'termino': t['termino_previsto']
-        } 
-        for t in baseline_data['tasks']
-    }
-    
-    # Itera sobre o DataFrame e substitui APENAS as colunas Previstas
-    for idx, row in df_baseline.iterrows():
-        # Verifica se pertence ao mesmo empreendimento da baseline
-        if row['Empreendimento'] == baseline_data.get('empreendimento'):
-            etapa = row['Etapa']
+    # Para cada task na baseline, atualizar as datas no DataFrame
+    for task in baseline_data['tasks']:
+        etapa = task['etapa']
+        
+        # Encontrar a linha correspondente no DataFrame
+        mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
+               (df_baseline['Etapa'] == etapa)
+        
+        if mask.any():
+            idx = df_baseline[mask].index[0]
             
-            if etapa in baseline_map:
-                datas = baseline_map[etapa]
-                
-                # Sobrescreve Inicio_Prevista com o dado da Baseline
-                if datas['inicio']:
-                    df_baseline.at[idx, 'Inicio_Prevista'] = pd.to_datetime(datas['inicio'])
-                
-                # Sobrescreve Termino_Prevista com o dado da Baseline
-                if datas['termino']:
-                    df_baseline.at[idx, 'Termino_Prevista'] = pd.to_datetime(datas['termino'])
+            # Atualizar datas previstas da baseline
+            if task['inicio_previsto']:
+                df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
+            if task['termino_previsto']:
+                df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
+            
+            # Atualizar percentual de conclusão
+            if 'percentual_concluido' in task:
+                df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
     
     return df_baseline
 
@@ -3179,6 +3191,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionTodayLine();
                             positionMetaLine();
                             updateProjectTitle();
+
+
 
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
