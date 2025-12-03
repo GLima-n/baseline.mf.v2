@@ -5839,12 +5839,9 @@ with st.spinner("Carregando e processando dados..."):
         if not empreendimentos_baseline:
             st.info("Nenhum empreendimento disponível")
             st.stop()
-        
-        # --- Lógica de Sincronização de Empreendimento ---
-        
+
+        # Lógica de Sincronização: Tenta obter o empreendimento principal selecionado no filtro (selected_emp)
         default_emp_index = 0
-        
-        # 1. Tenta obter o empreendimento principal selecionado no filtro (selected_emp)
         selected_emp_from_main_filter = None
         if 'selected_emp' in st.session_state and st.session_state.selected_emp:
             emp_value = st.session_state.selected_emp
@@ -5853,32 +5850,37 @@ with st.spinner("Carregando e processando dados..."):
             elif isinstance(emp_value, str):
                 selected_emp_from_main_filter = emp_value
         
-        # 2. Define o valor padrão do selectbox
-        # Prioridade 1: Empreendimento selecionado no filtro principal (se for um dos disponíveis)
+        # Se houver um empreendimento selecionado no filtro principal, tentamos usá-lo como padrão
         if selected_emp_from_main_filter and selected_emp_from_main_filter in empreendimentos_baseline:
             default_emp_index = empreendimentos_baseline.index(selected_emp_from_main_filter)
-        # Prioridade 2: Empreendimento armazenado na sessão (se for um dos disponíveis)
-        elif 'current_empreendimento' in st.session_state and st.session_state.current_empreendimento in empreendimentos_baseline:
-            default_emp_index = empreendimentos_baseline.index(st.session_state.current_empreendimento)
-        # Prioridade 3: O primeiro empreendimento da lista (já é o default_emp_index = 0)
         
-        # Se o empreendimento principal selecionado for diferente do empreendimento atual da baseline,
-        # forçamos a atualização do estado da sessão para o empreendimento principal.
-        # Isso garante que a lista de baselines mude quando o filtro principal mudar.
-        if selected_emp_from_main_filter and selected_emp_from_main_filter != st.session_state.get('current_empreendimento'):
-            # Se o filtro principal mudou, a tab3 deve refletir essa mudança.
-            # Definimos o current_empreendimento para o valor do filtro principal
-            st.session_state.current_empreendimento = selected_emp_from_main_filter
-            # E atualizamos o index para que o selectbox reflita isso
-            default_emp_index = empreendimentos_baseline.index(selected_emp_from_main_filter)
-        
-        
-        selected_empreendimento_baseline = st.selectbox(
-            "Empreendimento",
-            empreendimentos_baseline,
-            index=default_emp_index,
-            key="baseline_emp_tab3"
-        )
+        # Se o usuário não interagiu com este selectbox, usamos o valor do filtro principal
+        if 'baseline_emp_tab3' not in st.session_state:
+            selected_empreendimento_baseline = st.selectbox(
+                "Empreendimento",
+                empreendimentos_baseline,
+                index=default_emp_index,
+                key="baseline_emp_tab3"
+            )
+        else:
+            # Se o usuário já interagiu, mantemos o valor selecionado, mas garantimos que ele seja um dos disponíveis
+            current_value = st.session_state.baseline_emp_tab3
+            if current_value not in empreendimentos_baseline:
+                # Se o valor selecionado não estiver mais disponível (filtro principal mudou), voltamos para o padrão
+                selected_empreendimento_baseline = st.selectbox(
+                    "Empreendimento",
+                    empreendimentos_baseline,
+                    index=default_emp_index,
+                    key="baseline_emp_tab3"
+                )
+            else:
+                # Mantemos o valor selecionado pelo usuário
+                selected_empreendimento_baseline = st.selectbox(
+                    "Empreendimento",
+                    empreendimentos_baseline,
+                    index=empreendimentos_baseline.index(current_value),
+                    key="baseline_emp_tab3"
+                )
         
         # Atualizar o estado da sessão com o empreendimento selecionado na tab3
         # Isso é crucial para que a lógica de baseline na tab1 (Gantt) saiba qual empreendimento está sendo gerenciado.
