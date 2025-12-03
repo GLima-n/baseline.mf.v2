@@ -282,18 +282,19 @@ def process_baseline_change():
         st.query_params.clear()
         
         if baseline_name == 'P0-(padrão)':
-            # Limpar baseline apenas se for do mesm# Se a baseline for de um empreendimento diferente, limpa a sessão
-        # REMOVIDO: A lógica de limpeza será tratada na função principal (linha 5356)
-        # para permitir que o usuário selecione uma baseline e depois filtre o gráfico.
-            pass
-    
-    # Carregar baseline selecionada
-    baseline_data = load_baseline_data(empreendimento, baseline_name)
-    if baseline_data:
-        st.session_state.current_baseline = baseline_name
-        st.session_state.current_baseline_data = baseline_data
-        st.session_state.current_empreendimento = empreendimento
-        st.rerun()
+            # Limpar baseline
+            st.session_state.current_baseline = None
+            st.session_state.current_baseline_data = None
+            st.session_state.current_empreendimento = None
+            st.rerun()
+        else:
+            # Carregar baseline selecionada
+            baseline_data = load_baseline_data(empreendimento, baseline_name)
+            if baseline_data:
+                st.session_state.current_baseline = baseline_name
+                st.session_state.current_baseline_data = baseline_data
+                st.session_state.current_empreendimento = empreendimento
+                st.rerun()
             
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
