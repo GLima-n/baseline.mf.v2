@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #handleBaselineChange
+from dateutil.relativedelta import relativedelta #Dados para JavaScript
 
 import streamlit.components.v1 as components  
 import json
@@ -1167,21 +1167,32 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         if titulo_extra:
             project["name"] += titulo_extra
 
-            # Obter baselines disponíveis para o primeiro empreendimento (assumindo que é o mesmo para todos no modo projeto único)
-        primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
-        baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
-        
-        # Preparar dados das baselines para JavaScript
+        # --- NOVA LÓGICA: Carregar baselines para TODOS os empreendimentos disponíveis ---
         baselines_data = {}
-        if primeiro_empreendimento and baseline_options:
-            baselines = load_baselines()
-            emp_baselines = baselines.get(primeiro_empreendimento, {})
-            for version_name in baseline_options:
-                if version_name in emp_baselines:
-                    baselines_data[version_name] = emp_baselines[version_name]['data']
+        baselines_por_empreendimento = {}
+        baseline_options_por_empreendimento = {}
 
-        empreendimento_principal = ""
-        baseline_options = []
+        # Carregar baselines para todos os empreendimentos nos dados
+        todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
+        for emp in todos_empreendimentos:
+            # Obter opções de baseline para este empreendimento
+            emp_baseline_options = get_baseline_options(emp)
+            baseline_options_por_empreendimento[emp] = emp_baseline_options
+            
+            # Carregar dados das baselines
+            baselines = load_baselines()
+            if emp in baselines:
+                baselines_por_empreendimento[emp] = baselines[emp]
+                
+                # Preparar dados para JavaScript (apenas para o primeiro empreendimento inicial)
+                if emp == (df["Empreendimento"].iloc[0] if not df.empty else ""):
+                    for version_name in emp_baseline_options:
+                        if version_name in baselines[emp]:
+                            baselines_data[version_name] = baselines[emp][version_name]['data']
+
+        # Determinar empreendimento atual
+        empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
+        baseline_options = baseline_options_por_empreendimento.get(empreendimento_atual, []) if empreendimento_atual != "Múltiplos" else []
         
         # Obter todos os empreendimentos disponíveis nos dados filtrados
         todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
@@ -1205,7 +1216,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
         # --- Geração do HTML ---
         gantt_html = f"""
-        <!DOCTYPE html>
+            <!DOCTYPE html>
             <html lang="pt-BR">
             <head>
                 <meta charset="utf-8">
@@ -1231,54 +1242,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .header-cell.task-name-cell {{ text-align: left; }}
                     .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
                     
-                    
-                   /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
-
-                    .baseline-selector-container {{
-                        position: absolute;
-                        top: 10px;
-                        right: 100px;
-                        z-index: 1000;
-                        background: {'#f0f7ff' if baseline_name else 'white'};
-                        border-radius: 6px;
-                        padding: 8px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                        border: 1px solid {'#3b82f6' if baseline_name else '#ccc'};
-                        min-width: 240px;
-                        max-width: 300px;
-                    }}
-                    .baseline-selector-container select {{
-                        width: 100%;
-                        padding: 6px 8px;
-                        border: 1px solid #aaa;
-                        border-radius: 4px;
-                        font-size: 12px;
-                        background: white;
-                        margin-bottom: 4px;
-                    }}
-                    
-                    .baseline-label {{
-                        font-size: 11px;
-                        color: #333;
-                        margin-bottom: 6px;
-                        font-weight: bold;
-                    }}
-                    
-                    .baseline-info {{
-                        font-size: 10px;
-                        color: #666;
-                        line-height: 1.3;
-                    }}
-                    
-                    .baseline-disabled {{
-                        background: #f5f5f5;
-                        opacity: 0.7;
-                    }}
-                    
-                    .empreendimento-atual {{
-                        font-weight: bold;
-                        color: #3b82f6;
-                    }}
+                    /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
+                    /* Novos estilos para seletor de baseline */
                     .baseline-selector {{
                         position: absolute;
                         top: 60px;
@@ -1686,40 +1651,43 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             <body>
                 <script id="grupos-gantt-data" type="application/json">{json.dumps(GRUPOS)}</script>
                 <script id="subetapas-data" type="application/json">{json.dumps(SUBETAPAS)}</script>
+                <!-- Adicionar dados de todas as baselines -->
+                <script id="all-baselines-data" type="application/json">{json.dumps(baselines_por_empreendimento)}</script>
+                <script id="baseline-options-por-empreendimento" type="application/json">{json.dumps(baseline_options_por_empreendimento)}</script>
                 <div id="context-menu">
-                <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
-                <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
-            </div>
-            
-            <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
-            <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
+                    <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
+                    <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
+                </div>
+                
+                <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
+                <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
                 <div class="gantt-container" id="gantt-container-{project['id']}">
-                <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
-                    <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
-                        <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                            </svg>
-                        </span>
-                    </button>
-                    <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
-                        <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                            </svg>
-                        </span>
-                    </button>
-                </div>
-                <!-- Seletor de Baseline no Menu Flutuante -->
-                <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
-                    <div class="baseline-current" id="current-baseline-{project['id']}">
-                        {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
+                    <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
+                        <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
+                            <span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                                </svg>
+                            </span>
+                        </button>
+                        <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
+                            <span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                </svg>
+                            </span>
+                        </button>
                     </div>
-                    <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
-                        <option value="P0-(padrão)">P0-(padrão)</option>
-                        {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
-                    </select>
-                </div>
+                    <!-- Seletor de Baseline no Menu Flutuante -->
+                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
+                        <div class="baseline-current" id="current-baseline-{project['id']}">
+                            {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
+                        </div>
+                        <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
+                            <option value="P0-(padrão)">P0-(padrão)</option>
+                            {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
+                        </select>
+                    </div>
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                         <div class="filter-group">
                             <label for="filter-project-{project['id']}">Empreendimento</label>
@@ -1727,17 +1695,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         </div>
                         <div class="filter-group">
                             <label for="filter-setor-{project['id']}">Setor</label>
-                            
                             <div id="filter-setor-{project['id']}"></div>
                         </div>
                         <div class="filter-group">
                             <label for="filter-grupo-{project['id']}">Grupo</label>
-                            
                             <div id="filter-grupo-{project['id']}"></div>
                         </div>
                         <div class="filter-group">
                             <label for="filter-etapa-{project['id']}">Etapa</label>
-                            
                             <div id="filter-etapa-{project['id']}"></div>
                         </div>
                         <div class="filter-group">
@@ -1775,7 +1740,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 <label for="filter-pulmao-meses-{project['id']}" style="font-size: 12px; font-weight: 500;">Meses de Pulmão:</label>
                                 <input type="number" id="filter-pulmao-meses-{project['id']}" value="{pulmao_meses}" min="0" max="36" step="1" style="padding: 4px 6px; font-size: 12px; height: 28px; width: 80px;">
                             </div>
-                            </div>
+                        </div>
                         <button class="filter-apply-btn" id="filter-apply-btn-{project['id']}">Aplicar Filtros</button>
                     </div>
 
@@ -1820,18 +1785,25 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="tooltip" id="tooltip-{project["id"]}"></div>
 
                     <iframe id="hidden-iframe" name="hidden-iframe" style="display:none;"></iframe>
-                    </div>
+                </div>
                 
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
                 
-
                 <script>
                     // DEBUG: Verificar dados
+                    console.log('Inicializando Gantt para projeto:', '{project["name"]}');
                     
+                    // DADOS DE BASELINE ATUALIZADOS
                     const baselinesData = {json.dumps(baselines_data)};
                     const currentBaseline = {json.dumps(baseline_name)};
-                    const projectName = {json.dumps(primeiro_empreendimento)};
-                    console.log('Inicializando Gantt para projeto:', '{project["name"]}');
+                    
+                    
+                    // DADOS COMPLETOS DE TODAS AS BASELINES
+                    const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
+                    const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
+                    
+                    console.log('Dados de baseline carregados:', allBaselinesData);
+                    console.log('Opções de baseline por empreendimento:', baselineOptionsPorEmpreendimento);
                     
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
 
@@ -1901,7 +1873,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     let pulmaoStatus = '{pulmao_status}';
                     let filtersPopulated = false;
 
-                    // *** INÍCIO: Variáveis Globais para Virtual Select ***
+                    // *** Variáveis Globais para Virtual Select ***
                     let vsSetor, vsGrupo, vsEtapa;
                     // *** FIM: Variáveis Globais para Virtual Select ***
 
@@ -1992,67 +1964,118 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         return tasksOrganizadas;
                     }}
-                            function handleBaselineChange(selectedBaseline) {{
-                                const empreendimento = '{primeiro_empreendimento}';
-                                const timestamp = new Date().getTime();
-                                
-                                // Usar navegação simples
-                                const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                                const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
-                                iframe.src = url;
-                                
-                                // Feedback visual
-                                const select = document.getElementById('baseline-select-{project['id']}');
-                                select.disabled = true;
-                                select.style.opacity = '0.7';
-                                
-                                // Reativar após um tempo
-                                setTimeout(() => {{
-                                    select.disabled = false;
-                                    select.style.opacity = '1';
-                                }}, 1000);
+                    
+                    // *** NOVA FUNÇÃO: Atualizar dropdown de baseline ***
+                    function updateBaselineDropdownForProject(projectName) {{
+                        console.log('Atualizando baseline dropdown para:', projectName);
+                        
+                        const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
+                        const currentDiv = document.getElementById('current-baseline-{project['id']}');
+                        
+                        if (!dropdown || !currentDiv) {{
+                            console.error('Elementos do dropdown de baseline não encontrados');
+                            return;
+                        }}
+                        
+                        // Obter baselines para este empreendimento
+                        const baselinesDoEmpreendimento = baselineOptionsPorEmpreendimento[projectName] || [];
+                        
+                        // Salvar valor selecionado atual
+                        const currentValue = dropdown.value;
+                        
+                        // Limpar dropdown
+                        dropdown.innerHTML = '<option value="P0-(padrão)">P0-(padrão)</option>';
+                        
+                        // Adicionar novas opções
+                        if (baselinesDoEmpreendimento.length > 0) {{
+                            baselinesDoEmpreendimento.forEach(baselineName => {{
+                                const isSelected = baselineName === currentBaseline;
+                                dropdown.innerHTML += `<option value="${{baselineName}}" ${{isSelected ? 'selected' : ''}}>${{baselineName}}</option>`;
+                            }});
+                        }}
+                        
+                        // Restaurar valor selecionado se ainda existir
+                        if (currentValue && Array.from(dropdown.options).some(opt => opt.value === currentValue)) {{
+                            dropdown.value = currentValue;
+                        }}
+                        
+                        // Atualizar texto atual
+                        if (currentBaseline && currentBaseline !== 'P0-(padrão)') {{
+                            currentDiv.textContent = `Baseline: ${{currentBaseline}}`;
+                        }} else {{
+                            currentDiv.textContent = 'Baseline: P0-(padrão)';
+                        }}
+                        
+                        console.log('Dropdown atualizado com', baselinesDoEmpreendimento.length, 'baselines');
+                    }}
+                    
+                    function handleBaselineChange(selectedBaseline) {{
+                        const empreendimentoAtual = projectData[0].name;
+                        const timestamp = new Date().getTime();
+                        
+                        // Usar navegação simples
+                        const iframe = document.getElementById('hidden-iframe');
+                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimentoAtual)}}&t=${{timestamp}}`;
+                        iframe.src = url;
+                        
+                        // Feedback visual
+                        const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
+                        if (dropdown) {{
+                            dropdown.disabled = true;
+                            dropdown.style.opacity = '0.7';
+                            
+                            // Atualizar texto
+                            const currentDiv = document.getElementById('current-baseline-{project['id']}');
+                            if (currentDiv) {{
+                                currentDiv.textContent = `Carregando: ${{selectedBaseline}}...`;
+                                currentDiv.style.background = '#fff3cd';
                             }}
                             
-                            // Indicar visualmente qual baseline está ativa
-                            document.addEventListener('DOMContentLoaded', function() {{
-                                const select = document.getElementById('baseline-select-{project['id']}');
-                                const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                                const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                                const empreendimento = '{primeiro_empreendimento}';
-                                
-                                // Só permitir mudança se houver um empreendimento específico
-                                if (empreendimento === 'Múltiplos' || !empreendimento) {{
-                                    select.disabled = true;
-                                    select.title = 'Selecione um empreendimento específico para ver baselines';
-                                    infoDiv.innerHTML = 'Selecione um empreendimento específico';
-                                    infoDiv.style.color = '#ff6b6b';
+                            // Reativar após um tempo
+                            setTimeout(() => {{
+                                dropdown.disabled = false;
+                                dropdown.style.opacity = '1';
+                                if (currentDiv) {{
+                                    currentDiv.textContent = `Baseline: ${{selectedBaseline}}`;
+                                    currentDiv.style.background = '#e6f3ff';
                                 }}
-                                
-                                select.addEventListener('change', function() {{
-                                    if (empreendimento === 'Múltiplos' || !empreendimento) return;
-                                    
-                                    const selectedBaseline = this.value;
-                                    
-                                    // Feedback visual
-                                    const originalText = infoDiv.innerHTML;
-                                    infoDiv.innerHTML = 'Carregando...';
-                                    infoDiv.style.color = '#3b82f6';
-                                    select.disabled = true;
-                                    
-                                    // Usar iframe para enviar o comando
-                                    const timestamp = new Date().getTime();
-                                    const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
-                                    iframe.src = url;
-                                    
-                                    // Timeout para reativar
-                                    setTimeout(() => {{
-                                        select.disabled = false;
-                                        infoDiv.innerHTML = originalText;
-                                        infoDiv.style.color = '#888';
-                                    }}, 2000);
-                                }});
-                            }});
-
+                            }}, 1000);
+                        }}
+                    }}
+                    
+                    // *** NOVA FUNÇÃO: Alternar visibilidade do seletor de baseline ***
+                    function toggleBaselineSelector() {{
+                        const selector = document.getElementById('baseline-selector-{project['id']}');
+                        if (selector) {{
+                            selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
+                        }}
+                    }}
+                    
+                    // *** NOVA FUNÇÃO: Adicionar botão de baseline na toolbar ***
+                    function addBaselineButtonToToolbar() {{
+                        const toolbar = document.getElementById('gantt-toolbar-{project["id"]}');
+                        if (toolbar) {{
+                            // Verificar se o botão já existe
+                            if (document.getElementById('baseline-btn-{project["id"]}')) return;
+                            
+                            const baselineBtn = document.createElement('button');
+                            baselineBtn.id = 'baseline-btn-{project["id"]}';
+                            baselineBtn.className = 'toolbar-btn';
+                            baselineBtn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg></span>';
+                            baselineBtn.title = 'Selecionar Baseline';
+                            baselineBtn.onclick = toggleBaselineSelector;
+                            
+                            // Inserir após o botão de filtro
+                            const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+                            if (filterBtn && filterBtn.parentNode) {{
+                                filterBtn.parentNode.insertBefore(baselineBtn, filterBtn.nextSibling);
+                            }} else {{
+                                toolbar.appendChild(baselineBtn);
+                            }}
+                            
+                            console.log('Botão de baseline adicionado à toolbar');
+                        }}
+                    }}
 
                     function toggleSubtasks(taskName) {{
                         const subtaskRows = document.querySelectorAll('.subtask-row[data-parent="' + taskName + '"]');
@@ -2103,125 +2126,127 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }});
                         }}
                     }}
+                    
                     // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
-                (function() {{
-                    // 1. Configuração
-                    const containerId = 'gantt-container-' + '{project["id"]}';
-                    const container = document.getElementById(containerId);
-                    
-                    // Garante iframe
-                    let iframe = document.getElementById('hidden-iframe');
-                    if (!iframe) {{
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'hidden-iframe';
-                        iframe.style.display = 'none';
-                        if(container) container.appendChild(iframe);
-                    }}
+                    // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
+                    (function() {{
+                        // 1. Configuração
+                        const containerId = 'gantt-container-' + '{project["id"]}';
+                        const container = document.getElementById(containerId);
+                        
+                        // Garante iframe
+                        let iframe = document.getElementById('hidden-iframe');
+                        if (!iframe) {{
+                            iframe = document.createElement('iframe');
+                            iframe.id = 'hidden-iframe';
+                            iframe.style.display = 'none';
+                            if(container) container.appendChild(iframe);
+                        }}
 
-                    if (!container) return;
+                        if (!container) return;
 
-                    // Limpeza visual
-                    const oldMenu = container.querySelector('#context-menu');
-                    if (oldMenu) oldMenu.remove();
-                    const oldToast = container.querySelector('.js-toast-loading');
-                    if (oldToast) oldToast.remove();
+                        // Limpeza visual
+                        const oldMenu = container.querySelector('#context-menu');
+                        if (oldMenu) oldMenu.remove();
+                        const oldToast = container.querySelector('.js-toast-loading');
+                        if (oldToast) oldToast.remove();
 
-                    // 2. Criar Menu
-                    const menu = document.createElement('div');
-                    menu.id = 'context-menu';
-                    menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
-                    menu.innerHTML = `
-                        <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                            <span>📸</span> <b>Criar Linha de Base</b>
-                        </div>
-                    `;
-                    container.appendChild(menu);
+                        // 2. Criar Menu
+                        const menu = document.createElement('div');
+                        menu.id = 'context-menu';
+                        menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
+                        menu.innerHTML = `
+                            <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
+                                <span>📸</span> <b>Criar Linha de Base</b>
+                            </div>
+                        `;
+                        container.appendChild(menu);
 
-                    // 3. Criar Toast
-                    const toast = document.createElement('div');
-                    toast.className = 'js-toast-loading';
-                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
-                    container.appendChild(toast);
+                        // 3. Criar Toast
+                        const toast = document.createElement('div');
+                        toast.className = 'js-toast-loading';
+                        toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
+                        container.appendChild(toast);
 
-                    // 4. Listeners
-                    container.addEventListener('contextmenu', function(e) {{
-                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                        // 4. Listeners
+                        container.addEventListener('contextmenu', function(e) {{
+                            if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                                e.preventDefault();
+                                menu.style.display = 'block';
+                                menu.style.left = e.clientX + 'px';
+                                menu.style.top = e.clientY + 'px';
+                            }} else {{
+                                menu.style.display = 'none';
+                            }}
+                        }});
+
+                        document.addEventListener('click', function(e) {{
+                            if (menu.style.display === 'block' && !menu.contains(e.target)) {{
+                                menu.style.display = 'none';
+                            }}
+                        }}, true);
+
+                        // --- 5. AÇÃO DO BOTÃO ---
+                        const btnCreate = menu.querySelector('#btn-create-baseline');
+                        
+                        btnCreate.addEventListener('click', function(e) {{
+                            e.stopPropagation();
                             e.preventDefault();
-                            menu.style.display = 'block';
-                            menu.style.left = e.clientX + 'px';
-                            menu.style.top = e.clientY + 'px';
-                        }} else {{
-                            menu.style.display = 'none';
-                        }}
-                    }});
 
-                    document.addEventListener('click', function(e) {{
-                        if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                            menu.style.display = 'none';
-                        }}
-                    }}, true);
+                            // A. Nome do Projeto
+                            let currentProjectName = "Desconhecido";
+                            if (typeof projectData !== 'undefined' && projectData.length > 0) {{
+                                currentProjectName = projectData[0].name;
+                            }} else {{
+                                const titleEl = container.querySelector('.project-title-row span');
+                                if (titleEl) currentProjectName = titleEl.textContent;
+                            }}
 
-                    // --- 5. AÇÃO DO BOTÃO ---
-                    const btnCreate = menu.querySelector('#btn-create-baseline');
+                            // B. Feedback Visual (Laranja = Processando)
+                            menu.style.display = 'none';
+                            toast.style.display = 'block';
+                            toast.style.backgroundColor = "#e67e22"; // Laranja
+                            toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
+
+                            // C. Montar URL CORRETA
+                            const encodedProject = encodeURIComponent(currentProjectName);
+                            const timestamp = new Date().getTime();
+                            
+                            // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
+                            // Isso corrige o bug do "about:srcdoc"
+                            let baseUrl = document.referrer;
+                            if (!baseUrl || baseUrl === "") {{
+                                // Fallback raro
+                                baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
+                            }}
+                            // Remove barra final
+                            if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
+
+                            // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
+                            const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
+
+                            console.log("🚀 URL Iframe:", finalUrl);
+                            
+                            // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
+                            if (iframe) iframe.src = finalUrl;
+
+                            // E. Feedback Final
+                            // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
+                            setTimeout(() => {{
+                                toast.style.backgroundColor = "#27ae60"; // Verde
+                                toast.innerHTML = `
+                                    <div style="display:flex; flex-direction:column; gap:5px;">
+                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                        <span style="font-size:12px;">Dados processados em segundo plano.</span>
+                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
+                                    </div>
+                                `;
+                                setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
+                            }}, 4000);
+                        }});
+
+                    }})();
                     
-                    btnCreate.addEventListener('click', function(e) {{
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        // A. Nome do Projeto
-                        let currentProjectName = "Desconhecido";
-                        if (typeof projectData !== 'undefined' && projectData.length > 0) {{
-                            currentProjectName = projectData[0].name;
-                        }} else {{
-                            const titleEl = container.querySelector('.project-title-row span');
-                            if (titleEl) currentProjectName = titleEl.textContent;
-                        }}
-
-                        // B. Feedback Visual (Laranja = Processando)
-                        menu.style.display = 'none';
-                        toast.style.display = 'block';
-                        toast.style.backgroundColor = "#e67e22"; // Laranja
-                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
-
-                        // C. Montar URL CORRETA
-                        const encodedProject = encodeURIComponent(currentProjectName);
-                        const timestamp = new Date().getTime();
-                        
-                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                        // Isso corrige o bug do "about:srcdoc"
-                        let baseUrl = document.referrer;
-                        if (!baseUrl || baseUrl === "") {{
-                             // Fallback raro
-                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
-                        }}
-                        // Remove barra final
-                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-
-                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
-
-                        console.log("🚀 URL Iframe:", finalUrl);
-                        
-                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
-                        if (iframe) iframe.src = finalUrl;
-
-                        // E. Feedback Final
-                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
-                        setTimeout(() => {{
-                            toast.style.backgroundColor = "#27ae60"; // Verde
-                            toast.innerHTML = `
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
-                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
-                                </div>
-                            `;
-                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
-                        }}, 4000);
-                    }});
-
-                }})();
                     function initGantt() {{
                         console.log('Iniciando Gantt com dados:', projectData);
                         
@@ -2263,6 +2288,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             activeDataMinStr = finalMinDate.toISOString().split('T')[0];
                             activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
                         }}
+
+                        // *** ADICIONAR BOTÃO DE BASELINE ***
+                        addBaselineButtonToToolbar();
+                        
+                        // *** ATUALIZAR DROPDOWN DE BASELINE ***
+                        const currentProjectName = projectData[0].name;
+                        updateBaselineDropdownForProject(currentProjectName);
 
                         renderSidebar();
                         renderHeader();
@@ -2566,63 +2598,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }}
                     }}
-                    // Função para alternar visibilidade do seletor de baseline
-                    function toggleBaselineSelector() {{
-                        const selector = document.getElementById('baseline-selector-{project['id']}');
-                        selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
-                    }}
-                    
-                    // Função para mudar baseline
-                    function changeBaseline(selectedBaseline) {{
-                        if (selectedBaseline === 'P0-(padrão)') {{
-                            // Recarregar página sem baseline
-                            window.location.href = window.location.pathname;
-                        }} else {{
-                            // Enviar comando para Streamlit aplicar a baseline selecionada
-                            const timestamp = new Date().getTime();
-                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(projectName)}}&t=${{timestamp}}`;
-                            
-                            // Mostrar loading
-                            showBaselineLoading();
-                            
-                            // Usar iframe para carregar a URL
-                            const iframe = document.getElementById('hidden-iframe');
-                            iframe.src = url;
-                        }}
-                    }}
-                    
-                    function showBaselineLoading() {{
-                        // Implementar visual de loading
-                        const currentElement = document.getElementById('current-baseline-{project['id']}');
-                        currentElement.textContent = 'Carregando...';
-                        currentElement.style.background = '#fff3cd';
-                    }}
-                    
-                    // Adicionar botão de baseline na toolbar
-                    function addBaselineButton() {{
-                        const toolbar = document.getElementById('gantt-toolbar-{project["id"]}');
-                        if (toolbar) {{
-                            const baselineBtn = document.createElement('button');
-                            baselineBtn.className = 'toolbar-btn';
-                            baselineBtn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg></span>';
-                            baselineBtn.title = 'Selecionar Baseline';
-                            baselineBtn.onclick = toggleBaselineSelector;
-                            toolbar.appendChild(baselineBtn);
-                        }}
-                    }}
-                    
-                    // Inicializar quando o DOM estiver pronto
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        addBaselineButton();
-                        
-                        // Se há uma baseline ativa, destacar no seletor
-                        if (currentBaseline) {{
-                            const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
-                            if (dropdown) {{
-                                dropdown.value = currentBaseline;
-                            }}
-                        }}
-                    }});
 
                     function createBar(task, tipo) {{
                         const startDate = parseDate(tipo === 'previsto' ? task.start_previsto : task.start_real);
@@ -2662,7 +2637,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
 
                     function renderOverlapBar(task, row) {{
-                    if (!task.start_real || !(task.end_real_original_raw || task.end_real)) return;
+                        if (!task.start_real || !(task.end_real_original_raw || task.end_real)) return;
                         const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
                         const overlap_start = new Date(Math.max(s_prev, s_real)), overlap_end = new Date(Math.min(e_prev, e_real));
                         if (overlap_start < overlap_end) {{
@@ -2909,6 +2884,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         positionTodayLine();
                         positionMetaLine();
                         updateProjectTitle();
+                        
+                        // *** ATUALIZAR BASELINE PARA O EMPREENDIMENTO INICIAL ***
+                        updateBaselineDropdownForProject(projectData[0].name);
                     }}
 
                     function updateProjectTitle() {{
@@ -2926,8 +2904,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             document.exitFullscreen();
                         }}
                     }}
-
-
 
                     function toggleFullscreen() {{
                         const container = document.getElementById('gantt-container-{project["id"]}');
@@ -2950,6 +2926,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
                         }}
                     }}
+                    
                     function populateFilters() {{
                         if (filtersPopulated) return;
 
@@ -3028,8 +3005,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         filtersPopulated = true;
                     }}
 
-                    // *** FUNÇÃO applyFiltersAndRedraw CORRIGIDA ***
-                    // *** FUNÇÃO applyFiltersAndRedraw CORRIGIDA ***
+                    // *** FUNÇÃO applyFiltersAndRedraw ATUALIZADA ***
                     function applyFiltersAndRedraw() {{
                         try {{
                             const selProjectIndex = parseInt(document.getElementById('filter-project-{project["id"]}').value, 10);
@@ -3064,6 +3040,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 // Reorganizar tasks com estrutura de subetapas
                                 projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
                                 allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
+                                
+                                // *** ATUALIZAR BASELINE PARA O NOVO EMPREENDIMENTO ***
+                                const newProjectName = newProject.name;
+                                updateBaselineDropdownForProject(newProjectName);
                             }}
 
                             let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
@@ -3192,22 +3172,23 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionMetaLine();
                             updateProjectTitle();
 
-
-
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
                             alert('Erro ao aplicar filtros: ' + error.message);
                         }}
-                    }}                    // DEBUG: Verificar se há dados antes de inicializar
+                    }}
+                    
+                    // DEBUG: Verificar se há dados antes de inicializar
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
+                    console.log('Dados de baseline completos:', allBaselinesData);
                     
                     // Inicializar o Gantt
                     initGantt();
                 </script>
             </body>
             </html>
-        """
+            """
         # Exibe o componente HTML no Streamlit
         components.html(gantt_html, height=altura_gantt, scrolling=True)
         st.markdown("---")
@@ -4955,6 +4936,117 @@ with st.spinner("Carregando e processando dados..."):
             pulmao_status = "Sem Pulmão"
             pulmao_meses = 0
             tipo_visualizacao = "Ambos"  
+
+        # # --- SEÇÃO DE BASELINES (MOVIDA PARA FORA DA SIDEBAR) ---
+        #     st.markdown("---")
+        #     st.markdown("### 📊 Linhas de Base")
+
+        #     # Seleção de empreendimento para baseline
+        #     empreendimentos_baseline = df_data['Empreendimento'].unique().tolist() if not df_data.empty else []
+
+        #     # CORREÇÃO: Inicializar a variável selected_empreendimento_baseline
+        #     selected_empreendimento_baseline = None
+
+        #     if empreendimentos_baseline:
+        #         selected_empreendimento_baseline = st.selectbox(
+        #             "Empreendimento para Baseline",
+        #             empreendimentos_baseline,
+        #             key="baseline_emp"
+        #         )
+                
+        #         # NOVO: Seletor para aplicar baseline no gráfico
+        #         baseline_options = get_baseline_options(selected_empreendimento_baseline)
+        #         if baseline_options:
+        #             selected_baseline = st.selectbox(
+        #                 "Aplicar Baseline no Gráfico",
+        #                 ["Nenhuma"] + baseline_options,
+        #                 key="apply_baseline"
+        #             )
+                    
+        #             # Aplicar baseline se selecionada
+        #             if selected_baseline != "Nenhuma":
+        #                 baseline_data = load_baseline_data(selected_empreendimento_baseline, selected_baseline)
+        #                 if baseline_data:
+        #                     df_data = apply_baseline_to_dataframe(df_data, baseline_data)
+        #                     st.success(f"✅ Baseline {selected_baseline} aplicada!")
+                
+        #         # Botão para criar baseline
+        #         col1, col2 = st.columns([3, 1])
+        #         with col1:
+        #             if st.button("📸 Criar Linha de Base", use_container_width=True):
+        #                 if selected_empreendimento_baseline:
+        #                     try:
+        #                         version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
+        #                         st.success(f"✅ {version_name} criado!")
+        #                         st.rerun()
+        #                     except Exception as e:
+        #                         st.error(f"❌ Erro: {e}")
+        #                 else:
+        #                     st.warning("Selecione um empreendimento")
+                
+        #         # ... (restante do código existente de gerenciamento de baselines)
+            
+        #     # Linhas de base não enviadas
+        #     st.markdown("#### ☁️ Para Enviar")
+            
+        #     baselines = load_baselines()
+        #     unsent_baselines = st.session_state.get('unsent_baselines', {})
+            
+        #     # CORREÇÃO: Verificar se selected_empreendimento_baseline está definido
+        #     if selected_empreendimento_baseline:
+        #         emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
+                
+        #         if emp_unsent:
+        #             st.info(f"📋 {len(emp_unsent)} linha(s) de base aguardando envio")
+                    
+        #             for version_name in emp_unsent[:3]:  # Mostrar apenas 3 primeiras
+        #                 col1, col2, col3 = st.columns([3, 1, 1])
+        #                 with col1:
+        #                     st.write(f"`{version_name}`")
+        #                 with col2:
+        #                     if st.button("☁️", key=f"send_{version_name}"):
+        #                         if send_to_aws(selected_empreendimento_baseline, version_name):
+        #                             st.success(f"✅ {version_name} enviado!")
+        #                             st.rerun()
+        #                 with col3:
+        #                     if st.button("🗑️", key=f"del_unsent_{version_name}"):
+        #                         if delete_baseline(selected_empreendimento_baseline, version_name):
+        #                             if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
+        #                                 st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
+        #                             st.success(f"✅ {version_name} deletado!")
+        #                             st.rerun()
+        #         else:
+        #             st.info("📭 Nenhuma linha de base aguardando envio")
+                
+        #         # Todas as linhas de base
+        #         st.markdown("#### 💾 Todas as Linhas de Base")
+                
+        #         emp_baselines = baselines.get(selected_empreendimento_baseline, {})
+        #         if emp_baselines:
+        #             # Mostrar apenas as 5 mais recentes
+        #             for version_name in sorted(emp_baselines.keys())[:5]:
+        #                 is_unsent = version_name in emp_unsent
+                        
+        #                 col1, col2 = st.columns([3, 1])
+        #                 with col1:
+        #                     if is_unsent:
+        #                         st.write(f"`{version_name}` ⏳")
+        #                     else:
+        #                         st.write(f"`{version_name}` ✅")
+        #                 with col2:
+        #                     if st.button("🗑️", key=f"del_all_{version_name}"):
+        #                         if delete_baseline(selected_empreendimento_baseline, version_name):
+        #                             if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
+        #                                 st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
+        #                             st.success(f"✅ {version_name} deletado!")
+        #                             st.rerun()
+                    
+        #             if len(emp_baselines) > 5:
+        #                 st.info(f"... e mais {len(emp_baselines) - 5} linhas de base")
+        #         else:
+        #             st.info("Nenhuma linha de base criada")
+        #     else:
+        #         st.warning("Selecione um empreendimento para gerenciar baselines")
 
             # --- Menu de Contexto para Gantt ---
             def create_gantt_context_menu_component(selected_empreendimento):
