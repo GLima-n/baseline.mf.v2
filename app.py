@@ -282,21 +282,18 @@ def process_baseline_change():
         st.query_params.clear()
         
         if baseline_name == 'P0-(padrão)':
-            # Limpar baseline apenas se for do mesmo empreendimento
-            current_emp = st.session_state.get('current_empreendimento')
-            if current_emp == empreendimento:
-                st.session_state.current_baseline = None
-                st.session_state.current_baseline_data = None
-                st.session_state.current_empreendimento = None
-                st.rerun()
-        else:
-            # Carregar baseline selecionada
-            baseline_data = load_baseline_data(empreendimento, baseline_name)
-            if baseline_data:
-                st.session_state.current_baseline = baseline_name
-                st.session_state.current_baseline_data = baseline_data
-                st.session_state.current_empreendimento = empreendimento
-                st.rerun()
+            # Limpar baseline apenas se for do mesm# Se a baseline for de um empreendimento diferente, limpa a sessão
+        # REMOVIDO: A lógica de limpeza será tratada na função principal (linha 5356)
+        # para permitir que o usuário selecione uma baseline e depois filtre o gráfico.
+            pass
+    
+    # Carregar baseline selecionada
+    baseline_data = load_baseline_data(empreendimento, baseline_name)
+    if baseline_data:
+        st.session_state.current_baseline = baseline_name
+        st.session_state.current_baseline_data = baseline_data
+        st.session_state.current_empreendimento = empreendimento
+        st.rerun()
             
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
@@ -5353,7 +5350,15 @@ with st.spinner("Carregando e processando dados..."):
             current_emp = st.session_state.get('current_empreendimento')
             empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
             
-            # Só passar a baseline se pertencer a um empreendimento no gráfico atual
+            # Lógica de aplicação da baseline:
+            # 1. Se houver uma baseline ativa na sessão
+            # 2. E o empreendimento da baseline ativa estiver entre os empreendimentos do gráfico
+            #    (Isso garante que a baseline correta seja aplicada quando o filtro de empreendimento muda)
+            current_baseline = st.session_state.get('current_baseline')
+            current_baseline_data = st.session_state.get('current_baseline_data')
+            current_emp = st.session_state.get('current_empreendimento')
+            empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
+
             if current_emp and current_emp in empreendimentos_no_grafico:
                 baseline_to_use = current_baseline
                 baseline_data_to_use = current_baseline_data
