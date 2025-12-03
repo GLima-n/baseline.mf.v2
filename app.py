@@ -12,12 +12,6 @@ from datetime import datetime, timedelta
 import holidays
 from dateutil.relativedelta import relativedelta #Dados para JavaScript
 
-def normalize_empreendimento_name(name):
-    """Normaliza o nome do empreendimento para garantir consistência (remove espaços extras, converte para minúsculas)."""
-    if isinstance(name, str):
-        return name.strip().lower()
-    return name
-
 import streamlit.components.v1 as components  
 import json
 import random
@@ -472,7 +466,7 @@ def load_baselines():
             print(f"DEBUG load_baselines: {len(results)} registros encontrados no banco")
             
             for row in results:
-                empreendimento = normalize_empreendimento_name(row['empreendimento'])
+                empreendimento = row['empreendimento']
                 version_name = row['version_name']
                 
                 print(f"DEBUG: Carregando baseline - Empreendimento: {empreendimento}, Versão: {version_name}")
@@ -481,8 +475,6 @@ def load_baselines():
                     baselines[empreendimento] = {}
                 
                 try:
-                    # O Streamlit cache_data não lida bem com objetos mutáveis como st.session_state
-                    # Vamos garantir que o retorno seja um dicionário simples
                     baseline_data = json.loads(row['baseline_data'])
                     baselines[empreendimento][version_name] = {
                         "date": row['created_date'],
@@ -506,7 +498,6 @@ def load_baselines():
         return st.session_state.get('mock_baselines', {})
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
-    empreendimento = normalize_empreendimento_name(empreendimento)
     conn = get_db_connection()
     if conn:
         try:
@@ -564,7 +555,6 @@ def save_baseline(empreendimento, version_name, baseline_data, created_date, tip
         return True
 
 def delete_baseline(empreendimento, version_name):
-    empreendimento = normalize_empreendimento_name(empreendimento)
     conn = get_db_connection()
     if conn:
         try:
@@ -748,7 +738,6 @@ def converter_dados_para_gantt(df):
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
 def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
-    empreendimento = normalize_empreendimento_name(empreendimento)
     """Cria uma linha de base do estado atual do Gantt"""
     
     try:
@@ -886,7 +875,6 @@ def debug_baseline_system():
         st.error("❌ Session state: FALHA - unsent_baselines não encontrado")
 
 def load_baseline_data(empreendimento, version_name):
-    empreendimento = normalize_empreendimento_name(empreendimento)
     """Carrega os dados específicos de uma baseline"""
     baselines = load_baselines()
     if empreendimento in baselines and version_name in baselines[empreendimento]:
@@ -924,7 +912,6 @@ def apply_baseline_to_dataframe(df, baseline_data):
     return df_baseline
 
 def get_baseline_options(empreendimento):
-    empreendimento = normalize_empreendimento_name(empreendimento)
     """Retorna opções de baselines disponíveis para um empreendimento"""
     if not empreendimento:
         return []
