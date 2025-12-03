@@ -1180,28 +1180,46 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if version_name in emp_baselines:
                     baselines_data[version_name] = emp_baselines[version_name]['data']
 
-        empreendimento_principal = ""
-        baseline_options = []
-        
-        # Obter todos os empreendimentos disponíveis nos dados filtrados
+	        # A variável `baseline_options` já foi populada corretamente acima (linha 1172)
+	        # com as opções do `primeiro_empreendimento`.
+	        # A seção abaixo estava sobrescrevendo `baseline_options` com uma lista vazia
+	        # ou com as opções do `empreendimento_atual` (que é o mesmo que `primeiro_empreendimento`
+	        # no modo projeto único), mas o principal problema é a redefinição de `baseline_options`
+	        # para `[]` na linha 1184, e a lógica subsequente que não estava sendo usada
+	        # para popular o menu de seleção no HTML.
+	        
+	        # Vamos garantir que `baseline_options` contenha as opções corretas para o HTML.
+	        # O HTML (linha 1270) usa `baseline_options_json` que é criado a partir de `baseline_options`
+	        # na linha 1269.
+	        
+	        # O código original estava assim:
+	        # 1172: baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
+	        # 1184: # # # baseline_options = [] # Sobrescreve o valor correto
+	        # 1195: baseline_options = get_baseline_options(empreendimento_atual) # Repopula, mas pode ser redundante
+	        
+	        # A correção é remover a redefinição desnecessária e garantir que a variável
+	        # `baseline_options` usada para gerar o JSON final esteja correta.
+	        
+	        # A lógica de `baselines_por_empreendimento` é para o modo consolidado (múltiplos projetos),
+	        # mas no modo "por projeto" (que é o contexto do usuário), `primeiro_empreendimento`
+	        # e `empreendimento_atual` são o mesmo.
+	        
+	        # Vamos manter a lógica original de 1170-1172 e remover a redefinição problemática.
+	        
+	        # Obter todos os empreendimentos disponíveis nos dados filtrados
         todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
-        
-        # Determinar empreendimento atual baseado no filtro ou no primeiro da lista
+	        
+	        # Determinar empreendimento atual baseado no filtro ou no primeiro da lista
         empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
         
-        # Obter baselines para o empreendimento atual (se for único)
-        baseline_options = []
-        if empreendimento_atual != "Múltiplos":
-            baseline_options = get_baseline_options(empreendimento_atual)
-        
-        # Preparar dados para o JavaScript
+        # Preparar dados para o JavaScript (mantendo a lógica de baselines_por_empreendimento para o JS)
         baselines_por_empreendimento = {}
         for emp in todos_empreendimentos:
             emp_baselines = get_baseline_options(emp)
             if emp_baselines:
                 baselines_por_empreendimento[emp] = emp_baselines
-            # Reduz o fator de multiplicação para evitar excesso de espaço
-            altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
+        # Reduz o fator de multiplicação para evitar excesso de espaço
+        altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
         # --- Geração do HTML ---
         gantt_html = f"""
