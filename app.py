@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #Dados para JavaScript
+from dateutil.relativedelta import relativedelta #createBar
 
 import streamlit.components.v1 as components  
 import json
@@ -296,6 +296,7 @@ def process_baseline_change():
                 st.session_state.current_baseline = baseline_name
                 st.session_state.current_baseline_data = baseline_data
                 st.session_state.current_empreendimento = empreendimento
+                # *** FORÇAR RERUN PARA APLICAR A BASELINE ***
                 st.rerun()
             
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
@@ -610,10 +611,11 @@ def converter_dados_para_gantt(df):
         df_emp_sorted = df_emp.sort_values(by='Etapa').reset_index()
 
         for i, (idx, row) in enumerate(df_emp_sorted.iterrows()):
+            # *** MODIFICAÇÃO: Usar sempre os dados do DataFrame (já modificados pela baseline se aplicável) ***
             start_date = row.get("Inicio_Prevista")
             end_date = row.get("Termino_Prevista")
-            start_real = row.get("Inicio_Real")
-            end_real_original = row.get("Termino_Real")
+            start_real = row.get("Inicio_Real")  # Sempre os dados REAIS atuais
+            end_real_original = row.get("Termino_Real")  # Sempre os dados REAIS atuais
             progress = row.get("% concluído", 0)
 
             etapa_sigla = row.get("Etapa", "UNKNOWN")
@@ -716,11 +718,11 @@ def converter_dados_para_gantt(df):
                 "termino_real": pd.to_datetime(end_real_original).strftime("%d/%m/%y") if pd.notna(end_real_original) else "N/D",
                 "duracao_prev_meses": f"{dur_prev_meses:.1f}".replace('.', ',') if dur_prev_meses is not None else "-",
                 "duracao_real_meses": f"{dur_real_meses:.1f}".replace('.', ',') if dur_real_meses is not None else "-",
-
                 "vt_text": f"{int(vt):+d}d" if pd.notna(vt) else "-",
                 "vd_text": f"{int(vd):+d}d" if pd.notna(vd) else "-",
-
-                "status_color_class": status_color_class
+                "status_color_class": status_color_class,
+                # *** NOVO CAMPO: Indicar se está em modo baseline ***
+                "is_baseline": st.session_state.current_baseline is not None
             }
             tasks.append(task)
 
@@ -729,7 +731,9 @@ def converter_dados_para_gantt(df):
         project = {
             "id": f"p{len(gantt_data)}", "name": empreendimento,
             "tasks": tasks,
-            "meta_assinatura_date": data_meta.strftime("%Y-%m-%d") if data_meta else None
+            "meta_assinatura_date": data_meta.strftime("%Y-%m-%d") if data_meta else None,
+            # *** NOVO CAMPO: Nome da baseline atual ***
+            "current_baseline": st.session_state.current_baseline
         }
         gantt_data.append(project)
 
@@ -738,7 +742,7 @@ def converter_dados_para_gantt(df):
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
 def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
-    """Cria uma linha de base do estado atual do Gantt"""
+    """Cria uma linha de base do estado atual do Gantt - salva REAIS como PREVISTOS"""
     
     try:
         # Filtrar dados do empreendimento
@@ -757,10 +761,17 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             'tasks': []
         }
         
-        # Converter tasks para formato serializável com validação
+        # *** MODIFICAÇÃO PRINCIPAL: Salvar dados REAIS como PREVISTOS na baseline ***
         task_count = 0
         for _, row in df_empreendimento.iterrows():
             try:
+                # Usar dados REAIS para as datas PREVISTAS da baseline
+                inicio_previsto_baseline = row.get('Inicio_Real')
+                termino_previsto_baseline = row.get('Termino_Real')
+                
+                # Usar progresso atual
+                progress_atual = row.get('% concluído', 0)
+                
                 task = {
                     'etapa': row.get('Etapa', ''),
                     'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
@@ -768,32 +779,36 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                     'termino_previsto': None,
                     'inicio_real': None,
                     'termino_real': None,
-                    'percentual_concluido': row.get('% concluído', 0),
+                    'percentual_concluido': progress_atual,
                     'setor': row.get('SETOR', ''),
                     'grupo': row.get('GRUPO', ''),
                     'ugb': row.get('UGB', '')
                 }
                 
-                # Converter datas para string com tratamento seguro
-                date_fields = {
-                    'inicio_previsto': 'Inicio_Prevista',
-                    'termino_previsto': 'Termino_Prevista', 
-                    'inicio_real': 'Inicio_Real',
-                    'termino_real': 'Termino_Real'
-                }
+                # Converter datas REAIS para string (elas serão usadas como previstas na baseline)
+                if inicio_previsto_baseline is not None and pd.notna(inicio_previsto_baseline):
+                    if hasattr(inicio_previsto_baseline, 'strftime'):
+                        task['inicio_previsto'] = inicio_previsto_baseline.strftime("%Y-%m-%d")
+                    else:
+                        try:
+                            parsed_date = pd.to_datetime(inicio_previsto_baseline)
+                            task['inicio_previsto'] = parsed_date.strftime("%Y-%m-%d")
+                        except:
+                            task['inicio_previsto'] = None
                 
-                for task_field, df_field in date_fields.items():
-                    date_val = row.get(df_field)
-                    if date_val is not None and pd.notna(date_val):
-                        if hasattr(date_val, 'strftime'):
-                            task[task_field] = date_val.strftime("%Y-%m-%d")
-                        else:
-                            # Tentar converter para datetime se não for
-                            try:
-                                parsed_date = pd.to_datetime(date_val)
-                                task[task_field] = parsed_date.strftime("%Y-%m-%d")
-                            except:
-                                task[task_field] = None
+                if termino_previsto_baseline is not None and pd.notna(termino_previsto_baseline):
+                    if hasattr(termino_previsto_baseline, 'strftime'):
+                        task['termino_previsto'] = termino_previsto_baseline.strftime("%Y-%m-%d")
+                    else:
+                        try:
+                            parsed_date = pd.to_datetime(termino_previsto_baseline)
+                            task['termino_previsto'] = parsed_date.strftime("%Y-%m-%d")
+                        except:
+                            task['termino_previsto'] = None
+                
+                # Manter datas reais como None na baseline (serão preenchidas com dados atuais na visualização)
+                task['inicio_real'] = None
+                task['termino_real'] = None
                 
                 baseline_data['tasks'].append(task)
                 task_count += 1
@@ -841,7 +856,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             if version_name not in st.session_state.unsent_baselines[empreendimento]:
                 st.session_state.unsent_baselines[empreendimento].append(version_name)
             
-            st.success(f"Linha de base {version_name} salva com sucesso!")
+            st.success(f"Linha de base {version_name} salva com sucesso! (Datas reais salvas como planejadas)")
             return version_name
         else:
             raise Exception("Falha ao salvar linha de base no banco de dados")
@@ -882,13 +897,13 @@ def load_baseline_data(empreendimento, version_name):
     return None
 
 def apply_baseline_to_dataframe(df, baseline_data):
-    """Aplica os dados da baseline ao DataFrame principal"""
+    """Aplica os dados da baseline ao DataFrame principal - usa baseline como PREVISTO"""
     if not baseline_data or 'tasks' not in baseline_data:
         return df
     
     df_baseline = df.copy()
     
-    # Para cada task na baseline, atualizar as datas no DataFrame
+    # Para cada task na baseline, atualizar as datas PREVISTAS no DataFrame
     for task in baseline_data['tasks']:
         etapa = task['etapa']
         
@@ -899,15 +914,19 @@ def apply_baseline_to_dataframe(df, baseline_data):
         if mask.any():
             idx = df_baseline[mask].index[0]
             
-            # Atualizar datas previstas da baseline
+            # *** MODIFICAÇÃO: Usar dados da baseline como PREVISTOS ***
             if task['inicio_previsto']:
                 df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
+            
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
             
-            # Atualizar percentual de conclusão
+            # Atualizar percentual de conclusão da baseline
             if 'percentual_concluido' in task:
                 df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
+            
+            # *** IMPORTANTE: NÃO alterar datas REAIS - elas permanecem com os valores atuais ***
+            # As datas reais continuam sendo lidas do DataFrame original
     
     return df_baseline
 
@@ -1645,6 +1664,28 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .floating-filter-menu .vscomp-search-input {{
                         height: 30px;
                         font-size: 13px;
+                    }}
+                    /* Estilo para barras de baseline */
+                    .gantt-bar.baseline {{
+                        border: 2px dashed #3b82f6 !important;
+                        background-color: rgba(59, 130, 246, 0.15) !important;
+                        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3) !important;
+                    }}
+
+                    .gantt-bar.baseline .bar-label {{
+                        color: #1d4ed8 !important;
+                        font-weight: bold !important;
+                        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+                    }}
+
+                    /* Indicador visual na barra de baseline */
+                    .gantt-bar.baseline::before {{
+                        content: "📅";
+                        position: absolute;
+                        left: 3px;
+                        top: -8px;
+                        font-size: 10px;
+                        z-index: 11;
                     }}
                 </style>
             </head>
@@ -2617,11 +2658,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         const bar = document.createElement('div'); 
-                        bar.className = `gantt-bar ${{tipo}}`;
+                        bar.className = `gantt-bar ${tipo}`;
                         const coresSetor = coresPorSetor[task.setor] || coresPorSetor['Não especificado'] || {{previsto: '#cccccc', real: '#888888'}};
                         bar.style.backgroundColor = tipo === 'previsto' ? coresSetor.previsto : coresSetor.real;
                         bar.style.left = `${{left}}px`; 
                         bar.style.width = `${{width}}px`;
+                        
+                        // *** MODIFICAÇÃO: Adicionar classe de baseline se estiver em modo baseline ***
+                        const isBaselineMode = projectData[0].current_baseline && projectData[0].current_baseline !== 'P0-(padrão)';
+                        if (tipo === 'previsto' && isBaselineMode) {{
+                            bar.classList.add('baseline');
+                            bar.title = `Baseline: ${{projectData[0].current_baseline}}\nClique para detalhes`;
+                        }}
                         
                         // Adicionar rótulo apenas se houver espaço suficiente
                         if (width > 40) {{
@@ -2634,6 +2682,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         bar.addEventListener('mousemove', e => showTooltip(e, task, tipo));
                         bar.addEventListener('mouseout', () => hideTooltip());
                         return bar;
+                    }}
+                    function updateProjectTitle() {{
+                        const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
+                        if (projectTitle) {{
+                            const isBaselineMode = projectData[0].current_baseline && projectData[0].current_baseline !== 'P0-(padrão)';
+                            if (isBaselineMode) {{
+                                projectTitle.textContent = `${{projectData[0].name}} 📅 [${{projectData[0].current_baseline}}]`;
+                                projectTitle.style.color = '#3b82f6';
+                            }} else {{
+                                projectTitle.textContent = projectData[0].name;
+                                projectTitle.style.color = 'white';
+                            }}
+                        }}
                     }}
 
                     function renderOverlapBar(task, row) {{
@@ -2705,10 +2766,31 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     function showTooltip(e, task, tipo) {{
                         const tooltip = document.getElementById('tooltip-{project["id"]}');
                         let content = `<b>${{task.name}}</b><br>`;
-                        if (tipo === 'previsto') {{ content += `Previsto: ${{task.inicio_previsto}} - ${{task.termino_previsto}}<br>Duração: ${{task.duracao_prev_meses}}M`; }} else {{ content += `Real: ${{task.inicio_real}} - ${{task.termino_real}}<br>Duração: ${{task.duracao_real_meses}}M<br>Variação Término: ${{task.vt_text}}<br>Variação Duração: ${{task.vd_text}}`; }}
-                        content += `<br><b>Progresso: ${{task.progress}}%</b><br>Setor: ${{task.setor}}<br>Grupo: ${{task.grupo}}`;
+                        
+                        // *** MODIFICAÇÃO: Adicionar indicação de baseline ***
+                        const isBaselineMode = projectData[0].current_baseline && projectData[0].current_baseline !== 'P0-(padrão)';
+                        
+                        if (tipo === 'previsto') {{ 
+                            if (isBaselineMode) {{
+                                content += `<span style="color: #3b82f6; font-weight: bold;">📅 BASELINE (${{projectData[0].current_baseline}})</span><br>`;
+                                content += `Planejado (Snapshot da Baseline): ${{task.inicio_previsto}} - ${{task.termino_previsto}}<br>`;
+                            }} else {{
+                                content += `Previsto (Planejamento Original): ${{task.inicio_previsto}} - ${{task.termino_previsto}}<br>`;
+                            }}
+                        }} else {{ 
+                            content += `Real (Atual): ${{task.inicio_real}} - ${{task.termino_real}}<br>`;
+                        }}
+                        
+                        content += `Duração: ${{tipo === 'previsto' ? task.duracao_prev_meses : task.duracao_real_meses}}M<br>`;
+                        content += `Variação Término: ${{task.vt_text}}<br>`;
+                        content += `Variação Duração: ${{task.vd_text}}<br>`;
+                        content += `<b>Progresso: ${{task.progress}}%</b><br>`;
+                        content += `Setor: ${{task.setor}}<br>`;
+                        content += `Grupo: ${{task.grupo}}`;
+                        
                         tooltip.innerHTML = content;
                         tooltip.classList.add('show');
+                        
                         const tooltipWidth = tooltip.offsetWidth;
                         const tooltipHeight = tooltip.offsetHeight;
                         const viewportWidth = window.innerWidth;
@@ -2717,18 +2799,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const mouseY = e.clientY;
                         const padding = 15;
                         let left, top;
+                        
                         if ((mouseX + padding + tooltipWidth) > viewportWidth) {{
                             left = mouseX - padding - tooltipWidth;
-                        }} else {{
+                        }}else {{
                             left = mouseX + padding;
                         }}
+                        
                         if ((mouseY + padding + tooltipHeight) > viewportHeight) {{
                             top = mouseY - padding - tooltipHeight;
                         }} else {{
                             top = mouseY + padding;
                         }}
+                        
                         if (left < padding) left = padding;
                         if (top < padding) top = padding;
+                        
                         tooltip.style.left = `${{left}}px`;
                         tooltip.style.top = `${{top}}px`;
                     }}
@@ -3171,13 +3257,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             positionTodayLine();
                             positionMetaLine();
                             updateProjectTitle();
-
+                            updateProjectTitle();
+                            
                         }} catch (error) {{
                             console.error('Erro ao aplicar filtros:', error);
                             alert('Erro ao aplicar filtros: ' + error.message);
                         }}
                     }}
-                    
+                   
                     // DEBUG: Verificar se há dados antes de inicializar
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
@@ -4806,6 +4893,21 @@ with st.spinner("Carregando e processando dados..."):
         # Chamamos a função passando o df_data carregado AGORA.
         # Não confiamos apenas no session_state antigo.
         process_context_menu_actions(df_data)
+        # Supondo que você tenha uma função load_data() para carregar seus dados originais
+        try:
+            df_original = load_data()  # Ou sua função de carregamento
+        except:
+            # Se não tiver load_data, use os dados do exemplo
+            df_original = pd.DataFrame()  # Seus dados originais aqui
+
+        # *** MODIFICAÇÃO: Verificar e aplicar baseline se selecionada ***
+        if st.session_state.current_baseline and st.session_state.current_baseline_data:
+            # Aplicar baseline aos dados
+            df_para_gantt = apply_baseline_to_dataframe(df_original, st.session_state.current_baseline_data)
+            st.info(f"📅 Visualizando Baseline: **{st.session_state.current_baseline}**")
+        else:
+            # Usar dados originais (P0 padrão)
+            df_para_gantt = df_original.copy()
         # --------------------------------------
 
         with st.sidebar:
