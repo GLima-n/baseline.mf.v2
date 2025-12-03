@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #apply_baseline_to_dataframe
+from dateutil.relativedelta import relativedelta #Dados para JavaScript
 
 import streamlit.components.v1 as components  
 import json
@@ -462,9 +462,14 @@ def load_baselines():
             cursor.execute(query)
             results = cursor.fetchall()
             
+            # DEBUG
+            print(f"DEBUG load_baselines: {len(results)} registros encontrados no banco")
+            
             for row in results:
                 empreendimento = row['empreendimento']
                 version_name = row['version_name']
+                
+                print(f"DEBUG: Carregando baseline - Empreendimento: {empreendimento}, Versão: {version_name}")
                 
                 if empreendimento not in baselines:
                     baselines[empreendimento] = {}
@@ -479,6 +484,8 @@ def load_baselines():
                 except Exception as e:
                     print(f"DEBUG: Erro ao carregar baseline {version_name}: {e}")
                     continue
+                    
+            return baselines
         except Error as e:
             print(f"DEBUG: Erro no banco: {e}")
             return {}
@@ -486,30 +493,9 @@ def load_baselines():
             if conn.is_connected():
                 cursor.close()
                 conn.close()
-        return baselines
     else:
         print("DEBUG: Usando mock_baselines")
         return st.session_state.get('mock_baselines', {})
-
-def get_baseline_options(empreendimento):
-    baselines = load_baselines()
-    if empreendimento in baselines:
-        return list(baselines[empreendimento].keys())
-    return []
-
-def process_baseline_change():
-    query_params = st.experimental_get_query_params()
-    if 'change_baseline' in query_params and 'empreendimento' in query_params:
-        baseline_name = query_params['change_baseline'][0]
-        empreendimento = query_params['empreendimento'][0]
-        
-        baselines = load_baselines()
-        if empreendimento in baselines and baseline_name in baselines[empreendimento]:
-            baseline_data = baselines[empreendimento][baseline_name]['data']
-            st.session_state.current_baseline = baseline_name
-            st.session_state.current_baseline_data = baseline_data
-            st.session_state.current_empreendimento = empreendimento
-        st.experimental_rerun()
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
     conn = get_db_connection()
@@ -896,25 +882,30 @@ def load_baseline_data(empreendimento, version_name):
     return None
 
 def apply_baseline_to_dataframe(df, baseline_data):
+    """Aplica os dados da baseline ao DataFrame principal"""
     if not baseline_data or 'tasks' not in baseline_data:
         return df
     
     df_baseline = df.copy()
     
+    # Para cada task na baseline, atualizar as datas no DataFrame
     for task in baseline_data['tasks']:
         etapa = task['etapa']
         
+        # Encontrar a linha correspondente no DataFrame
         mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
                (df_baseline['Etapa'] == etapa)
         
         if mask.any():
             idx = df_baseline[mask].index[0]
             
+            # Atualizar datas previstas da baseline
             if task['inicio_previsto']:
                 df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
             
+            # Atualizar percentual de conclusão
             if 'percentual_concluido' in task:
                 df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
     
@@ -4412,56 +4403,26 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
 def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_data=None, baseline_name=None):
+    """
+    Decide qual Gantt gerar com base na seleção da etapa inicial.
+    """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
+    # Determinar qual empreendimento está sendo visualizado
     empreendimentos_no_df = df["Empreendimento"].unique()
     empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
     
     current_empreendimento = st.session_state.get('current_empreendimento')
     
+    # Aplicar baseline apenas se for específica para este empreendimento
     should_apply_baseline = (
         baseline_data is not None and 
         baseline_name is not None and 
         current_empreendimento == empreendimento_visualizado and
         empreendimento_visualizado != "Múltiplos"
     )
-    
-    if should_apply_baseline:
-        df = apply_baseline_to_dataframe(df, baseline_data)
-        
-        with st.container():
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.info(f"**Visualizando:** {baseline_name} | **Projeto:** {empreendimento_visualizado}")
-            with col2:
-                if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
-                    st.session_state.current_baseline = None
-                    st.session_state.current_baseline_data = None
-                    st.session_state.current_empreendimento = None
-                    st.rerun()
-
-    is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
-
-    if is_consolidated_view:
-        gerar_gantt_consolidado(
-            df, 
-            tipo_visualizacao, 
-            df_original_para_ordenacao, 
-            pulmao_status, 
-            pulmao_meses,
-            etapa_selecionada_inicialmente
-        )
-    else:
-        gerar_gantt_por_projeto(
-            df, 
-            tipo_visualizacao, 
-            df_original_para_ordenacao, 
-            pulmao_status, 
-            pulmao_meses,
-            baseline_name=baseline_name if should_apply_baseline else None
-        )
     
     if should_apply_baseline:
         df = apply_baseline_to_dataframe(df, baseline_data)
