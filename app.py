@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #Dados para JavaScript
+from dateutil.relativedelta import relativedelta #apply_baseline_to_dataframe
 
 import streamlit.components.v1 as components  
 import json
@@ -180,6 +180,11 @@ class StyleConfig:
     def set_offset_variacao_termino(cls, novo_offset):
         cls.OFFSET_VARIACAO_TERMINO = novo_offset
 
+def load_baselines_for_project(project_name):
+    baselines = load_baselines()
+    if project_name in baselines:
+        return baselines[project_name]
+    return {}
 
 # --- Funções de Banco de Dados (VERSÃO ROBUSTA AWS) ---
 
@@ -191,6 +196,7 @@ def get_db_connection():
     except Error as e:
         print(f"❌ Erro de Conexão MySQL: {e}") # Log no terminal
         return None
+
 
 def create_baselines_table():
     conn = get_db_connection()
@@ -282,11 +288,13 @@ def process_baseline_change():
         st.query_params.clear()
         
         if baseline_name == 'P0-(padrão)':
-            # Limpar baseline
-            st.session_state.current_baseline = None
-            st.session_state.current_baseline_data = None
-            st.session_state.current_empreendimento = None
-            st.rerun()
+            # Limpar baseline apenas se for do mesmo empreendimento
+            current_emp = st.session_state.get('current_empreendimento')
+            if current_emp == empreendimento:
+                st.session_state.current_baseline = None
+                st.session_state.current_baseline_data = None
+                st.session_state.current_empreendimento = None
+                st.rerun()
         else:
             # Carregar baseline selecionada
             baseline_data = load_baseline_data(empreendimento, baseline_name)
@@ -460,14 +468,9 @@ def load_baselines():
             cursor.execute(query)
             results = cursor.fetchall()
             
-            # DEBUG
-            print(f"DEBUG load_baselines: {len(results)} registros encontrados no banco")
-            
             for row in results:
                 empreendimento = row['empreendimento']
                 version_name = row['version_name']
-                
-                print(f"DEBUG: Carregando baseline - Empreendimento: {empreendimento}, Versão: {version_name}")
                 
                 if empreendimento not in baselines:
                     baselines[empreendimento] = {}
@@ -482,8 +485,6 @@ def load_baselines():
                 except Exception as e:
                     print(f"DEBUG: Erro ao carregar baseline {version_name}: {e}")
                     continue
-                    
-            return baselines
         except Error as e:
             print(f"DEBUG: Erro no banco: {e}")
             return {}
@@ -491,9 +492,30 @@ def load_baselines():
             if conn.is_connected():
                 cursor.close()
                 conn.close()
+        return baselines
     else:
         print("DEBUG: Usando mock_baselines")
         return st.session_state.get('mock_baselines', {})
+
+def get_baseline_options(empreendimento):
+    baselines = load_baselines()
+    if empreendimento in baselines:
+        return list(baselines[empreendimento].keys())
+    return []
+
+def process_baseline_change():
+    query_params = st.experimental_get_query_params()
+    if 'change_baseline' in query_params and 'empreendimento' in query_params:
+        baseline_name = query_params['change_baseline'][0]
+        empreendimento = query_params['empreendimento'][0]
+        
+        baselines = load_baselines()
+        if empreendimento in baselines and baseline_name in baselines[empreendimento]:
+            baseline_data = baselines[empreendimento][baseline_name]['data']
+            st.session_state.current_baseline = baseline_name
+            st.session_state.current_baseline_data = baseline_data
+            st.session_state.current_empreendimento = empreendimento
+        st.experimental_rerun()
 
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
     conn = get_db_connection()
@@ -880,30 +902,25 @@ def load_baseline_data(empreendimento, version_name):
     return None
 
 def apply_baseline_to_dataframe(df, baseline_data):
-    """Aplica os dados da baseline ao DataFrame principal"""
     if not baseline_data or 'tasks' not in baseline_data:
         return df
     
     df_baseline = df.copy()
     
-    # Para cada task na baseline, atualizar as datas no DataFrame
     for task in baseline_data['tasks']:
         etapa = task['etapa']
         
-        # Encontrar a linha correspondente no DataFrame
         mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
                (df_baseline['Etapa'] == etapa)
         
         if mask.any():
             idx = df_baseline[mask].index[0]
             
-            # Atualizar datas previstas da baseline
             if task['inicio_previsto']:
                 df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
             
-            # Atualizar percentual de conclusão
             if 'percentual_concluido' in task:
                 df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
     
@@ -1082,2087 +1099,1432 @@ def aplicar_ordenacao_final(df, empreendimentos_ordenados):
 
 # --- *** FUNÇÃO gerar_gantt_por_projeto MODIFICADA *** ---
 def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, pulmao_status, pulmao_meses, titulo_extra="", baseline_name=None):
-        """
-        Gera um único gráfico de Gantt com todos os projetos.
-        """
-        # --- Processar DF SEM PULMÃO ---
-        df_sem_pulmao = df.copy()
-        df_gantt_sem_pulmao = df_sem_pulmao.copy()
+    """
+    Gera um único gráfico de Gantt com todos os projetos.
+    """
+    # --- Processar DF SEM PULMÃO ---
+    df_sem_pulmao = df.copy()
+    df_gantt_sem_pulmao = df_sem_pulmao.copy()
 
-        for col in ["Inicio_Prevista", "Termino_Prevista", "Inicio_Real", "Termino_Real"]:
-            if col in df_gantt_sem_pulmao.columns:
-                df_gantt_sem_pulmao[col] = pd.to_datetime(df_gantt_sem_pulmao[col], errors="coerce")
+    for col in ["Inicio_Prevista", "Termino_Prevista", "Inicio_Real", "Termino_Real"]:
+        if col in df_gantt_sem_pulmao.columns:
+            df_gantt_sem_pulmao[col] = pd.to_datetime(df_gantt_sem_pulmao[col], errors="coerce")
 
-        if "% concluído" not in df_gantt_sem_pulmao.columns:
-            df_gantt_sem_pulmao["% concluído"] = 0
-        df_gantt_sem_pulmao["% concluído"] = df_gantt_sem_pulmao["% concluído"].fillna(0).apply(converter_porcentagem)
+    if "% concluído" not in df_gantt_sem_pulmao.columns:
+        df_gantt_sem_pulmao["% concluído"] = 0
+    df_gantt_sem_pulmao["% concluído"] = df_gantt_sem_pulmao["% concluído"].fillna(0).apply(converter_porcentagem)
 
-        # Agrega os dados (usando nomes completos)
-        df_gantt_agg_sem_pulmao = df_gantt_sem_pulmao.groupby(['Empreendimento', 'Etapa']).agg(
-            Inicio_Prevista=('Inicio_Prevista', 'min'),
-            Termino_Prevista=('Termino_Prevista', 'max'),
-            Inicio_Real=('Inicio_Real', 'min'),
-            Termino_Real=('Termino_Real', 'max'),
-            **{'% concluído': ('% concluído', 'max')},
-            SETOR=('SETOR', 'first')
-        ).reset_index()
+    # Agrega os dados (usando nomes completos)
+    df_gantt_agg_sem_pulmao = df_gantt_sem_pulmao.groupby(['Empreendimento', 'Etapa']).agg(
+        Inicio_Prevista=('Inicio_Prevista', 'min'),
+        Termino_Prevista=('Termino_Prevista', 'max'),
+        Inicio_Real=('Inicio_Real', 'min'),
+        Termino_Real=('Termino_Real', 'max'),
+        **{'% concluído': ('% concluído', 'max')},
+        SETOR=('SETOR', 'first')
+    ).reset_index()
 
-        df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
-        # Obter baselines disponíveis
-        if not df.empty:
-                # Se estamos em visão consolidada por etapa, pode ter múltiplos empreendimentos
-                # Mas no modo projeto, geralmente temos um empreendimento principal
-                empreendimentos_no_grafico = df["Empreendimento"].unique()
-                empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
-        else:
-            empreendimento_principal = ""
-        # Mapear o SETOR e GRUPO
-        df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
-        df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
-
-        # Converte o DataFrame FILTRADO agregado em lista de projetos
-        gantt_data_base = converter_dados_para_gantt(df_gantt_agg_sem_pulmao)
-
-        # --- SE NÃO HÁ DADOS FILTRADOS, NÃO FAZ NADA ---
-        if not gantt_data_base:
-            st.warning("Nenhum dado disponível para exibir.")
-            return
-
-        # --- Prepara opções de filtro ---
-        filter_options = {
-            "setores": ["Todos"] + sorted(list(SETOR.keys())),
-            "grupos": ["Todos"] + sorted(list(GRUPOS.keys())),
-            "etapas": ["Todas"] + ORDEM_ETAPAS_NOME_COMPLETO
-        }
-            # DEBUG: Verificar dados
-        print(f"DEBUG gerar_gantt_por_projeto:")
-        print(f"  - DF vazio: {df.empty}")
-        if not df.empty:
-            print(f"  - Empreendimentos: {df['Empreendimento'].unique()}")
-
-        # *** CORREÇÃO: USAR O PRIMEIRO PROJETO DA LISTA EM VEZ DE CRIAR "TODOS OS EMPREENDIMENTOS" ***
-        if gantt_data_base:
-            # Usa o primeiro projeto da lista
-            project = gantt_data_base[0]
-            project_id = f"p_{project['name'].replace(' ', '_').lower()}"
-            correct_project_index_for_js = 0
-        else:
-            return
-
-        # Filtra o DF agregado para cálculo de data_min/max
-        df_para_datas = df_gantt_agg_sem_pulmao
-
-        tasks_base_data = project['tasks'] if project else []
-
-        data_min_proj, data_max_proj = calcular_periodo_datas(df_para_datas)
-        total_meses_proj = ((data_max_proj.year - data_min_proj.year) * 12) + (data_max_proj.month - data_min_proj.month) + 1
-
-        num_tasks = len(project["tasks"]) if project else 0
-        if num_tasks == 0:
-            st.warning("Nenhuma tarefa disponível para exibir.")
-            return
-        
-        if titulo_extra:
-            project["name"] += titulo_extra
-
-            # Obter baselines disponíveis para o primeiro empreendimento (assumindo que é o mesmo para todos no modo projeto único)
-        primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
-        baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
-        
-        # Preparar dados das baselines para JavaScript
-        baselines_data = {}
-        if primeiro_empreendimento and baseline_options:
-            baselines = load_baselines()
-            emp_baselines = baselines.get(primeiro_empreendimento, {})
-            for version_name in baseline_options:
-                if version_name in emp_baselines:
-                    baselines_data[version_name] = emp_baselines[version_name]['data']
-
+    df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
+    # Obter baselines disponíveis
+    if not df.empty:
+        # Se estamos em visão consolidada por etapa, pode ter múltiplos empreendimentos
+        # Mas no modo projeto, geralmente temos um empreendimento principal
+        empreendimentos_no_grafico = df["Empreendimento"].unique()
+        empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
+    else:
         empreendimento_principal = ""
-        baseline_options = []
-        
-        # Obter todos os empreendimentos disponíveis nos dados filtrados
-        todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
-        
-        # Determinar empreendimento atual baseado no filtro ou no primeiro da lista
-        empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
-        
-        # Obter baselines para o empreendimento atual (se for único)
-        baseline_options = []
-        if empreendimento_atual != "Múltiplos":
-            baseline_options = get_baseline_options(empreendimento_atual)
-        
-        # Preparar dados para o JavaScript
-        baselines_por_empreendimento = {}
-        for emp in todos_empreendimentos:
-            emp_baselines = get_baseline_options(emp)
-            if emp_baselines:
-                baselines_por_empreendimento[emp] = emp_baselines
-            # Reduz o fator de multiplicação para evitar excesso de espaço
-            altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
+    # Mapear o SETOR e GRUPO
+    df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
+    df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
 
-        # --- Geração do HTML ---
-        gantt_html = f"""
-        <!DOCTYPE html>
-            <html lang="pt-BR">
-            <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                
-                <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
-                
-                <style>
-                    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                    html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
-                    .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
-                    .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
-                    .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
-                    .gantt-sidebar-header {{ background: linear-gradient(135deg, #4a5568, #2d3748); display: flex; flex-direction: column; height: 60px; flex-shrink: 0; }}
-                    .project-title-row {{ display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 30px; color: white; font-weight: 600; font-size: 14px; }}
-                    .toggle-sidebar-btn {{ background: rgba(255,255,255,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, transform 0.3s ease-in-out; }}
-                    .toggle-sidebar-btn:hover {{ background: rgba(255,255,255,0.4); }}
-                    .sidebar-grid-header-wrapper {{ display: grid; grid-template-columns: 30px 1fr; color: #d1d5db; font-size: 9px; font-weight: 600; text-transform: uppercase; height: 30px; align-items: center; }}
-                    .sidebar-grid-header {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; padding: 0 10px; align-items: center; }}
-                    .sidebar-row {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; }}
-                    .sidebar-cell {{ display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4a5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; border: none; }}
-                    .header-cell {{ text-align: center; }}
-                    .header-cell.task-name-cell {{ text-align: left; }}
-                    .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
-                    
-                    
-                   /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
-                   /* Novos estilos para seletor de baseline */
-                    .baseline-selector {{
-                        position: absolute;
-                        top: 60px;
-                        right: 50px;
-                        z-index: 100;
-                        background: rgba(255, 255, 255, 0.95);
-                        border-radius: 6px;
-                        padding: 10px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-                        border: 1px solid #e2e8f0;
-                        min-width: 200px;
-                    }}
-                    
-                    .baseline-selector select {{
-                        width: 100%;
-                        padding: 6px 8px;
-                        border: 1px solid #cbd5e0;
-                        border-radius: 4px;
-                        font-size: 12px;
-                        background: white;
-                    }}
-                    
-                    .baseline-current {{
-                        background: #e6f3ff;
-                        padding: 4px 8px;
-                        border-radius: 4px;
-                        font-size: 11px;
-                        margin-bottom: 8px;
-                        border-left: 3px solid #3b82f6;
-                    }}
-                    
-                    .baseline-option {{
-                        padding: 6px 8px;
-                        cursor: pointer;
-                        border-radius: 3px;
-                        font-size: 12px;
-                        margin: 2px 0;
-                    }}
-                    
-                    .baseline-option:hover {{
-                        background: #f1f5f9;
-                    }}
-                    
-                    .baseline-option.active {{
-                        background: #3b82f6;
-                        color: white;
-                    }}
+    # Converte o DataFrame FILTRADO agregado em lista de projetos
+    gantt_data_base = converter_dados_para_gantt(df_gantt_agg_sem_pulmao)
 
-                    .baseline-selector-container {{
-                        position: absolute;
-                        top: 10px;
-                        right: 100px;
-                        z-index: 1000;
-                        background: {'#f0f7ff' if baseline_name else 'white'};
-                        border-radius: 6px;
-                        padding: 8px;
-                        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-                        border: 1px solid {'#3b82f6' if baseline_name else '#ccc'};
-                        min-width: 240px;
-                        max-width: 300px;
-                    }}
-                    
-                    .baseline-selector-container select {{
-                        width: 100%;
-                        padding: 6px 8px;
-                        border: 1px solid #aaa;
-                        border-radius: 4px;
-                        font-size: 12px;
-                        background: white;
-                        margin-bottom: 4px;
-                    }}
-                    
-                    .baseline-label {{
-                        font-size: 11px;
-                        color: #333;
-                        margin-bottom: 6px;
-                        font-weight: bold;
-                    }}
-                    
-                    .baseline-info {{
-                        font-size: 10px;
-                        color: #666;
-                        line-height: 1.3;
-                    }}
-                    
-                    .baseline-disabled {{
-                        background: #f5f5f5;
-                        opacity: 0.7;
-                    }}
-                    
-                    .empreendimento-atual {{
-                        font-weight: bold;
-                        color: #3b82f6;
-                    }}
-                    #context-menu {{
-                        position: fixed; /* MUDANÇA: Fixed funciona melhor se estiver dentro do container */
-                        background: white;
-                        border: 1px solid #ccc;
-                        border-radius: 5px;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-                        z-index: 2147483647; /* Máximo Z-Index possível no navegador */
-                        display: none;
-                        font-family: 'Segoe UI', sans-serif;
-                        min-width: 160px;
-                    }}
-                    .context-menu-item {{
-                        padding: 12px 16px;
-                        cursor: pointer;
-                        border-bottom: 1px solid #eee;
-                        font-size: 13px;
-                        color: #333;
-                        display: flex;
-                        align-items: center;
-                        gap: 8px;
-                        transition: background 0.1s;
-                    }}
-                    .context-menu-item:hover {{
-                        background: #f1f3f5;
-                        color: #000;
-                    }}
-                    /* Estilo para o Toast Dinâmico */
-                    .js-toast-loading {{
-                        position: absolute !important; /* Absolute relativo ao container fullscreen */
-                        bottom: 20px;
-                        right: 20px;
-                        background: #333;
-                        color: white;
-                        padding: 12px 24px;
-                        border-radius: 5px;
-                        z-index: 2147483647 !important;
-                        font-size: 14px;
-                        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
-                        display: none;
-                        animation: fadeIn 0.3s;
-                    }}
-                    @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(10px); }} to {{ opacity: 1; transform: translateY(0); }} }}
-                    /* Iframe invisível mas renderizado */
-                    #hidden-iframe {{
-                        position: absolute;
-                        width: 0;
-                        height: 0;
-                        border: 0;
-                        visibility: hidden;
-                    }}
-                    /* Toast de Loading */
-                    .toast-loading {{
-                        position: fixed;
-                        bottom: 20px;
-                        right: 20px;
-                        background: #333;
-                        color: white;
-                        padding: 12px 24px;
-                        border-radius: 4px;
-                        z-index: 10001;
-                        display: none;
-                        font-size: 13px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-                    }}
+    # --- SE NÃO HÁ DADOS FILTRADOS, NÃO FAZ NADA ---
+    if not gantt_data_base:
+        st.warning("Nenhum dado disponível para exibir.")
+        return
 
-                    /* Estilos para agrupamento */
-                    .main-task-row {{ font-weight: 600; }}
-                    .main-task-row.has-subtasks {{ cursor: pointer; }}
-                    .expand-collapse-btn {{
-                        background: none;
-                        border: none;
-                        cursor: pointer;
-                        width: 20px;
-                        height: 20px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-size: 12px;
-                        color: #4a5568;
-                        margin-right: 5px;
-                    }}
-                    .subtask-row {{ 
-                        display: none;
-                        background-color: #f8fafc;
-                        padding-left: 40px;
-                    }}
-                    .subtask-row.visible {{ display: grid; }}
-                    .gantt-subtask-row {{ 
-                        display: none;
-                        background-color: #f8fafc;
-                    }}
-                    .gantt-subtask-row.visible {{ 
-                        display: block !important;
-                    }}
-                    
-                    /* Estilo para barras de etapas pai quando subetapas estão expandidas */
-                    .gantt-bar.parent-task-real.expanded {{
-                        background-color: transparent !important;
-                        border: 2px solid;
-                        box-shadow: none;
-                    }}
-                    .gantt-bar.parent-task-real.expanded .bar-label {{
-                        color: #000000 !important;
-                        text-shadow: 0 1px 2px rgba(255,255,255,0.8);
-                    }}
-                    
-                    .sidebar-group-wrapper {{
-                        display: flex;
-                        border-bottom: 1px solid #e2e8f0;
-                    }}
-                    .gantt-sidebar-content > .sidebar-group-wrapper:last-child {{ border-bottom: none; }}
-                    .sidebar-group-title-vertical {{
-                        width: 30px; background-color: #f8fafc; color: #4a5568;
-                        font-size: 8px; 
-                        font-weight: 700; text-transform: uppercase;
-                        display: flex; align-items: center; justify-content: center;
-                        writing-mode: vertical-rl; transform: rotate(180deg);
-                        flex-shrink: 0; border-right: 1px solid #e2e8f0;
-                        text-align: center; white-space: nowrap; overflow: hidden;
-                        text-overflow: ellipsis; padding: 5px 0; letter-spacing: -0.5px;
-                        align-self: flex-start;
-                    }}
-                    .sidebar-group-spacer {{ display: none; }}
-                    .sidebar-rows-container {{ flex-grow: 1; }}
-                    .sidebar-row.odd-row {{ background-color: #fdfdfd; }}
-                    .sidebar-rows-container .sidebar-row:last-child {{ border-bottom: none; }}
-                    .sidebar-row:hover {{ background-color: #f5f8ff; }}
-                    .sidebar-cell.task-name-cell {{ justify-content: flex-start; font-weight: 600; color: #2d3748; }}
-                    .sidebar-cell.status-green {{ color: #1E8449; font-weight: 700; }}
-                    .sidebar-cell.status-red    {{ color: #C0392B; font-weight: 700; }}
-                    .sidebar-cell.status-yellow{{ color: #B9770E; font-weight: 700; }}
-                    .sidebar-cell.status-default{{ color: #566573; font-weight: 700; }}
-                    .sidebar-row .sidebar-cell:nth-child(2),
-                    .sidebar-row .sidebar-cell:nth-child(3),
-                    .sidebar-row .sidebar-cell:nth-child(4),
-                    .sidebar-row .sidebar-cell:nth-child(5),
-                    .sidebar-row .sidebar-cell:nth-child(6),
-                    .sidebar-row .sidebar-cell:nth-child(7),
-                    .sidebar-row .sidebar-cell:nth-child(8),
-                    .sidebar-row .sidebar-cell:nth-child(9),
-                    .sidebar-row .sidebar-cell:nth-child(10) {{ font-size: 8px; }}
-                    .gantt-row-spacer, .sidebar-row-spacer {{
-                        height: 15px;
-                        border: none;
-                        border-bottom: 1px solid #e2e8f0; 
-                        box-sizing: border-box; 
-                    }}
-                    .gantt-row-spacer {{ background-color: #ffffff; position: relative; z-index: 5; }}
-                    .sidebar-row-spacer {{ background-color: #f8f9fa; }}
-                    .gantt-sidebar-wrapper.collapsed {{ width: 250px; }}
-                    .gantt-sidebar-wrapper.collapsed .sidebar-grid-header, .gantt-sidebar-wrapper.collapsed .sidebar-row {{ grid-template-columns: 1fr; padding: 0 15px 0 10px; }}
-                    .gantt-sidebar-wrapper.collapsed .header-cell:not(.task-name-cell), .gantt-sidebar-wrapper.collapsed .sidebar-cell:not(.task-name-cell) {{ display: none; }}
-                    .gantt-sidebar-wrapper.collapsed .toggle-sidebar-btn {{ transform: rotate(180deg); }}
-                    .gantt-chart-content {{ flex: 1; overflow: auto; position: relative; background-color: white; user-select: none; cursor: grab; }}
-                    .gantt-chart-content.active {{ cursor: grabbing; }}
-                    .chart-container {{ position: relative; min-width: {total_meses_proj * 30}px; }}
-                    .chart-header {{ background: linear-gradient(135deg, #4a5568, #2d3748); color: white; height: 60px; position: sticky; top: 0; z-index: 9; display: flex; flex-direction: column; }}
-                    .year-header {{ height: 30px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); }}
-                    .year-section {{ text-align: center; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); height: 100%; }}
-                    .month-header {{ height: 30px; display: flex; align-items: center; }}
-                    .month-cell {{ width: 30px; height: 30px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; }}
-                    .chart-body {{ position: relative; }}
-                    .gantt-row {{ position: relative; height: 30px; border-bottom: 1px solid #eff2f5; background-color: white; }}
-                    .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                    .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
-                    .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
-                    .gantt-bar.previsto {{ z-index: 7; }}
-                    .gantt-bar.real {{ z-index: 8; }}
-                    .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
-                    .gantt-bar.real .bar-label {{ color: white; }}
-                    .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
-                    .tooltip {{ position: fixed; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
-                    .tooltip.show {{ opacity: 1; }}
-                    .today-line {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
-                    .month-divider {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fcf6f6; z-index: 4; pointer-events: none; }}
-                    .month-divider.first {{ background-color: #eeeeee; width: 1px; }}
-                    .meta-line {{ position: absolute; top: 60px; bottom: 0; width: 2px; border-left: 2px dashed #8e44ad; z-index: 5; box-shadow: 0 0 4px rgba(142, 68, 173, 0.6); }}
-                    .meta-line-label {{ position: absolute; top: 65px; background-color: #8e44ad; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; white-space: nowrap; z-index: 8; transform: translateX(-50%); }}
-                    .gantt-chart-content, .gantt-sidebar-content {{
-                        scrollbar-width: thin;
-                        scrollbar-color: transparent transparent;
-                    }}
-                    .gantt-chart-content:hover, .gantt-sidebar-content:hover {{
-                        scrollbar-color: #d1d5db transparent;
-                    }}
-                    .gantt-chart-content::-webkit-scrollbar,
-                    .gantt-sidebar-content::-webkit-scrollbar {{
-                        height: 8px;
-                        width: 8px;
-                    }}
-                    .gantt-chart-content::-webkit-scrollbar-track,
-                    .gantt-sidebar-content::-webkit-scrollbar-track {{
-                        background: transparent;
-                    }}
-                    .gantt-chart-content::-webkit-scrollbar-thumb,
-                    .gantt-sidebar-content::-webkit-scrollbar-thumb {{
-                        background-color: transparent;
-                        border-radius: 4px;
-                    }}
-                    .gantt-chart-content:hover::-webkit-scrollbar-thumb,
-                    .gantt-sidebar-content:hover::-webkit-scrollbar-thumb {{
-                        background-color: #d1d5db;
-                    }}
-                    .gantt-chart-content:hover::-webkit-scrollbar-thumb:hover,
-                    .gantt-sidebar-content:hover::-webkit-scrollbar-thumb:hover {{
-                        background-color: #a8b2c1;
-                    }}
-                    .gantt-toolbar {{
-                        position: absolute; top: 10px; right: 10px;
-                        z-index: 100;
-                        display: flex;
-                        flex-direction: column;
-                        gap: 5px;
-                        background: rgba(45, 55, 72, 0.9); /* Cor de fundo escura para minimalismo */
-                        border-radius: 6px;
-                        padding: 5px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                    }}
-                    .toolbar-btn {{
-                        background: none;
-                        border: none;
-                        width: 36px;
-                        height: 36px;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        font-size: 20px;
-                        color: white;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        transition: background-color 0.2s, box-shadow 0.2s;
-                        padding: 0;
-                    }}
-                    .toolbar-btn:hover {{
-                        background-color: rgba(255, 255, 255, 0.1);
-                        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
-                    }}
-                    .toolbar-btn.is-fullscreen {{
-                        background-color: #3b82f6; /* Cor de destaque para o botão ativo */
-                        box-shadow: 0 0 0 2px #3b82f6;
-                    }}
-                    .toolbar-btn.is-fullscreen:hover {{
-                        background-color: #2563eb;
-                    }}
-                    .floating-filter-menu {{
-                        display: none;
-                        position: absolute;
-                        top: 10px; right: 50px; /* Ajuste a posição para abrir ao lado da barra de ferramentas */
-                        width: 280px;
-                        background: white;
-                        border-radius: 8px;
-                        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                        z-index: 99;
-                        padding: 15px;
-                        border: 1px solid #e2e8f0;
-                    }}
-                    .floating-filter-menu.is-open {{
-                        display: block;
-                    }}
-                    .filter-group {{ margin-bottom: 12px; }}
-                    .filter-group label {{
-                        display: block;
-                        font-size: 11px; font-weight: 600;
-                        color: #4a5568; margin-bottom: 4px;
-                        text-transform: uppercase;
-                    }}
-                    .filter-group select, .filter-group input[type=number] {{
-                        width: 100%;
-                        padding: 6px 8px;
-                        border: 1px solid #cbd5e0;
-                        border-radius: 4px;
-                        font-size: 13px;
-                    }}
-                    .filter-group-radio, .filter-group-checkbox {{
-                        display: flex; align-items: center;
-                        padding: 5px 0;
-                    }}
-                    .filter-group-radio input, .filter-group-checkbox input {{
-                        width: auto; margin-right: 8px;
-                    }}
-                    .filter-group-radio label, .filter-group-checkbox label {{
-                        font-size: 13px; font-weight: 500;
-                        color: #2d3748; margin-bottom: 0; text-transform: none;
-                    }}
-                    .filter-apply-btn {{
-                        width: 100%; padding: 8px; font-size: 14px; font-weight: 600;
-                        color: white; background-color: #2d3748;
-                        border: none; border-radius: 4px; cursor: pointer;
-                        margin-top: 5px;
-                    }}
+    # --- Prepara opções de filtro ---
+    filter_options = {
+        "setores": ["Todos"] + sorted(list(SETOR.keys())),
+        "grupos": ["Todos"] + sorted(list(GRUPOS.keys())),
+        "etapas": ["Todas"] + ORDEM_ETAPAS_NOME_COMPLETO
+    }
+    # DEBUG: Verificar dados
+    print(f"DEBUG gerar_gantt_por_projeto:")
+    print(f"  - DF vazio: {df.empty}")
+    if not df.empty:
+        print(f"  - Empreendimentos: {df['Empreendimento'].unique()}")
 
-                    .floating-filter-menu .vscomp-toggle-button {{
-                        border: 1px solid #cbd5e0;
-                        border-radius: 4px;
-                        padding: 6px 8px;
-                        font-size: 13px;
-                        min-height: 30px;
-                    }}
-                    .floating-filter-menu .vscomp-options {{
-                        font-size: 13px;
-                    }}
-                    .floating-filter-menu .vscomp-option {{
-                        min-height: 30px;
-                    }}
-                    .floating-filter-menu .vscomp-search-input {{
-                        height: 30px;
-                        font-size: 13px;
-                    }}
-                </style>
-            </head>
-            <body>
-                <script id="grupos-gantt-data" type="application/json">{json.dumps(GRUPOS)}</script>
-                <script id="subetapas-data" type="application/json">{json.dumps(SUBETAPAS)}</script>
-                <div id="context-menu">
-                <div class="context-menu-item" id="ctx-baseline">📸 Criar Linha de Base</div>
-                <div class="context-menu-item" style="color: #999; cursor: default;">🚫 Deletar (Em breve)</div>
+    # *** CORREÇÃO: USAR O PRIMEIRO PROJETO DA LISTA EM VEZ DE CRIAR "TODOS OS EMPREENDIMENTOS" ***
+    if gantt_data_base:
+        # Usa o primeiro projeto da lista
+        project = gantt_data_base[0]
+        project_id = f"p_{project['name'].replace(' ', '_').lower()}"
+        correct_project_index_for_js = 0
+    else:
+        return
+
+    # Filtra o DF agregado para cálculo de data_min/max
+    df_para_datas = df_gantt_agg_sem_pulmao
+
+    tasks_base_data = project['tasks'] if project else []
+
+    data_min_proj, data_max_proj = calcular_periodo_datas(df_para_datas)
+    total_meses_proj = ((data_max_proj.year - data_min_proj.year) * 12) + (data_max_proj.month - data_min_proj.month) + 1
+
+    num_tasks = len(project["tasks"]) if project else 0
+    if num_tasks == 0:
+        st.warning("Nenhuma tarefa disponível para exibir.")
+        return
+
+    if titulo_extra:
+        project["name"] += titulo_extra
+
+    # Obter baselines disponíveis para o primeiro empreendimento (assumindo que é o mesmo para todos no modo projeto único)
+    primeiro_empreendimento = df["Empreendimento"].iloc[0] if not df.empty else ""
+    baseline_options = get_baseline_options(primeiro_empreendimento) if primeiro_empreendimento else []
+
+    # Preparar dados das baselines para JavaScript
+    baselines_por_empreendimento = {}
+    if primeiro_empreendimento:
+        baselines_por_empreendimento[primeiro_empreendimento] = baseline_options
+
+    # Reduz o fator de multiplicação para evitar excesso de espaço
+    altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
+
+    # --- Geração do HTML ---
+    gantt_html = f"""
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
+        <style>
+            * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+            html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
+            .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
+            .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
+            .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
+            .gantt-sidebar-header {{ background: linear-gradient(135deg, #4a5568, #2d3748); display: flex; flex-direction: column; height: 60px; flex-shrink: 0; }}
+            .project-title-row {{ display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 30px; color: white; font-weight: 600; font-size: 14px; }}
+            .toggle-sidebar-btn {{ background: rgba(255,255,255,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, transform 0.3s ease-in-out; }}
+            .toggle-sidebar-btn:hover {{ background: rgba(255,255,255,0.4); }}
+            .sidebar-grid-header-wrapper {{ display: grid; grid-template-columns: 30px 1fr; color: #d1d5db; font-size: 9px; font-weight: 600; text-transform: uppercase; height: 30px; align-items: center; }}
+            .sidebar-grid-header {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; padding: 0 10px; align-items: center; }}
+            .sidebar-row {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; }}
+            .sidebar-cell {{ display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4a5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; border: none; }}
+            .header-cell {{ text-align: center; }}
+            .header-cell.task-name-cell {{ text-align: left; }}
+            .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
+            .gantt-chart-content {{ flex: 1; overflow: auto; position: relative; background-color: white; user-select: none; cursor: grab; }}
+            .chart-container {{ position: relative; min-width: {total_meses_proj * 30}px; }}
+            .chart-header {{ background: linear-gradient(135deg, #4a5568, #2d3748); color: white; height: 60px; position: sticky; top: 0; z-index: 9; display: flex; flex-direction: column; }}
+            .year-header {{ height: 30px; display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.2); }}
+            .year-section {{ text-align: center; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); height: 100%; }}
+            .month-header {{ height: 30px; display: flex; align-items: center; }}
+            .month-cell {{ width: 30px; height: 30px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; }}
+            .chart-body {{ position: relative; }}
+            .gantt-row {{ position: relative; height: 30px; border-bottom: 1px solid #eff2f5; background-color: white; }}
+            .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+            .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
+            .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
+            .gantt-bar.previsto {{ z-index: 7; }}
+            .gantt-bar.real {{ z-index: 8; }}
+            .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
+            .gantt-bar.real .bar-label {{ color: white; }}
+            .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
+            .tooltip {{ position: fixed; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
+            .tooltip.show {{ opacity: 1; }}
+            .today-line {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
+            .month-divider {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fcf6f6; z-index: 4; pointer-events: none; }}
+            .month-divider.first {{ background-color: #eeeeee; width: 1px; }}
+            .meta-line {{ position: absolute; top: 60px; bottom: 0; width: 2px; border-left: 2px dashed #8e44ad; z-index: 5; box-shadow: 0 0 4px rgba(142, 68, 173, 0.6); }}
+            .meta-line-label {{ position: absolute; top: 65px; background-color: #8e44ad; color: white; padding: 2px 5px; border-radius: 4px; font-size: 9px; font-weight: 600; white-space: nowrap; z-index: 8; transform: translateX(-50%); }}
+            .gantt-chart-content, .gantt-sidebar-content {{ scrollbar-width: thin; scrollbar-color: transparent transparent; }}
+            .gantt-chart-content:hover, .gantt-sidebar-content:hover {{ scrollbar-color: #d1d5db transparent; }}
+            .gantt-chart-content::-webkit-scrollbar, .gantt-sidebar-content::-webkit-scrollbar {{ height: 8px; width: 8px; }}
+            .gantt-chart-content::-webkit-scrollbar-track, .gantt-sidebar-content::-webkit-scrollbar-track {{ background: transparent; }}
+            .gantt-chart-content::-webkit-scrollbar-thumb, .gantt-sidebar-content::-webkit-scrollbar-thumb {{ background-color: transparent; border-radius: 4px; }}
+            .gantt-chart-content:hover::-webkit-scrollbar-thumb, .gantt-sidebar-content:hover::-webkit-scrollbar-thumb {{ background-color: #d1d5db; }}
+            .gantt-chart-content:hover::-webkit-scrollbar-thumb:hover, .gantt-sidebar-content:hover::-webkit-scrollbar-thumb:hover {{ background-color: #a8b2c1; }}
+            .gantt-toolbar {{
+                position: absolute; top: 10px; right: 10px;
+                z-index: 100;
+                display: flex;
+                flex-direction: column;
+                gap: 5px;
+                background: rgba(45, 55, 72, 0.9); /* Cor de fundo escura para minimalismo */
+                border-radius: 6px;
+                padding: 5px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            }}
+            .toolbar-btn {{
+                background: none;
+                border: none;
+                width: 36px;
+                height: 36px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 20px;
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: background-color 0.2s, box-shadow 0.2s;
+                padding: 0;
+            }}
+            .toolbar-btn:hover {{
+                background-color: rgba(255, 255, 255, 0.1);
+                box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+            }}
+            .toolbar-btn.is-fullscreen {{
+                background-color: #3b82f6; /* Cor de destaque para o botão ativo */
+                box-shadow: 0 0 0 2px #3b82f6;
+            }}
+            .toolbar-btn.is-fullscreen:hover {{
+                background-color: #2563eb;
+            }}
+            .floating-filter-menu {{
+                display: none;
+                position: absolute;
+                top: 10px; right: 50px; /* Ajuste a posição para abrir ao lado da barra de ferramentas */
+                width: 280px;
+                background: white;
+                border-radius: 8px;
+                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                z-index: 99;
+                padding: 15px;
+                border: 1px solid #e2e8f0;
+            }}
+            .floating-filter-menu.is-open {{
+                display: block;
+            }}
+            .filter-group {{ margin-bottom: 12px; }}
+            .filter-group label {{
+                display: block;
+                font-size: 11px; font-weight: 600;
+                color: #4a5568; margin-bottom: 4px;
+                text-transform: uppercase;
+            }}
+            .filter-group select, .filter-group input[type=number] {{
+                width: 100%;
+                padding: 6px 8px;
+                border: 1px solid #cbd5e0;
+                border-radius: 4px;
+                font-size: 13px;
+            }}
+            .filter-group-radio, .filter-group-checkbox {{
+                display: flex;
+                align-items: center;
+                padding: 5px 0;
+            }}
+            .filter-group-radio input, .filter-group-checkbox input {{
+                width: auto;
+                margin-right: 8px;
+            }}
+            .filter-group-radio label, .filter-group-checkbox label {{
+                font-size: 13px;
+                font-weight: 500;
+                color: #2d3748;
+                margin-bottom: 0;
+                text-transform: none;
+            }}
+            .filter-apply-btn {{
+                width: 100%;
+                padding: 8px;
+                font-size: 14px;
+                font-weight: 600;
+                color: white;
+                background-color: #2d3748;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-top: 5px;
+            }}
+            .floating-filter-menu .vscomp-toggle-button {{
+                border: 1px solid #cbd5e0;
+                border-radius: 4px;
+                padding: 6px 8px;
+                font-size: 13px;
+                min-height: 30px;
+            }}
+            .floating-filter-menu .vscomp-options {{
+                font-size: 13px;
+            }}
+            .floating-filter-menu .vscomp-option {{
+                min-height: 30px;
+            }}
+            .floating-filter-menu .vscomp-search-input {{
+                height: 30px;
+                font-size: 13px;
+            }}
+            .baseline-selector {{
+                position: absolute;
+                top: 60px;
+                right: 50px;
+                z-index: 100;
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 6px;
+                padding: 10px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                border: 1px solid #e2e8f0;
+                min-width: 200px;
+            }}
+            .baseline-selector select {{
+                width: 100%;
+                padding: 6px 8px;
+                border: 1px solid #aaa;
+                border-radius: 4px;
+                font-size: 12px;
+                background: white;
+                margin-bottom: 4px;
+            }}
+            .baseline-label {{
+                font-size: 11px;
+                color: #333;
+                margin-bottom: 6px;
+                font-weight: bold;
+            }}
+            .baseline-info {{
+                font-size: 10px;
+                color: #666;
+                line-height: 1.3;
+            }}
+            .baseline-disabled {{
+                background: #f5f5f5;
+                opacity: 0.7;
+            }}
+            .baseline-current {{
+                background: #e6f3ff;
+                padding: 4px 8px;
+                border-radius: 4px;
+                font-size: 11px;
+                margin-bottom: 8px;
+                border-left: 3px solid #3b82f6;
+            }}
+            .baseline-option {{
+                padding: 6px 8px;
+                cursor: pointer;
+                border-radius: 3px;
+                font-size: 12px;
+                margin: 2px 0;
+            }}
+            .baseline-option:hover {{
+                background: #f1f5f9;
+            }}
+            .baseline-option.active {{
+                background: #3b82f6;
+                color: white;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="gantt-container" id="gantt-container-{project['id']}">
+            <div class="gantt-toolbar" id="gantt-toolbar-{project['id']}">
+                <button class="toolbar-btn" id="filter-btn-{project['id']}" title="Filtros">
+                    <span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+                        </svg>
+                    </span>
+                </button>
+                <button class="toolbar-btn" id="fullscreen-btn-{project['id']}" title="Tela Cheia">
+                    <span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                        </svg>
+                    </span>
+                </button>
             </div>
-            
-            <iframe id="hidden-iframe" name="hidden-iframe"></iframe>
-            <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
-                <div class="gantt-container" id="gantt-container-{project['id']}">
-                <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
-                    <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
-                        <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                            </svg>
-                        </span>
-                    </button>
-                    <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
-                        <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
-                            </svg>
-                        </span>
-                    </button>
+            <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
+                <div class="baseline-current" id="current-baseline-{project['id']}">
+                    {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                 </div>
-                <!-- Seletor de Baseline no Menu Flutuante -->
-                <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
-                    <div class="baseline-current" id="current-baseline-{project['id']}">
-                        {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
-                    </div>
-                    <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
-                        <option value="P0-(padrão)">P0-(padrão)</option>
-                        {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
-                    </select>
+                <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
+                    <option value="P0-(padrão)">P0-(padrão)</option>
+                    {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
+                </select>
+            </div>
+            <div class="floating-filter-menu" id="filter-menu-{project['id']}">
+                <div class="filter-group">
+                    <label for="filter-project-{project['id']}">Empreendimento</label>
+                    <select id="filter-project-{project['id']}"></select>
                 </div>
-                    <div class="floating-filter-menu" id="filter-menu-{project['id']}">
-                        <div class="filter-group">
-                            <label for="filter-project-{project['id']}">Empreendimento</label>
-                            <select id="filter-project-{project['id']}"></select>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filter-setor-{project['id']}">Setor</label>
-                            
-                            <div id="filter-setor-{project['id']}"></div>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filter-grupo-{project['id']}">Grupo</label>
-                            
-                            <div id="filter-grupo-{project['id']}"></div>
-                        </div>
-                        <div class="filter-group">
-                            <label for="filter-etapa-{project['id']}">Etapa</label>
-                            
-                            <div id="filter-etapa-{project['id']}"></div>
-                        </div>
-                        <div class="filter-group">
-                            <div class="filter-group-checkbox">
-                                <input type="checkbox" id="filter-concluidas-{project['id']}">
-                                <label for="filter-concluidas-{project['id']}">Mostrar apenas não concluídas</label>
-                            </div>
-                        </div>
-                        <div class="filter-group">
-                            <label>Visualização</label>
-                            <div class="filter-group-radio">
-                                <input type="radio" id="filter-vis-ambos-{project['id']}" name="filter-vis-{project['id']}" value="Ambos" checked>
-                                <label for="filter-vis-ambos-{project['id']}">Ambos</label>
-                            </div>
-                            <div class="filter-group-radio">
-                                <input type="radio" id="filter-vis-previsto-{project['id']}" name="filter-vis-{project['id']}" value="Previsto">
-                                <label for="filter-vis-previsto-{project['id']}">Previsto</label>
-                            </div>
-                            <div class="filter-group-radio">
-                                <input type="radio" id="filter-vis-real-{project['id']}" name="filter-vis-{project['id']}" value="Real">
-                                <label for="filter-vis-real-{project['id']}">Real</label>
-                            </div>
-                        </div>
-                        <div class="filter-group">
-                            <label>Simulação Pulmão</label>
-                            <div class="filter-group-radio">
-                                <input type="radio" id="filter-pulmao-sem-{project['id']}" name="filter-pulmao-{project['id']}" value="Sem Pulmão">
-                                <label for="filter-pulmao-sem-{project['id']}">Sem Pulmão</label>
-                            </div>
-                            <div class="filter-group-radio">
-                                <input type="radio" id="filter-pulmao-com-{project['id']}" name="filter-pulmao-{project['id']}" value="Com Pulmão">
-                                <label for="filter-pulmao-com-{project['id']}">Com Pulmão</label>
-                            </div>
-                            <div class="filter-group" id="pulmao-meses-group-{project['id']}" style="margin-top: 8px; display: none; padding-left: 25px;">
-                                <label for="filter-pulmao-meses-{project['id']}" style="font-size: 12px; font-weight: 500;">Meses de Pulmão:</label>
-                                <input type="number" id="filter-pulmao-meses-{project['id']}" value="{pulmao_meses}" min="0" max="36" step="1" style="padding: 4px 6px; font-size: 12px; height: 28px; width: 80px;">
-                            </div>
-                            </div>
-                        <button class="filter-apply-btn" id="filter-apply-btn-{project['id']}">Aplicar Filtros</button>
+                <div class="filter-group">
+                    <label for="filter-setor-{project['id']}">Setor</label>
+                    <div id="filter-setor-{project['id']}"></div>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-grupo-{project['id']}">Grupo</label>
+                    <div id="filter-grupo-{project['id']}"></div>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-etapa-{project['id']}">Etapa</label>
+                    <div id="filter-etapa-{project['id']}"></div>
+                </div>
+                <div class="filter-group">
+                    <div class="filter-group-checkbox">
+                        <input type="checkbox" id="filter-concluidas-{project['id']}">
+                        <label for="filter-concluidas-{project['id']}">Mostrar apenas não concluídas</label>
                     </div>
-
-                    <div class="gantt-main">
-                        <div class="gantt-sidebar-wrapper" id="gantt-sidebar-wrapper-{project['id']}">
-                            <div class="gantt-sidebar-header">
-                                <div class="project-title-row">
-                                    <span>{project["name"]}</span>
-                                    <button class="toggle-sidebar-btn" id="toggle-sidebar-btn-{project['id']}" title="Recolher/Expandir Tabela">«</button>
-                                </div>
-                                <div class="sidebar-grid-header-wrapper">
-                                    <div></div>
-                                    <div class="sidebar-grid-header">
-                                        <div class="header-cell task-name-cell">SERVIÇO</div>
-                                        <div class="header-cell">INÍCIO-P</div>
-                                        <div class="header-cell">TÉRMINO-P</div>
-                                        <div class="header-cell">DUR-P</div>
-                                        <div class="header-cell">INÍCIO-R</div>
-                                        <div class="header-cell">TÉRMINO-R</div>
-                                        <div class="header-cell">DUR-R</div>
-                                        <div class="header-cell">%</div>
-                                        <div class="header-cell">VT</div>
-                                        <div class="header-cell">VD</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="gantt-sidebar-content" id="gantt-sidebar-content-{project['id']}"></div>
+                </div>
+                <div class="filter-group">
+                    <label>Visualização</label>
+                    <div class="filter-group-radio">
+                        <input type="radio" id="filter-vis-ambos-{project['id']}" name="filter-vis-{project['id']}" value="Ambos" checked>
+                        <label for="filter-vis-ambos-{project['id']}">Ambos</label>
+                    </div>
+                    <div class="filter-group-radio">
+                        <input type="radio" id="filter-vis-previsto-{project['id']}" name="filter-vis-{project['id']}" value="Previsto">
+                        <label for="filter-vis-previsto-{project['id']}">Previsto</label>
+                    </div>
+                    <div class="filter-group-radio">
+                        <input type="radio" id="filter-vis-real-{project['id']}" name="filter-vis-{project['id']}" value="Real">
+                        <label for="filter-vis-real-{project['id']}">Real</label>
+                    </div>
+                </div>
+                <div class="filter-group">
+                    <label>Simulação Pulmão</label>
+                    <div class="filter-group-radio">
+                        <input type="radio" id="filter-pulmao-sem-{project['id']}" name="filter-pulmao-{project['id']}" value="Sem Pulmão">
+                        <label for="filter-pulmao-sem-{project['id']}">Sem Pulmão</label>
+                    </div>
+                    <div class="filter-group-radio">
+                        <input type="radio" id="filter-pulmao-com-{project['id']}" name="filter-pulmao-{project['id']}" value="Com Pulmão">
+                        <label for="filter-pulmao-com-{project['id']}">Com Pulmão</label>
+                    </div>
+                    <div class="filter-group" id="pulmao-meses-group-{project['id']}" style="margin-top: 8px; display: none; padding-left: 25px;">
+                        <label for="filter-pulmao-meses-{project['id']}" style="font-size: 12px; font-weight: 500;">Meses de Pulmão:</label>
+                        <input type="number" id="filter-pulmao-meses-{project['id']}" value="{pulmao_meses}" min="0" max="36" step="1" style="padding: 4px 6px; font-size: 12px; height: 28px; width: 80px;">
+                    </div>
+                </div>
+                <button class="filter-apply-btn" id="filter-apply-btn-{project['id']}">Aplicar Filtros</button>
+            </div>
+            <div class="gantt-main">
+                <div class="gantt-sidebar-wrapper" id="gantt-sidebar-wrapper-{project['id']}">
+                    <div class="gantt-sidebar-header">
+                        <div class="project-title-row">
+                            <span>{project["name"]}</span>
+                            <button class="toggle-sidebar-btn" id="toggle-sidebar-btn-{project['id']}" title="Recolher/Expandir Tabela">«</button>
                         </div>
-                        <div class="gantt-chart-content" id="gantt-chart-content-{project['id']}">
-                            <div class="chart-container" id="chart-container-{project["id"]}">
-                                <div class="chart-header">
-                                    <div class="year-header" id="year-header-{project["id"]}"></div>
-                                    <div class="month-header" id="month-header-{project["id"]}"></div>
-                                </div>
-                                <div class="chart-body" id="chart-body-{project["id"]}"></div>
-                                <div class="today-line" id="today-line-{project["id"]}"></div>
-                                <div class="meta-line" id="meta-line-{project["id"]}"></div>
-                                <div class="meta-line-label" id="meta-line-label-{project["id"]}"></div>
+                        <div class="sidebar-grid-header-wrapper">
+                            <div></div>
+                            <div class="sidebar-grid-header">
+                                <div class="header-cell task-name-cell">SERVIÇO</div>
+                                <div class="header-cell">INÍCIO-P</div>
+                                <div class="header-cell">TÉRMINO-P</div>
+                                <div class="header-cell">DUR-P</div>
+                                <div class="header-cell">INÍCIO-R</div>
+                                <div class="header-cell">TÉRMINO-R</div>
+                                <div class="header-cell">DUR-R</div>
+                                <div class="header-cell">%</div>
+                                <div class="header-cell">VT</div>
+                                <div class="header-cell">VD</div>
                             </div>
                         </div>
                     </div>
-                    <div class="tooltip" id="tooltip-{project["id"]}"></div>
-
-                    <iframe id="hidden-iframe" name="hidden-iframe" style="display:none;"></iframe>
+                    <div class="gantt-sidebar-content" id="gantt-sidebar-content-{project['id']}"></div>
+                </div>
+                <div class="gantt-chart-content" id="gantt-chart-content-{project['id']}">
+                    <div class="chart-container" id="chart-container-{project['id']}">
+                        <div class="chart-header">
+                            <div class="year-header" id="year-header-{project['id']}"></div>
+                            <div class="month-header" id="month-header-{project['id']}"></div>
+                        </div>
+                        <div class="chart-body" id="chart-body-{project['id']}"></div>
+                        <div class="today-line" id="today-line-{project['id']}"></div>
+                        <div class="meta-line" id="meta-line-{project['id']}"></div>
+                        <div class="meta-line-label" id="meta-line-label-{project['id']}"></div>
                     </div>
-                
-                <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
-                
-
-                <script>
-                    // DEBUG: Verificar dados
-                    
-                    const baselinesData = {json.dumps(baselines_data)};
-                    const currentBaseline = {json.dumps(baseline_name)};
-                    const projectName = {json.dumps(primeiro_empreendimento)};
-                    console.log('Inicializando Gantt para projeto:', '{project["name"]}');
-                    
-                    const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
-
-                    const allProjectsData = {json.dumps(gantt_data_base)};
-
-                    let currentProjectIndex = {correct_project_index_for_js};
-                    const initialProjectIndex = {correct_project_index_for_js};
-
-                    let projectData = {json.dumps([project])};
-
-                    // Datas originais (Python)
-                    const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
-                    const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
-
-                    let activeDataMinStr = dataMinStr;
-                    let activeDataMaxStr = dataMaxStr;
-
-                    const initialTipoVisualizacao = '{tipo_visualizacao}';
-                    let tipoVisualizacao = '{tipo_visualizacao}';
-                    const PIXELS_PER_MONTH = 30;
-
-                    // --- ESTRUTURA DE SUBETAPAS ---
-                    const SUBETAPAS = JSON.parse(document.getElementById('subetapas-data').textContent);
-                    
-                    // Mapeamento reverso para encontrar etapa pai
-                    const ETAPA_PAI_POR_SUBETAPA = {{}};
-                    for (const [etapaPai, subetapas] of Object.entries(SUBETAPAS)) {{
-                        for (const subetapa of subetapas) {{
-                            ETAPA_PAI_POR_SUBETAPA[subetapa] = etapaPai;
-                        }}
+                </div>
+            </div>
+            <div class="tooltip" id="tooltip-{project['id']}"></div>
+            <iframe id="hidden-iframe" name="hidden-iframe" style="display:none;"></iframe>
+        </div>
+        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
+        <script>
+                {{
+                // DEBUG: Verificar dados
+                console.log('Inicializando Gantt para projeto:', '{project['name']}');
+                const coresPorSetor = {{json.dumps(StyleConfig.CORES_POR_SETOR)}};
+                const allProjectsData = {{json.dumps(gantt_data_base)}};
+                let currentProjectIndex = {correct_project_index_for_js};
+                const initialProjectIndex = {correct_project_index_for_js};
+                let projectData = {{json.dumps([project])}};
+                const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
+                const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
+                let activeDataMinStr = dataMinStr;
+                let activeDataMaxStr = dataMaxStr;
+                const initialTipoVisualizacao = '{tipo_visualizacao}';
+                let tipoVisualizacao = '{tipo_visualizacao}';
+                const PIXELS_PER_MONTH = 30;
+                const SUBETAPAS = JSON.parse(document.getElementById('subetapas-data').textContent);
+                const ETAPA_PAI_POR_SUBETAPA = {{}};
+                for (const [etapaPai, subetapas] of Object.entries(SUBETAPAS)) {{
+                    for (const subetapa of subetapas) {{
+                        ETAPA_PAI_POR_SUBETAPA[subetapa] = etapaPai;
                     }}
-
-                    // --- INÍCIO HELPERS DE DATA E PULMÃO ---
-                    const etapas_pulmao = ["PULMÃO VENDA", "PULMÃO INFRA", "PULMÃO RADIER"];
-                    const etapas_sem_alteracao = ["PROSPECÇÃO", "RADIER", "DEMANDA MÍNIMA", "PE. ÁREAS COMUNS (URB)", "PE. ÁREAS COMUNS (ENG)", "ORÇ. ÁREAS COMUNS", "SUP. ÁREAS COMUNS", "EXECUÇÃO ÁREAS COMUNS"];
-
-                    const formatDateDisplay = (dateStr) => {{
-                        if (!dateStr) return "N/D";
-                        const d = parseDate(dateStr);
-                        if (!d || isNaN(d.getTime())) return "N/D";
-                        const day = String(d.getUTCDate()).padStart(2, '0');
-                        const month = String(d.getUTCMonth() + 1).padStart(2, '0');
-                        const year = String(d.getUTCFullYear()).slice(-2);
-                        return `${{day}}/${{month}}/${{year}}`;
+                }}
+                const filterOptions = {{json.dumps(filter_options)}};
+                let allTasks_baseData = {{json.dumps(tasks_base_data)}};
+                const initialPulmaoStatus = '{pulmao_status}';
+                const initialPulmaoMeses = {pulmao_meses};
+                let pulmaoStatus = '{pulmao_status}';
+                let filtersPopulated = false;
+                let vsSetor, vsGrupo, vsEtapa;
+                const etapas_pulmao = ["PULMÃO VENDA", "PULMÃO INFRA", "PULMÃO RADIER"];
+                const etapas_sem_alteracao = ["PROSPECÇÃO", "RADIER", "DEMANDA MÍNIMA", "PE. ÁREAS COMUNS (URB)", "PE. ÁREAS COMUNS (ENG)", "ORÇ. ÁREAS COMUNS", "SUP. ÁREAS COMUNS", "EXECUÇÃO ÁREAS COMUNS"];
+                
+                const formatDateDisplay = (dateStr) => {{
+                    if (!dateStr) return "N/D";
+                    const d = parseDate(dateStr);
+                    if (!d || isNaN(d.getTime())) return "N/D";
+                    const day = String(d.getUTCDate()).padStart(2, '0');
+                    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const year = String(d.getUTCFullYear()).slice(-2);
+                    return `${{day}}/${{month}}/${{year}}`;
+                }};
+                
+                function addMonths(dateStr, months) {{
+                    if (!dateStr) return null;
+                    const date = parseDate(dateStr);
+                    if (!date || isNaN(date.getTime())) return null;
+                    const originalDay = date.getUTCDate();
+                    date.setUTCMonth(date.getUTCMonth() + months);
+                    if (date.getUTCDate() !== originalDay) {{
+                        date.setUTCDate(0);
+                    }}
+                    return date.toISOString().split('T')[0];
+                }}
+                
+                function parseDate(dateStr) {{ 
+                    if (!dateStr) return null; 
+                    const [year, month, day] = dateStr.split('-').map(Number); 
+                    return new Date(Date.UTC(year, month - 1, day)); 
+                }}
+                
+                function findNewDateRange(tasks) {{
+                    let minDate = null;
+                    let maxDate = null;
+                    
+                    const updateRange = (dateStr) => {{
+                        if (!dateStr) return;
+                        const date = parseDate(dateStr);
+                        if (!date || isNaN(date.getTime())) return;
+                        if (!minDate || date < minDate) {{
+                            minDate = date;
+                        }}
+                        if (!maxDate || date > maxDate) {{
+                            maxDate = date;
+                        }}
                     }};
                     
-                    function addMonths(dateStr, months) {{
-                        if (!dateStr) return null;
-                        const date = parseDate(dateStr);
-                        if (!date || isNaN(date.getTime())) return null;
-                        const originalDay = date.getUTCDate();
-                        date.setUTCMonth(date.getUTCMonth() + months);
-                        if (date.getUTCDate() !== originalDay) {{
-                            date.setUTCDate(0);
-                        }}
-                        return date.toISOString().split('T')[0];
-                    }}
-                    // --- FIM HELPERS DE DATA E PULMÃO ---
-
-                    const filterOptions = {json.dumps(filter_options)};
-
-                    let allTasks_baseData = {json.dumps(tasks_base_data)};
-
-                    const initialPulmaoStatus = '{pulmao_status}';
-                    const initialPulmaoMeses = {pulmao_meses};
-
-                    let pulmaoStatus = '{pulmao_status}';
-                    let filtersPopulated = false;
-
-                    // *** INÍCIO: Variáveis Globais para Virtual Select ***
-                    let vsSetor, vsGrupo, vsEtapa;
-                    // *** FIM: Variáveis Globais para Virtual Select ***
-
-                    function parseDate(dateStr) {{ 
-                        if (!dateStr) return null; 
-                        const [year, month, day] = dateStr.split('-').map(Number); 
-                        return new Date(Date.UTC(year, month - 1, day)); 
-                    }}
-
-                    function findNewDateRange(tasks) {{
-                        let minDate = null;
-                        let maxDate = null;
-
-                        const updateRange = (dateStr) => {{
-                            if (!dateStr) return;
-                            const date = parseDate(dateStr);
-                            if (!date || isNaN(date.getTime())) return;
-
-                            if (!minDate || date < minDate) {{
-                                minDate = date;
-                            }}
-                            if (!maxDate || date > maxDate) {{
-                                maxDate = date;
-                            }}
-                        }};
-
-                        tasks.forEach(task => {{
-                            updateRange(task.start_previsto);
-                            updateRange(task.end_previsto);
-                            updateRange(task.start_real);
-                            updateRange(task.end_real_original_raw || task.end_real);
-                        }});
-
-                        return {{
-                            min: minDate ? minDate.toISOString().split('T')[0] : null,
-                            max: maxDate ? maxDate.toISOString().split('T')[0] : null
-                        }};
-                    }}
-
-                    // --- FUNÇÕES DE AGRUPAMENTO ---
-                    function organizarTasksComSubetapas(tasks) {{
-                        const tasksOrganizadas = [];
-                        const tasksProcessadas = new Set();
-                        
-                        // Primeiro, adiciona todas as etapas principais
-                        tasks.forEach(task => {{
-                            if (tasksProcessadas.has(task.name)) return;
-                            
-                            const etapaPai = ETAPA_PAI_POR_SUBETAPA[task.name];
-                            
-                            // Se é uma subetapa, pula por enquanto
-                            if (etapaPai) return;
-                            
-                            // Se é uma etapa principal que tem subetapas
-                            if (SUBETAPAS[task.name]) {{
-                                const taskPrincipal = {{...task, isMainTask: true, expanded: false}};
-                                tasksOrganizadas.push(taskPrincipal);
-                                tasksProcessadas.add(task.name);
-                                
-                                // Adiciona subetapas
-                                SUBETAPAS[task.name].forEach(subetapaNome => {{
-                                    const subetapa = tasks.find(t => t.name === subetapaNome);
-                                    if (subetapa) {{
-                                        const subetapaComPai = {{
-                                            ...subetapa, 
-                                            isSubtask: true, 
-                                            parentTask: task.name,
-                                            visible: false
-                                        }};
-                                        tasksOrganizadas.push(subetapaComPai);
-                                        tasksProcessadas.add(subetapaNome);
-                                    }}
-                                }});
-                            }} else {{
-                                // É uma etapa principal sem subetapas
-                                tasksOrganizadas.push({{...task, isMainTask: true}});
-                                tasksProcessadas.add(task.name);
-                            }}
-                        }});
-                        
-                        // Adiciona quaisquer tasks que não foram processadas (não estão no mapeamento)
-                        tasks.forEach(task => {{
-                            if (!tasksProcessadas.has(task.name)) {{
-                                tasksOrganizadas.push({{...task, isMainTask: true}});
-                                tasksProcessadas.add(task.name);
-                            }}
-                        }});
-                        
-                        return tasksOrganizadas;
-                    }}
-                    function handleBaselineChange(selectedBaseline) {{
-                        const empreendimento = '{primeiro_empreendimento}';
-                        const timestamp = new Date().getTime();
-                        
-                        // Usar navegação simples
-                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
-                        iframe.src = url;
-                        
-                        // Feedback visual
-                        const select = document.getElementById('baseline-select-{project['id']}');
-                        select.disabled = true;
-                        select.style.opacity = '0.7';
-                        
-                        // Reativar após um tempo
-                        setTimeout(() => {{
-                            select.disabled = false;
-                            select.style.opacity = '1';
-                        }}, 1000);
-                    }}
-                    
-                    // Indicar visualmente qual baseline está ativa
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        const select = document.getElementById('baseline-select-{project['id']}');
-                        const iframe = document.getElementById('hidden-iframe-{project['id']}');
-                        const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                        const empreendimento = '{empreendimento_principal}';
-                        
-                        // Só permitir mudança se houver um empreendimento específico
-                        if (empreendimento === 'Múltiplos' || !empreendimento) {{
-                            select.disabled = true;
-                            select.title = 'Selecione um empreendimento específico para ver baselines';
-                            infoDiv.innerHTML = 'Selecione um empreendimento específico';
-                            infoDiv.style.color = '#ff6b6b';
-                        }}
-                        
-                        select.addEventListener('change', function() {{
-                            if (empreendimento === 'Múltiplos' || !empreendimento) return;
-                            
-                            const selectedBaseline = this.value;
-                            
-                            // Feedback visual
-                            const originalText = infoDiv.innerHTML;
-                            infoDiv.innerHTML = 'Carregando...';
-                            infoDiv.style.color = '#3b82f6';
-                            select.disabled = true;
-                            
-                            // Usar iframe para enviar o comando
-                            const timestamp = new Date().getTime();
-                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
-                            iframe.src = url;
-                            
-                            // Timeout para reativar
-                            setTimeout(() => {{
-                                select.disabled = false;
-                                infoDiv.innerHTML = originalText;
-                                infoDiv.style.color = '#888';
-                            }}, 2000);
-                        }});
+                    tasks.forEach(task => {{
+                        updateRange(task.start_previsto);
+                        updateRange(task.end_previsto);
+                        updateRange(task.start_real);
+                        updateRange(task.end_real_original_raw || task.end_real);
                     }});
-
-                    function toggleSubtasks(taskName) {{
-                        const subtaskRows = document.querySelectorAll('.subtask-row[data-parent="' + taskName + '"]');
-                        const ganttSubtaskRows = document.querySelectorAll('.gantt-subtask-row[data-parent="' + taskName + '"]');
-                        const button = document.querySelector('.expand-collapse-btn[data-task="' + taskName + '"]');
+                    
+                    return {{
+                        min: minDate ? minDate.toISOString().split('T')[0] : null,
+                        max: maxDate ? maxDate.toISOString().split('T')[0] : null
+                    }};
+                }}
+                
+                function organizarTasksComSubetapas(tasks) {{
+                    const tasksOrganizadas = [];
+                    const tasksProcessadas = new Set();
+                    
+                    tasks.forEach(task => {{
+                        if (tasksProcessadas.has(task.name)) return;
                         
-                        const isVisible = subtaskRows[0]?.classList.contains('visible');
+                        const etapaPai = ETAPA_PAI_POR_SUBETAPA[task.name];
+                        if (etapaPai) return;
                         
-                        // Alterna visibilidade
-                        subtaskRows.forEach(row => {{
-                            row.classList.toggle('visible', !isVisible);
-                        }});
+                        const taskPrincipal = {{ ...task, isMainTask: true, expanded: false }};
+                        tasksOrganizadas.push(taskPrincipal);
+                        tasksProcessadas.add(task.name);
                         
-                        ganttSubtaskRows.forEach(row => {{
-                            row.style.display = isVisible ? 'none' : 'block';
-                            row.classList.toggle('visible', !isVisible);
-                        }});
-                        
-                        // Atualiza ícone do botão
-                        if (button) {{
-                            button.textContent = isVisible ? '+' : '-';
-                        }}
-                        
-                        // Atualiza estado no array de tasks
-                        const taskIndex = projectData[0].tasks.findIndex(t => t.name === taskName && t.isMainTask);
-                        if (taskIndex !== -1) {{
-                            projectData[0].tasks[taskIndex].expanded = !isVisible;
-                        }}
-
-                        // Aplica/remove estilo nas barras reais da etapa pai
-                        updateParentTaskBarStyle(taskName, !isVisible);
-                    }}
-
-                    function updateParentTaskBarStyle(taskName, isExpanded) {{
-                        const parentTaskRow = document.querySelector('.gantt-row[data-task="' + taskName + '"]');
-                        if (parentTaskRow) {{
-                            const realBars = parentTaskRow.querySelectorAll('.gantt-bar.real');
-                            realBars.forEach(bar => {{
-                                if (isExpanded) {{
-                                    bar.classList.add('parent-task-real', 'expanded');
-                                    // Define a cor da borda com a mesma cor original
-                                    const originalColor = bar.style.backgroundColor;
-                                    bar.style.borderColor = originalColor;
-                                }} else {{
-                                    bar.classList.remove('parent-task-real', 'expanded');
-                                    bar.style.borderColor = '';
+                        if (SUBETAPAS[task.name]) {{
+                            SUBETAPAS[task.name].forEach(subetapaNome => {{
+                                const subetapa = tasks.find(t => t.name === subetapaNome);
+                                if (subetapa) {{
+                                    const subetapaComPai = {{
+                                        ...subetapa, 
+                                        isSubtask: true, 
+                                        parentTask: task.name,
+                                        visible: false
+                                    }};
+                                    tasksOrganizadas.push(subetapaComPai);
+                                    tasksProcessadas.add(subetapaNome);
                                 }}
                             }});
                         }}
-                    }}
-                    // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
-                (function() {{
-                    // 1. Configuração
-                    const containerId = 'gantt-container-' + '{project["id"]}';
-                    const container = document.getElementById(containerId);
+                    }});
                     
-                    // Garante iframe
-                    let iframe = document.getElementById('hidden-iframe');
-                    if (!iframe) {{
-                        iframe = document.createElement('iframe');
-                        iframe.id = 'hidden-iframe';
-                        iframe.style.display = 'none';
-                        if(container) container.appendChild(iframe);
+                    return tasksOrganizadas;
+                }}
+                
+                function handleBaselineChange(selectedBaseline) {{
+                    const empreendimento = '{primeiro_empreendimento}';
+                    const timestamp = new Date().getTime();
+                    const iframe = document.getElementById('hidden-iframe');
+                    const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimento)}}&t=${{timestamp}}`;
+                    iframe.src = url;
+                }}
+                
+                function toggleSubtasks(taskName) {{
+                    const subtaskRows = document.querySelectorAll('.subtask-row[data-parent="' + taskName + '"]');
+                    const ganttSubtaskRows = document.querySelectorAll('.gantt-subtask-row[data-parent="' + taskName + '"]');
+                    const button = document.querySelector('.expand-collapse-btn[data-task="' + taskName + '"]');
+                    const isVisible = subtaskRows[0]?.classList.contains('visible');
+                    
+                    subtaskRows.forEach(row => {{
+                        row.classList.toggle('visible', !isVisible);
+                    }});
+                    
+                    ganttSubtaskRows.forEach(row => {{
+                        row.style.display = isVisible ? 'none' : 'block';
+                        row.classList.toggle('visible', !isVisible);
+                    }});
+                    
+                    if (button) {{
+                        button.textContent = isVisible ? '+' : '-';
                     }}
-
-                    if (!container) return;
-
-                    // Limpeza visual
-                    const oldMenu = container.querySelector('#context-menu');
-                    if (oldMenu) oldMenu.remove();
-                    const oldToast = container.querySelector('.js-toast-loading');
-                    if (oldToast) oldToast.remove();
-
-                    // 2. Criar Menu
-                    const menu = document.createElement('div');
-                    menu.id = 'context-menu';
-                    menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
-                    menu.innerHTML = `
-                        <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                            <span>📸</span> <b>Criar Linha de Base</b>
-                        </div>
-                    `;
-                    container.appendChild(menu);
-
-                    // 3. Criar Toast
-                    const toast = document.createElement('div');
-                    toast.className = 'js-toast-loading';
-                    toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
-                    container.appendChild(toast);
-
-                    // 4. Listeners
-                    container.addEventListener('contextmenu', function(e) {{
-                        if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
+                    
+                    const taskIndex = projectData[0].tasks.findIndex(t => t.name === taskName && t.isMainTask);
+                    if (taskIndex !== -1) {{
+                        projectData[0].tasks[taskIndex].expanded = !isVisible;
+                    }}
+                    
+                    updateParentTaskBarStyle(taskName, !isVisible);
+                }}
+                
+                function updateParentTaskBarStyle(taskName, isExpanded) {{
+                    const parentTaskRow = document.querySelector('.gantt-row[data-task="' + taskName + '"]');
+                    if (parentTaskRow) {{
+                        const realBars = parentTaskRow.querySelectorAll('.gantt-bar.real');
+                        realBars.forEach(bar => {{
+                            if (isExpanded) {{
+                                bar.classList.add('parent-task-real', 'expanded');
+                                const originalColor = bar.style.backgroundColor;
+                                bar.style.borderColor = originalColor;
+                            }} else {{
+                                bar.classList.remove('parent-task-real', 'expanded');
+                                bar.style.borderColor = '';
+                            }}
+                        }});
+                    }}
+                }}
+                
+                function initGantt() {{
+                    console.log('Iniciando Gantt com dados:', projectData);
+                    
+                    if (!projectData || !projectData[0] || !projectData[0].tasks || projectData[0].tasks.length === 0) {{
+                        console.error('Nenhum dado disponível para renderizar');
+                        document.getElementById('chart-body-{project['id']}').innerHTML = '<div style="padding: 20px; text-align: center; color: red;">Erro: Nenhum dado disponível</div>';
+                        return;
+                    }}
+                    
+                    projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
+                    allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
+                    
+                    applyInitialPulmaoState();
+                    
+                    if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
+                        const {{ min: newMinStr, max: newMaxStr }} = findNewDateRange(projectData[0].tasks);
+                        const newMin = parseDate(newMinStr);
+                        const newMax = parseDate(newMaxStr);
+                        const originalMin = parseDate(activeDataMinStr);
+                        const originalMax = parseDate(activeDataMaxStr);
+                        
+                        let finalMinDate = originalMin;
+                        if (newMin && newMin < finalMinDate) {{
+                            finalMinDate = newMin;
+                        }}
+                        
+                        let finalMaxDate = originalMax;
+                        if (newMax && newMax > finalMaxDate) {{
+                            finalMaxDate = newMax;
+                        }}
+                        
+                        finalMinDate = new Date(finalMinDate.getTime());
+                        finalMaxDate = new Date(finalMaxDate.getTime());
+                        finalMinDate.setUTCDate(1);
+                        finalMaxDate.setUTCMonth(finalMaxDate.getUTCMonth() + 1, 0);
+                        
+                        activeDataMinStr = finalMinDate.toISOString().split('T')[0];
+                        activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
+                    }}
+                    
+                    renderSidebar();
+                    renderHeader();
+                    renderChart();
+                    renderMonthDividers();
+                    setupEventListeners();
+                    positionTodayLine();
+                    positionMetaLine();
+                    populateFilters();
+                }}
+                
+                function applyInitialPulmaoState() {{
+                    if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
+                        const offsetMeses = -initialPulmaoMeses;
+                        let baseTasks = projectData[0].tasks;
+                        
+                        baseTasks.forEach(task => {{
+                            const etapaNome = task.name;
+                            if (etapas_sem_alteracao.includes(etapaNome)) {{
+                                // Não altera datas
+                            }} else if (etapas_pulmao.includes(etapaNome)) {{
+                                // APENAS PREVISTO
+                                task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                            }} else {{
+                                // APENAS PREVISTO
+                                task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                task.end_previsto = addMonths(task.end_previsto, offsetMeses);
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                // NÃO modificar dados reais
+                            }}
+                        }});
+                        
+                        allTasks_baseData = JSON.parse(JSON.stringify(baseTasks));
+                    }}
+                }}
+                
+                function renderSidebar() {{
+                    const sidebarContent = document.getElementById('gantt-sidebar-content-{project['id']}');
+                    const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
+                    const tasks = projectData[0].tasks;
+                    
+                    if (!tasks || tasks.length === 0) {{
+                        sidebarContent.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Nenhuma tarefa disponível para os filtros aplicados</div>';
+                        return;
+                    }}
+                    
+                    let html = '';
+                    let globalRowIndex = 0;
+                    const groupKeys = Object.keys(gruposGantt);
+                    
+                    for (let i = 0; i < groupKeys.length; i++) {{
+                        const grupo = groupKeys[i];
+                        const tasksInGroupNames = gruposGantt[grupo].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
+                        
+                        if (tasksInGroupNames.length === 0) continue;
+                        
+                        const groupHeight = (tasksInGroupNames.length * 30);
+                        html += `<div class="sidebar-group-wrapper">`;
+                        html += `<div class="sidebar-group-title-vertical" style="height: ${{groupHeight}}px;"><span>${{grupo}}</span></div>`;
+                        html += `<div class="sidebar-rows-container">`;
+                        
+                        gruposGantt[grupo].forEach(etapaNome => {{
+                            const task = tasks.find(t => t.name === etapaNome && !t.isSubtask);
+                            if (task) {{
+                                globalRowIndex++;
+                                const rowClass = globalRowIndex % 2 !== 0 ? 'odd-row' : '';
+                                const hasSubtasks = SUBETAPAS[task.name] && SUBETAPAS[task.name].length > 0;
+                                const mainTaskClass = hasSubtasks ? 'main-task-row has-subtasks' : 'main-task-row';
+                                
+                                html += `<div class="sidebar-row ${{mainTaskClass}} ${{rowClass}}" data-task="${{task.name}}">`;
+                                
+                                if (hasSubtasks) {{
+                                    html += `<div class="sidebar-cell task-name-cell" style="display: flex; align-items: center;">`;
+                                    html += `<button class="expand-collapse-btn" data-task="${{task.name}}">${{task.expanded ? '-' : '+'}}</button>`;
+                                    html += `<span title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</span>`;
+                                    html += `</div>`;
+                                }} else {{
+                                    html += `<div class="sidebar-cell task-name-cell" title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</div>`;
+                                }}
+                                
+                                html += `<div class="sidebar-cell">${{task.inicio_previsto}}</div>`;
+                                html += `<div class="sidebar-cell">${{task.termino_previsto}}</div>`;
+                                html += `<div class="sidebar-cell">${{task.duracao_prev_meses}}</div>`;
+                                html += `<div class="sidebar-cell">${{task.inicio_real}}</div>`;
+                                html += `<div class="sidebar-cell">${{task.termino_real}}</div>`;
+                                html += `<div class="sidebar-cell">${{task.duracao_real_meses}}</div>`;
+                                html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.progress}}%</div>`;
+                                html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.vt_text}}</div>`;
+                                html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.vd_text}}</div>`;
+                                html += `</div>`;
+                                
+                                if (hasSubtasks && SUBETAPAS[task.name]) {{
+                                    SUBETAPAS[task.name].forEach(subetapaNome => {{
+                                        const subetapa = tasks.find(t => t.name === subetapaNome && t.isSubtask);
+                                        if (subetapa) {{
+                                            globalRowIndex++;
+                                            const subtaskRowClass = globalRowIndex % 2 !== 0 ? 'odd-row' : '';
+                                            const visibleClass = task.expanded ? 'visible' : '';
+                                            
+                                            html += `<div class="sidebar-row subtask-row ${{subtaskRowClass}} ${{visibleClass}}" data-parent="${{task.name}}">`;
+                                            html += `<div class="sidebar-cell task-name-cell" title="${{subetapa.numero_etapa}}. • ${{subetapa.name}}">${{subetapa.numero_etapa}}. • ${{subetapa.name}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.inicio_previsto}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.termino_previsto}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.duracao_prev_meses}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.inicio_real}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.termino_real}}</div>`;
+                                            html += `<div class="sidebar-cell">${{subetapa.duracao_real_meses}}</div>`;
+                                            html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.progress}}%</div>`;
+                                            html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.vt_text}}</div>`;
+                                            html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.vd_text}}</div>`;
+                                            html += `</div>`;
+                                        }}
+                                    }});
+                                }}
+                            }}
+                        }});
+                        
+                        html += `</div></div>`;
+                        
+                        const tasksInGroup = tasksInGroupNames;
+                        if (i < groupKeys.length - 1 && tasksInGroup.length > 0) {{
+                            const nextGroupKey = groupKeys[i + 1];
+                            const nextGroupTasks = gruposGantt[nextGroupKey].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
+                            if (nextGroupTasks.length > 0) {{
+                                html += `<div class="sidebar-row-spacer"></div>`;
+                            }}
+                        }}
+                    }}
+                    
+                    sidebarContent.innerHTML = html;
+                    
+                    document.querySelectorAll('.expand-collapse-btn').forEach(button => {{
+                        button.addEventListener('click', function(e) {{
+                            e.stopPropagation();
+                            const taskName = this.getAttribute('data-task');
+                            toggleSubtasks(taskName);
+                        }});
+                    }});
+                    
+                    document.querySelectorAll('.main-task-row.has-subtasks').forEach(row => {{
+                        row.addEventListener('click', function() {{
+                            const taskName = this.getAttribute('data-task');
+                            toggleSubtasks(taskName);
+                        }});
+                    }});
+                }}
+                
+                function renderHeader() {{
+                    const yearHeader = document.getElementById('year-header-{project['id']}');
+                    const monthHeader = document.getElementById('month-header-{project['id']}');
+                    let yearHtml = '', monthHtml = '';
+                    const yearsData = [];
+                    
+                    let currentDate = parseDate(activeDataMinStr);
+                    const dataMax = parseDate(activeDataMaxStr);
+                    
+                    if (!currentDate || !dataMax || isNaN(currentDate.getTime()) || isNaN(dataMax.getTime())) {{
+                        yearHeader.innerHTML = "Datas inválidas";
+                        monthHeader.innerHTML = "";
+                        return;
+                    }}
+                    
+                    let currentYear = -1, monthsInCurrentYear = 0;
+                    let totalMonths = 0;
+                    
+                    while (currentDate <= dataMax && totalMonths < 240) {{
+                        const year = currentDate.getUTCFullYear();
+                        if (year !== currentYear) {{
+                            if (currentYear !== -1) yearsData.push({{ year: currentYear, count: monthsInCurrentYear }});
+                            currentYear = year;
+                            monthsInCurrentYear = 0;
+                        }}
+                        
+                        const monthNumber = String(currentDate.getUTCMonth() + 1).padStart(2, '0');
+                        monthHtml += `<div class="month-cell">${{monthNumber}}</div>`;
+                        
+                        monthsInCurrentYear++;
+                        currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
+                        totalMonths++;
+                    }}
+                    
+                    if (currentYear !== -1) yearsData.push({{ year: currentYear, count: monthsInCurrentYear }});
+                    
+                    yearsData.forEach(data => {{
+                        const yearWidth = data.count * PIXELS_PER_MONTH;
+                        yearHtml += `<div class="year-section" style="width:${{yearWidth}}px">${{data.year}}</div>`;
+                    }});
+                    
+                    const chartContainer = document.getElementById('chart-container-{project['id']}');
+                    if (chartContainer) {{
+                        chartContainer.style.minWidth = `${{totalMonths * PIXELS_PER_MONTH}}px`;
+                    }}
+                    
+                    yearHeader.innerHTML = yearHtml;
+                    monthHeader.innerHTML = monthHtml;
+                }}
+                
+                function renderChart() {{
+                    const chartBody = document.getElementById('chart-body-{project['id']}');
+                    const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
+                    const tasks = projectData[0].tasks;
+                    
+                    if (!tasks || tasks.length === 0) {{
+                        chartBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Nenhuma tarefa disponível</div>';
+                        return;
+                    }}
+                    
+                    chartBody.innerHTML = '';
+                    const groupKeys = Object.keys(gruposGantt);
+                    let rowIndex = 0;
+                    
+                    for (let i = 0; i < groupKeys.length; i++) {{
+                        const grupo = groupKeys[i];
+                        const tasksInGroup = gruposGantt[grupo].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
+                        
+                        if (tasksInGroup.length === 0) continue;
+                        
+                        gruposGantt[grupo].forEach(etapaNome => {{
+                            const task = tasks.find(t => t.name === etapaNome && !t.isSubtask);
+                            if (task) {{
+                                const row = document.createElement('div');
+                                row.className = 'gantt-row';
+                                row.setAttribute('data-task', task.name);
+                                
+                                let barPrevisto = null;
+                                if (tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Previsto') {{
+                                    barPrevisto = createBar(task, 'previsto');
+                                    if (barPrevisto) row.appendChild(barPrevisto);
+                                }}
+                                
+                                let barReal = null;
+                                if ((tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Real') && task.start_real && (task.end_real_original_raw || task.end_real)) {{
+                                    barReal = createBar(task, 'real');
+                                    if (barReal) row.appendChild(barReal);
+                                }}
+                                
+                                if (barPrevisto && barReal) {{
+                                    const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
+                                    if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{
+                                        barPrevisto.style.zIndex = '8';
+                                        barReal.style.zIndex = '7';
+                                    }}
+                                    renderOverlapBar(task, row);
+                                }}
+                                
+                                chartBody.appendChild(row);
+                                rowIndex++;
+                                
+                                if (task.expanded) {{
+                                    updateParentTaskBarStyle(task.name, true);
+                                }}
+                                
+                                if (SUBETAPAS[task.name]) {{
+                                    SUBETAPAS[task.name].forEach(subetapaNome => {{
+                                        const subetapa = tasks.find(t => t.name === subetapaNome && t.isSubtask);
+                                        if (subetapa) {{
+                                            const subtaskRow = document.createElement('div');
+                                            subtaskRow.className = 'gantt-row gantt-subtask-row';
+                                            subtaskRow.setAttribute('data-parent', task.name);
+                                            subtaskRow.style.display = task.expanded ? 'block' : 'none';
+                                            if (task.expanded) {{
+                                                subtaskRow.classList.add('visible');
+                                            }}
+                                            
+                                            let subBarPrevisto = null;
+                                            if (tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Previsto') {{
+                                                subBarPrevisto = createBar(subetapa, 'previsto');
+                                                if (subBarPrevisto) subtaskRow.appendChild(subBarPrevisto);
+                                            }}
+                                            
+                                            let subBarReal = null;
+                                            if ((tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Real') && subetapa.start_real && (subetapa.end_real_original_raw || subetapa.end_real)) {{
+                                                subBarReal = createBar(subetapa, 'real');
+                                                if (subBarReal) subtaskRow.appendChild(subBarReal);
+                                            }}
+                                            
+                                            if (subBarPrevisto && subBarReal) {{
+                                                const s_prev = parseDate(subetapa.start_previsto), e_prev = parseDate(subetapa.end_previsto), s_real = parseDate(subetapa.start_real), e_real = parseDate(subetapa.end_real_original_raw || subetapa.end_real);
+                                                if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{
+                                                    subBarPrevisto.style.zIndex = '8';
+                                                    subBarReal.style.zIndex = '7';
+                                                }}
+                                                renderOverlapBar(subetapa, subtaskRow);
+                                            }}
+                                            
+                                            chartBody.appendChild(subtaskRow);
+                                            rowIndex++;
+                                        }}
+                                    }});
+                                }}
+                            }}
+                        }});
+                        
+                        if (i < groupKeys.length - 1 && tasksInGroup.length > 0) {{
+                            const nextGroupKey = groupKeys[i + 1];
+                            const nextGroupTasks = gruposGantt[nextGroupKey].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
+                            if (nextGroupTasks.length > 0) {{
+                                const spacerRow = document.createElement('div');
+                                spacerRow.className = 'gantt-row-spacer';
+                                chartBody.appendChild(spacerRow);
+                                rowIndex++;
+                            }}
+                        }}
+                    }}
+                }}
+                
+                function createBar(task, tipo) {{
+                    const startDate = parseDate(tipo === 'previsto' ? task.start_previsto : task.start_real);
+                    const endDate = parseDate(tipo === 'previsto' ? task.end_previsto : (task.end_real_original_raw || task.end_real));
+                    
+                    if (!startDate || !endDate) return null;
+                    
+                    const left = getPosition(startDate);
+                    const width = Math.max(getPosition(endDate) - left + (PIXELS_PER_MONTH / 30), 5);
+                    
+                    const bar = document.createElement('div');
+                    bar.className = `gantt-bar ${{tipo}}`;
+                    const coresSetor = coresPorSetor[task.setor] || coresPorSetor['Não especificado'] || {{previsto: '#cccccc', real: '#888888'}};
+                    bar.style.backgroundColor = tipo === 'previsto' ? coresSetor.previsto : coresSetor.real;
+                    bar.style.left = `${{left}}px`;
+                    bar.style.width = `${{width}}px`;
+                    
+                    if (width > 40) {{
+                        const barLabel = document.createElement('span');
+                        barLabel.className = 'bar-label';
+                        barLabel.textContent = `${{task.name}} (${{task.progress}}%)`;
+                        bar.appendChild(barLabel);
+                    }}
+                    
+                    bar.addEventListener('mousemove', e => showTooltip(e, task, tipo));
+                    bar.addEventListener('mouseout', () => hideTooltip());
+                    
+                    return bar;
+                }}
+                
+                function renderOverlapBar(task, row) {{
+                    if (!task.start_real || !(task.end_real_original_raw || task.end_real)) return;
+                    
+                    const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
+                    const overlap_start = new Date(Math.max(s_prev, s_real)), overlap_end = new Date(Math.min(e_prev, e_real));
+                    
+                    if (overlap_start < overlap_end) {{
+                        const left = getPosition(overlap_start), width = getPosition(overlap_end) - left + (PIXELS_PER_MONTH / 30);
+                        if (width > 0) {{
+                            const overlapBar = document.createElement('div');
+                            overlapBar.className = 'gantt-bar-overlap';
+                            overlapBar.style.left = `${{left}}px`;
+                            overlapBar.style.width = `${{width}}px`;
+                            row.appendChild(overlapBar);
+                        }}
+                    }}
+                }}
+                
+                function getPosition(date) {{
+                    if (!date) return 0;
+                    const chartStart = parseDate(activeDataMinStr);
+                    if (!chartStart || isNaN(chartStart.getTime())) return 0;
+                    
+                    const monthsOffset = (date.getUTCFullYear() - chartStart.getUTCFullYear()) * 12 + (date.getUTCMonth() - chartStart.getUTCMonth());
+                    const dayOfMonth = date.getUTCDate() - 1;
+                    const daysInMonth = new Date(date.getUTCFullYear(), date.getUTCMonth() + 1, 0).getUTCDate();
+                    const fractionOfMonth = daysInMonth > 0 ? dayOfMonth / daysInMonth : 0;
+                    
+                    return (monthsOffset + fractionOfMonth) * PIXELS_PER_MONTH;
+                }}
+                
+                function positionTodayLine() {{
+                    const todayLine = document.getElementById('today-line-{project['id']}');
+                    const today = new Date(), todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+                    const chartStart = parseDate(activeDataMinStr), chartEnd = parseDate(activeDataMaxStr);
+                    
+                    if (chartStart && chartEnd && !isNaN(chartStart.getTime()) && !isNaN(chartEnd.getTime()) && todayUTC >= chartStart && todayUTC <= chartEnd) {{
+                        const offset = getPosition(todayUTC);
+                        todayLine.style.left = `${{offset}}px`;
+                        todayLine.style.display = 'block';
+                    }} else {{
+                        todayLine.style.display = 'none';
+                    }}
+                }}
+                
+                function positionMetaLine() {{
+                    const metaLine = document.getElementById('meta-line-{project['id']}'), metaLabel = document.getElementById('meta-line-label-{project['id']}');
+                    const metaDateStr = projectData[0].meta_assinatura_date;
+                    
+                    if (!metaDateStr) {{
+                        metaLine.style.display = 'none';
+                        metaLabel.style.display = 'none';
+                        return;
+                    }}
+                    
+                    const metaDate = parseDate(metaDateStr);
+                    const chartStart = parseDate(activeDataMinStr);
+                    const chartEnd = parseDate(activeDataMaxStr);
+                    
+                    if (metaDate && chartStart && chartEnd && !isNaN(metaDate.getTime()) && !isNaN(chartStart.getTime()) && !isNaN(chartEnd.getTime()) && metaDate >= chartStart && metaDate <= chartEnd) {{
+                        const offset = getPosition(metaDate);
+                        metaLine.style.left = `${{offset}}px`;
+                        metaLabel.style.left = `${{offset}}px`;
+                        metaLine.style.display = 'block';
+                        metaLabel.style.display = 'block';
+                        metaLabel.textContent = `Meta: ${{metaDate.toLocaleDateString('pt-BR', {{day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'}})}}`;
+                    }} else {{
+                        metaLine.style.display = 'none';
+                        metaLabel.style.display = 'none';
+                    }}
+                }}
+                
+                function showTooltip(e, task, tipo) {{
+                    const tooltip = document.getElementById('tooltip-{project['id']}');
+                    let content = `<b>${{task.name}}</b><br>`;
+                    
+                    if (tipo === 'previsto') {{
+                        content += `Previsto: ${{task.inicio_previsto}} - ${{task.termino_previsto}}<br>Duração: ${{task.duracao_prev_meses}}M`;
+                    }} else {{
+                        content += `Real: ${{task.inicio_real}} - ${{task.termino_real}}<br>Duração: ${{task.duracao_real_meses}}M<br>Variação Término: ${{task.vt_text}}<br>Variação Duração: ${{task.vd_text}}`;
+                    }}
+                    
+                    content += `<br><b>Progresso: ${{task.progress}}%</b><br>Setor: ${{task.setor}}<br>Grupo: ${{task.grupo}}`;
+                    tooltip.innerHTML = content;
+                    tooltip.classList.add('show');
+                    
+                    const tooltipWidth = tooltip.offsetWidth;
+                    const tooltipHeight = tooltip.offsetHeight;
+                    const viewportWidth = window.innerWidth;
+                    const viewportHeight = window.innerHeight;
+                    const mouseX = e.clientX;
+                    const mouseY = e.clientY;
+                    const padding = 15;
+                    
+                    let left, top;
+                    
+                    if ((mouseX + padding + tooltipWidth) > viewportWidth) {{
+                        left = mouseX - padding - tooltipWidth;
+                    }} else {{
+                        left = mouseX + padding;
+                    }}
+                    
+                    if ((mouseY + padding + tooltipHeight) > viewportHeight) {{
+                        top = mouseY - padding - tooltipHeight;
+                    }} else {{
+                        top = mouseY + padding;
+                    }}
+                    
+                    if (left < padding) left = padding;
+                    if (top < padding) top = padding;
+                    
+                    tooltip.style.left = `${{left}}px`;
+                    tooltip.style.top = `${{top}}px`;
+                }}
+                
+                function hideTooltip() {{
+                    document.getElementById('tooltip-{project['id']}').classList.remove('show');
+                }}
+                
+                function renderMonthDividers() {{
+                    const chartContainer = document.getElementById('chart-container-{project['id']}');
+                    chartContainer.querySelectorAll('.month-divider, .month-divider-label').forEach(el => el.remove());
+                    
+                    let currentDate = parseDate(activeDataMinStr);
+                    const dataMax = parseDate(activeDataMaxStr);
+                    
+                    if (!currentDate || !dataMax || isNaN(currentDate.getTime()) || isNaN(dataMax.getTime())) return;
+                    
+                    let totalMonths = 0;
+                    while (currentDate <= dataMax && totalMonths < 240) {{
+                        const left = getPosition(currentDate);
+                        const divider = document.createElement('div');
+                        divider.className = 'month-divider';
+                        if (currentDate.getUTCMonth() === 0) divider.classList.add('first');
+                        divider.style.left = `${{left}}px`;
+                        chartContainer.appendChild(divider);
+                        
+                        currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
+                        totalMonths++;
+                    }}
+                }}
+                
+                function setupEventListeners() {{
+                    const ganttChartContent = document.getElementById('gantt-chart-content-{project['id']}'), sidebarContent = document.getElementById('gantt-sidebar-content-{project['id']}');
+                    const fullscreenBtn = document.getElementById('fullscreen-btn-{project['id']}'), toggleBtn = document.getElementById('toggle-sidebar-btn-{project['id']}');
+                    const filterBtn = document.getElementById('filter-btn-{project['id']}');
+                    const container = document.getElementById('gantt-container-{project['id']}');
+                    const applyBtn = document.getElementById('filter-apply-btn-{project['id']}');
+                    
+                    if (applyBtn) applyBtn.addEventListener('click', () => applyFiltersAndRedraw());
+                    
+                    if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => toggleFullscreen());
+                    
+                    if (filterBtn) {{
+                        filterBtn.addEventListener('click', () => {{
+                            const filterMenu = document.getElementById('filter-menu-{project['id']}');
+                            filterMenu.classList.toggle('is-open');
+                        }});
+                    }}
+                    
+                    if (container) container.addEventListener('fullscreenchange', () => handleFullscreenChange());
+                    
+                    if (toggleBtn) toggleBtn.addEventListener('click', () => toggleSidebar());
+                    
+                    if (ganttChartContent && sidebarContent) {{
+                        let isSyncing = false;
+                        
+                        ganttChartContent.addEventListener('scroll', () => {{
+                            if (!isSyncing) {{
+                                isSyncing = true;
+                                sidebarContent.scrollTop = ganttChartContent.scrollTop;
+                                isSyncing = false;
+                            }}
+                        }});
+                        
+                        sidebarContent.addEventListener('scroll', () => {{
+                            if (!isSyncing) {{
+                                isSyncing = true;
+                                ganttChartContent.scrollTop = sidebarContent.scrollTop;
+                                isSyncing = false;
+                            }}
+                        }});
+                        
+                        let isDown = false, startX, scrollLeft;
+                        
+                        ganttChartContent.addEventListener('mousedown', (e) => {{
+                            isDown = true;
+                            ganttChartContent.classList.add('active');
+                            startX = e.pageX - ganttChartContent.offsetLeft;
+                            scrollLeft = ganttChartContent.scrollLeft;
+                        }});
+                        
+                        ganttChartContent.addEventListener('mouseleave', () => {{
+                            isDown = false;
+                            ganttChartContent.classList.remove('active');
+                        }});
+                        
+                        ganttChartContent.addEventListener('mouseup', () => {{
+                            isDown = false;
+                            ganttChartContent.classList.remove('active');
+                        }});
+                        
+                        ganttChartContent.addEventListener('mousemove', (e) => {{
+                            if (!isDown) return;
                             e.preventDefault();
-                            menu.style.display = 'block';
-                            menu.style.left = e.clientX + 'px';
-                            menu.style.top = e.clientY + 'px';
-                        }} else {{
-                            menu.style.display = 'none';
-                        }}
-                    }});
-
-                    document.addEventListener('click', function(e) {{
-                        if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                            menu.style.display = 'none';
-                        }}
-                    }}, true);
-
-                    // --- 5. AÇÃO DO BOTÃO ---
-                    const btnCreate = menu.querySelector('#btn-create-baseline');
-                    
-                    btnCreate.addEventListener('click', function(e) {{
-                        e.stopPropagation();
-                        e.preventDefault();
-
-                        // A. Nome do Projeto
-                        let currentProjectName = "Desconhecido";
-                        if (typeof projectData !== 'undefined' && projectData.length > 0) {{
-                            currentProjectName = projectData[0].name;
-                        }} else {{
-                            const titleEl = container.querySelector('.project-title-row span');
-                            if (titleEl) currentProjectName = titleEl.textContent;
-                        }}
-
-                        // B. Feedback Visual (Laranja = Processando)
-                        menu.style.display = 'none';
-                        toast.style.display = 'block';
-                        toast.style.backgroundColor = "#e67e22"; // Laranja
-                        toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
-
-                        // C. Montar URL CORRETA
-                        const encodedProject = encodeURIComponent(currentProjectName);
-                        const timestamp = new Date().getTime();
-                        
-                        // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                        // Isso corrige o bug do "about:srcdoc"
-                        let baseUrl = document.referrer;
-                        if (!baseUrl || baseUrl === "") {{
-                             // Fallback raro
-                             baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
-                        }}
-                        // Remove barra final
-                        if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
-
-                        // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
-                        const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
-
-                        console.log("🚀 URL Iframe:", finalUrl);
-                        
-                        // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
-                        if (iframe) iframe.src = finalUrl;
-
-                        // E. Feedback Final
-                        // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
-                        setTimeout(() => {{
-                            toast.style.backgroundColor = "#27ae60"; // Verde
-                            toast.innerHTML = `
-                                <div style="display:flex; flex-direction:column; gap:5px;">
-                                    <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                    <span style="font-size:12px;">Dados processados em segundo plano.</span>
-                                    <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
-                                </div>
-                            `;
-                            setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
-                        }}, 4000);
-                    }});
-
-                }})();
-                    function initGantt() {{
-                        console.log('Iniciando Gantt com dados:', projectData);
-                        
-                        // Verificar se há dados para renderizar
-                        if (!projectData || !projectData[0] || !projectData[0].tasks || projectData[0].tasks.length === 0) {{
-                            console.error('Nenhum dado disponível para renderizar');
-                            document.getElementById('chart-body-{project["id"]}').innerHTML = '<div style="padding: 20px; text-align: center; color: red;">Erro: Nenhum dado disponível</div>';
-                            return;
-                        }}
-
-                        // Organizar tasks com estrutura de subetapas
-                        projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
-                        allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
-
-                        applyInitialPulmaoState();
-
-                        if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
-                            const {{ min: newMinStr, max: newMaxStr }} = findNewDateRange(projectData[0].tasks);
-                            const newMin = parseDate(newMinStr);
-                            const newMax = parseDate(newMaxStr);
-                            const originalMin = parseDate(activeDataMinStr);
-                            const originalMax = parseDate(activeDataMaxStr);
-
-                            let finalMinDate = originalMin;
-                            if (newMin && newMin < finalMinDate) {{
-                                finalMinDate = newMin;
-                            }}
-                            let finalMaxDate = originalMax;
-                            if (newMax && newMax > finalMaxDate) {{
-                                finalMaxDate = newMax;
-                            }}
-
-                            finalMinDate = new Date(finalMinDate.getTime());
-                            finalMaxDate = new Date(finalMaxDate.getTime());
-
-                            finalMinDate.setUTCDate(1);
-                            finalMaxDate.setUTCMonth(finalMaxDate.getUTCMonth() + 1, 0);
-
-                            activeDataMinStr = finalMinDate.toISOString().split('T')[0];
-                            activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
-                        }}
-
-                        renderSidebar();
-                        renderHeader();
-                        renderChart();
-                        renderMonthDividers();
-                        setupEventListeners();
-                        positionTodayLine();
-                        positionMetaLine();
-                        populateFilters();
+                            const x = e.pageX - ganttChartContent.offsetLeft;
+                            const walk = (x - startX) * 2;
+                            ganttChartContent.scrollLeft = scrollLeft - walk;
+                        }});
                     }}
-
-                    function applyInitialPulmaoState() {{
-                        if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
-                            const offsetMeses = -initialPulmaoMeses;
-                            let baseTasks = projectData[0].tasks;
-
+                }}
+                
+                function toggleSidebar() {{
+                    document.getElementById('gantt-sidebar-wrapper-{project['id']}').classList.toggle('collapsed');
+                }}
+                
+                function toggleFullscreen() {{
+                    const container = document.getElementById('gantt-container-{project['id']}');
+                    if (!document.fullscreenElement) {{
+                        container.requestFullscreen().catch(err => alert('Erro: ' + err.message));
+                    }} else {{
+                        document.exitFullscreen();
+                    }}
+                }}
+                
+                function handleFullscreenChange() {{
+                    const btn = document.getElementById('fullscreen-btn-{project['id']}');
+                    const container = document.getElementById('gantt-container-{project['id']}');
+                    
+                    if (document.fullscreenElement === container) {{
+                        btn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9l6 6m0-6l-6 6M3 20.29V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2v-.29"></path></svg></span>';
+                        btn.classList.add('is-fullscreen');
+                    }} else {{
+                        btn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></span>';
+                        btn.classList.remove('is-fullscreen');
+                        document.getElementById('filter-menu-{project['id']}').classList.remove('is-open');
+                    }}
+                }}
+                
+                function populateFilters() {{
+                    if (filtersPopulated) return;
+                    
+                    const selProject = document.getElementById('filter-project-{project['id']}');
+                    allProjectsData.forEach((proj, index) => {{
+                        const isSelected = (index === initialProjectIndex) ? 'selected' : '';
+                        selProject.innerHTML += '<option value="' + index + '" ' + isSelected + '>' + proj.name + '</option>';
+                    }});
+                    
+                    const vsConfig = {{
+                        multiple: true,
+                        search: true,
+                        optionsCount: 6,
+                        showResetButton: true,
+                        resetButtonText: 'Limpar',
+                        selectAllText: 'Selecionar Todos',
+                        allOptionsSelectedText: 'Todos',
+                        optionsSelectedText: 'selecionados',
+                        searchPlaceholderText: 'Buscar...',
+                        optionHeight: '30px',
+                        popupDropboxBreakpoint: '3000px',
+                        noOptionsText: 'Nenhuma opção encontrada',
+                        noSearchResultsText: 'Nenhum resultado encontrado',
+                    }};
+                    
+                    const setorOptions = filterOptions.setores.map(s => ({{ label: s, value: s }}));
+                    vsSetor = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-setor-{project['id']}',
+                        options: setorOptions,
+                        placeholder: "Selecionar Setor(es)",
+                        selectedValue: ["Todos"]
+                    }});
+                    
+                    const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
+                    vsGrupo = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-grupo-{project['id']}',
+                        options: grupoOptions,
+                        placeholder: "Selecionar Grupo(s)",
+                        selectedValue: ["Todos"]
+                    }});
+                    
+                    const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
+                    vsEtapa = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-etapa-{project['id']}',
+                        options: etapaOptions,
+                        placeholder: "Selecionar Etapa(s)",
+                        selectedValue: ["Todas"]
+                    }});
+                    
+                    const visRadio = document.querySelector('input[name="filter-vis-{project['id']}"][value="' + initialTipoVisualizacao + '"]');
+                    if (visRadio) visRadio.checked = true;
+                    
+                    const pulmaoRadio = document.querySelector('input[name="filter-pulmao-{project['id']}"][value="' + initialPulmaoStatus + '"]');
+                    if (pulmaoRadio) pulmaoRadio.checked = true;
+                    
+                    document.getElementById('filter-pulmao-meses-{project['id']}').value = initialPulmaoMeses;
+                    updatePulmaoInputVisibility();
+                    
+                    filtersPopulated = true;
+                }}
+                
+                function applyFiltersAndRedraw() {{
+                    try {{
+                        const selProjectIndex = parseInt(document.getElementById('filter-project-{project['id']}').value, 10);
+                        const selSetorArray = vsSetor ? vsSetor.getValue() || [] : [];
+                        const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : [];
+                        const selEtapaArray = vsEtapa ? vsEtapa.getValue() || [] : [];
+                        const selConcluidas = document.getElementById('filter-concluidas-{project['id']}').checked;
+                        const selVis = document.querySelector('input[name="filter-vis-{project['id']}"]:checked').value;
+                        const selPulmao = document.querySelector('input[name="filter-pulmao-{project['id']}"]:checked').value;
+                        const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project['id']}').value, 10) || 0;
+                        
+                        console.log('Filtros aplicados:', {{
+                            setor: selSetorArray,
+                            grupo: selGrupoArray,
+                            etapa: selEtapaArray,
+                            concluidas: selConcluidas,
+                            visualizacao: selVis,
+                            pulmao: selPulmao,
+                            mesesPulmao: selPulmaoMeses
+                        }});
+                        
+                        document.getElementById('filter-menu-{project['id']}').classList.remove('is-open');
+                        
+                        if (selProjectIndex !== currentProjectIndex) {{
+                            currentProjectIndex = selProjectIndex;
+                            const newProject = allProjectsData[selProjectIndex];
+                            projectData = [JSON.parse(JSON.stringify(newProject))];
+                            projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
+                            allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
+                        }}
+                        
+                        let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
+                        
+                        if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
+                            const offsetMeses = -selPulmaoMeses;
+                            console.log("Aplicando pulmão APENAS no previsto para filtros");
+                            
                             baseTasks.forEach(task => {{
                                 const etapaNome = task.name;
                                 if (etapas_sem_alteracao.includes(etapaNome)) {{
                                     // Não altera datas
-                                }}
-                                else if (etapas_pulmao.includes(etapaNome)) {{
-                                    // APENAS PREVISTO
+                                }} else if (etapas_pulmao.includes(etapaNome)) {{
+                                    // Apenas datas previstas
                                     task.start_previsto = addMonths(task.start_previsto, offsetMeses);
                                     task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                }}
-                                else {{
-                                    // APENAS PREVISTO
+                                }} else {{
+                                    // Apenas datas previstas
                                     task.start_previsto = addMonths(task.start_previsto, offsetMeses);
                                     task.end_previsto = addMonths(task.end_previsto, offsetMeses);
                                     task.inicio_previsto = formatDateDisplay(task.start_previsto);
                                     task.termino_previsto = formatDateDisplay(task.end_previsto);
-                                    // NÃO modificar dados reais
                                 }}
                             }});
-
-                            allTasks_baseData = JSON.parse(JSON.stringify(baseTasks));
-                        }}
-                    }}
-
-                    function renderSidebar() {{
-                        const sidebarContent = document.getElementById('gantt-sidebar-content-{project['id']}');
-                        const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
-                        const tasks = projectData[0].tasks;
-                        
-                        if (!tasks || tasks.length === 0) {{
-                            sidebarContent.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Nenhuma tarefa disponível para os filtros aplicados</div>';
-                            return;
                         }}
                         
-                        let html = '';
-                        let globalRowIndex = 0;
-                        const groupKeys = Object.keys(gruposGantt);
+                        let filteredTasks = baseTasks;
                         
-                        for (let i = 0; i < groupKeys.length; i++) {{
-                            const grupo = groupKeys[i];
-                            const tasksInGroupNames = gruposGantt[grupo].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
-                            if (tasksInGroupNames.length === 0) continue;
-                            
-                            const groupHeight = (tasksInGroupNames.length * 30);
-                            html += `<div class="sidebar-group-wrapper">`;
-                            html += `<div class="sidebar-group-title-vertical" style="height: ${{groupHeight}}px;"><span>${{grupo}}</span></div>`;
-                            html += `<div class="sidebar-rows-container">`;
-                            
-                            gruposGantt[grupo].forEach(etapaNome => {{
-                                const task = tasks.find(t => t.name === etapaNome && !t.isSubtask);
-                                if (task) {{
-                                    globalRowIndex++;
-                                    const rowClass = globalRowIndex % 2 !== 0 ? 'odd-row' : '';
-                                    const hasSubtasks = SUBETAPAS[task.name] && SUBETAPAS[task.name].length > 0;
-                                    const mainTaskClass = hasSubtasks ? 'main-task-row has-subtasks' : 'main-task-row';
-                                    
-                                    html += `<div class="sidebar-row ${{mainTaskClass}} ${{rowClass}}" data-task="${{task.name}}">`;
-                                    
-                                    // Coluna do botão de expandir/recolher
-                                    if (hasSubtasks) {{
-                                        html += `<div class="sidebar-cell task-name-cell" style="display: flex; align-items: center;">`;
-                                        html += `<button class="expand-collapse-btn" data-task="${{task.name}}">${{task.expanded ? '-' : '+'}}</button>`;
-                                        html += `<span title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</span>`;
-                                        html += `</div>`;
-                                    }} else {{
-                                        html += `<div class="sidebar-cell task-name-cell" title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</div>`;
-                                    }}
-                                    
-                                    html += `<div class="sidebar-cell">${{task.inicio_previsto}}</div>`;
-                                    html += `<div class="sidebar-cell">${{task.termino_previsto}}</div>`;
-                                    html += `<div class="sidebar-cell">${{task.duracao_prev_meses}}</div>`;
-                                    html += `<div class="sidebar-cell">${{task.inicio_real}}</div>`;
-                                    html += `<div class="sidebar-cell">${{task.termino_real}}</div>`;
-                                    html += `<div class="sidebar-cell">${{task.duracao_real_meses}}</div>`;
-                                    html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.progress}}%</div>`;
-                                    html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.vt_text}}</div>`;
-                                    html += `<div class="sidebar-cell ${{task.status_color_class}}">${{task.vd_text}}</div>`;
-                                    html += `</div>`;
-                                    
-                                    // Adicionar subetapas se existirem
-                                    if (hasSubtasks && SUBETAPAS[task.name]) {{
-                                        SUBETAPAS[task.name].forEach(subetapaNome => {{
-                                            const subetapa = tasks.find(t => t.name === subetapaNome && t.isSubtask);
-                                            if (subetapa) {{
-                                                globalRowIndex++;
-                                                const subtaskRowClass = globalRowIndex % 2 !== 0 ? 'odd-row' : '';
-                                                const visibleClass = task.expanded ? 'visible' : '';
-                                                html += `<div class="sidebar-row subtask-row ${{subtaskRowClass}} ${{visibleClass}}" data-parent="${{task.name}}">`;
-                                                html += `<div class="sidebar-cell task-name-cell" title="${{subetapa.numero_etapa}}. • ${{subetapa.name}}">${{subetapa.numero_etapa}}. • ${{subetapa.name}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.inicio_previsto}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.termino_previsto}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.duracao_prev_meses}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.inicio_real}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.termino_real}}</div>`;
-                                                html += `<div class="sidebar-cell">${{subetapa.duracao_real_meses}}</div>`;
-                                                html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.progress}}%</div>`;
-                                                html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.vt_text}}</div>`;
-                                                html += `<div class="sidebar-cell ${{subetapa.status_color_class}}">${{subetapa.vd_text}}</div>`;
-                                                html += `</div>`;
-                                            }}
-                                        }});
-                                    }}
-                                }}
-                            }});
-                            html += `</div></div>`;
-                            
-                            const tasksInGroup = tasksInGroupNames;
-                            if (i < groupKeys.length - 1 && tasksInGroup.length > 0) {{
-                                const nextGroupKey = groupKeys[i + 1];
-                                const nextGroupTasks = gruposGantt[nextGroupKey].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
-                                if (nextGroupTasks.length > 0) {{
-                                    html += `<div class="sidebar-row-spacer"></div>`;
-                                }}
-                            }}
-                        }}
-                        sidebarContent.innerHTML = html;
-                        
-                        // Adicionar event listeners para os botões de expandir/recolher
-                        document.querySelectorAll('.expand-collapse-btn').forEach(button => {{
-                            button.addEventListener('click', function(e) {{
-                                e.stopPropagation();
-                                const taskName = this.getAttribute('data-task');
-                                toggleSubtasks(taskName);
-                            }});
-                        }});
-                        
-                        // Adicionar event listeners para as linhas principais com subetapas
-                        document.querySelectorAll('.main-task-row.has-subtasks').forEach(row => {{
-                            row.addEventListener('click', function() {{
-                                const taskName = this.getAttribute('data-task');
-                                toggleSubtasks(taskName);
-                            }});
-                        }});
-                    }}
-
-                    function renderHeader() {{
-                        const yearHeader = document.getElementById('year-header-{project["id"]}');
-                        const monthHeader = document.getElementById('month-header-{project["id"]}');
-                        let yearHtml = '', monthHtml = '';
-                        const yearsData = [];
-
-                        let currentDate = parseDate(activeDataMinStr);
-                        const dataMax = parseDate(activeDataMaxStr);
-
-                        if (!currentDate || !dataMax || isNaN(currentDate.getTime()) || isNaN(dataMax.getTime())) {{
-                            yearHeader.innerHTML = "Datas inválidas";
-                            monthHeader.innerHTML = "";
-                            return;
-                        }}
-
-                        // DECLARE estas variáveis
-                        let currentYear = -1, monthsInCurrentYear = 0;
-
-                        let totalMonths = 0;
-                        while (currentDate <= dataMax && totalMonths < 240) {{
-                            const year = currentDate.getUTCFullYear();
-                            if (year !== currentYear) {{
-                                if (currentYear !== -1) yearsData.push({{ year: currentYear, count: monthsInCurrentYear }});
-                                currentYear = year; 
-                                monthsInCurrentYear = 0;
-                            }}
-                            const monthNumber = String(currentDate.getUTCMonth() + 1).padStart(2, '0');
-                            monthHtml += `<div class="month-cell">${{monthNumber}}</div>`;
-                            monthsInCurrentYear++;
-                            currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
-                            totalMonths++;
-                        }}
-                        if (currentYear !== -1) yearsData.push({{ year: currentYear, count: monthsInCurrentYear }});
-                        yearsData.forEach(data => {{ 
-                            const yearWidth = data.count * PIXELS_PER_MONTH; 
-                            yearHtml += `<div class="year-section" style="width:${{yearWidth}}px">${{data.year}}</div>`; 
-                        }});
-
-                        const chartContainer = document.getElementById('chart-container-{project["id"]}');
-                        if (chartContainer) {{
-                            chartContainer.style.minWidth = `${{totalMonths * PIXELS_PER_MONTH}}px`;
-                        }}
-
-                        yearHeader.innerHTML = yearHtml;
-                        monthHeader.innerHTML = monthHtml;
-                    }}
-
-                    function renderChart() {{
-                        const chartBody = document.getElementById('chart-body-{project["id"]}');
-                        const gruposGantt = JSON.parse(document.getElementById('grupos-gantt-data').textContent);
-                        const tasks = projectData[0].tasks;
-                        
-                        if (!tasks || tasks.length === 0) {{
-                            chartBody.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">Nenhuma tarefa disponível</div>';
-                            return;
+                        if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
+                            filteredTasks = filteredTasks.filter(t => selSetorArray.includes(t.setor));
+                            console.log('Após filtro setor:', filteredTasks.length);
                         }}
                         
-                        chartBody.innerHTML = '';
-                        const groupKeys = Object.keys(gruposGantt);
-                        let rowIndex = 0;
-                        
-                        for (let i = 0; i < groupKeys.length; i++) {{
-                            const grupo = groupKeys[i];
-                            const tasksInGroup = gruposGantt[grupo].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
-                            if (tasksInGroup.length === 0) continue;
-                            
-                            gruposGantt[grupo].forEach(etapaNome => {{
-                                const task = tasks.find(t => t.name === etapaNome && !t.isSubtask);
-                                if (task) {{
-                                    // Linha principal
-                                    const row = document.createElement('div'); 
-                                    row.className = 'gantt-row';
-                                    row.setAttribute('data-task', task.name);
-                                    
-                                    let barPrevisto = null;
-                                    if (tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Previsto') {{ 
-                                        barPrevisto = createBar(task, 'previsto'); 
-                                        if (barPrevisto) row.appendChild(barPrevisto); 
-                                    }}
-                                    let barReal = null;
-                                    if ((tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Real') && task.start_real && (task.end_real_original_raw || task.end_real)) {{ 
-                                        barReal = createBar(task, 'real'); 
-                                        if (barReal) row.appendChild(barReal); 
-                                    }}
-                                    if (barPrevisto && barReal) {{
-                                        const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
-                                        if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{ 
-                                            barPrevisto.style.zIndex = '8'; 
-                                            barReal.style.zIndex = '7'; 
-                                        }}
-                                        renderOverlapBar(task, row);
-                                    }}
-                                    chartBody.appendChild(row);
-                                    rowIndex++;
-                                    
-                                    // Aplica estilo se a tarefa pai estiver expandida
-                                    if (task.expanded) {{
-                                        updateParentTaskBarStyle(task.name, true);
-                                    }}
-                                    
-                                    // Subetapas - SEMPRE criar as linhas, mas controlar visibilidade via CSS
-                                    if (SUBETAPAS[task.name]) {{
-                                        SUBETAPAS[task.name].forEach(subetapaNome => {{
-                                            const subetapa = tasks.find(t => t.name === subetapaNome && t.isSubtask);
-                                            if (subetapa) {{
-                                                const subtaskRow = document.createElement('div'); 
-                                                subtaskRow.className = 'gantt-row gantt-subtask-row';
-                                                subtaskRow.setAttribute('data-parent', task.name);
-                                                // Inicialmente oculto - será mostrado via toggle
-                                                subtaskRow.style.display = task.expanded ? 'block' : 'none';
-                                                if (task.expanded) {{
-                                                    subtaskRow.classList.add('visible');
-                                                }}
-                                                
-                                                let subBarPrevisto = null;
-                                                if (tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Previsto') {{ 
-                                                    subBarPrevisto = createBar(subetapa, 'previsto'); 
-                                                    if (subBarPrevisto) subtaskRow.appendChild(subBarPrevisto); 
-                                                }}
-                                                let subBarReal = null;
-                                                if ((tipoVisualizacao === 'Ambos' || tipoVisualizacao === 'Real') && subetapa.start_real && (subetapa.end_real_original_raw || subetapa.end_real)) {{ 
-                                                    subBarReal = createBar(subetapa, 'real'); 
-                                                    if (subBarReal) subtaskRow.appendChild(subBarReal); 
-                                                }}
-                                                if (subBarPrevisto && subBarReal) {{
-                                                    const s_prev = parseDate(subetapa.start_previsto), e_prev = parseDate(subetapa.end_previsto), s_real = parseDate(subetapa.start_real), e_real = parseDate(subetapa.end_real_original_raw || subetapa.end_real);
-                                                    if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{ 
-                                                        subBarPrevisto.style.zIndex = '8'; 
-                                                        subBarReal.style.zIndex = '7'; 
-                                                    }}
-                                                    renderOverlapBar(subetapa, subtaskRow);
-                                                }}
-                                                chartBody.appendChild(subtaskRow);
-                                                rowIndex++;
-                                            }}
-                                        }});
-                                    }}
-                                }}
-                            }});
-                            
-                            if (i < groupKeys.length - 1 && tasksInGroup.length > 0) {{
-                                const nextGroupKey = groupKeys[i + 1];
-                                const nextGroupTasks = gruposGantt[nextGroupKey].filter(etapaNome => tasks.some(t => t.name === etapaNome && !t.isSubtask));
-                                if (nextGroupTasks.length > 0) {{
-                                    const spacerRow = document.createElement('div');
-                                    spacerRow.className = 'gantt-row-spacer';
-                                    chartBody.appendChild(spacerRow);
-                                    rowIndex++;
-                                }}
-                            }}
-                        }}
-                    }}
-                    // Função para alternar visibilidade do seletor de baseline
-                    function toggleBaselineSelector() {{
-                        const selector = document.getElementById('baseline-selector-{project['id']}');
-                        selector.style.display = selector.style.display === 'none' ? 'block' : 'none';
-                    }}
-                    
-                    // Função para mudar baseline
-                    function changeBaseline(selectedBaseline) {{
-                        if (selectedBaseline === 'P0-(padrão)') {{
-                            // Recarregar página sem baseline
-                            window.location.href = window.location.pathname;
-                        }} else {{
-                            // Enviar comando para Streamlit aplicar a baseline selecionada
-                            const timestamp = new Date().getTime();
-                            const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(projectName)}}&t=${{timestamp}}`;
-                            
-                            // Mostrar loading
-                            showBaselineLoading();
-                            
-                            // Usar iframe para carregar a URL
-                            const iframe = document.getElementById('hidden-iframe');
-                            iframe.src = url;
-                        }}
-                    }}
-                    
-                    function showBaselineLoading() {{
-                        // Implementar visual de loading
-                        const currentElement = document.getElementById('current-baseline-{project['id']}');
-                        currentElement.textContent = 'Carregando...';
-                        currentElement.style.background = '#fff3cd';
-                    }}
-                    
-                    // Adicionar botão de baseline na toolbar
-                    function addBaselineButton() {{
-                        const toolbar = document.getElementById('gantt-toolbar-{project["id"]}');
-                        if (toolbar) {{
-                            const baselineBtn = document.createElement('button');
-                            baselineBtn.className = 'toolbar-btn';
-                            baselineBtn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14,2 14,8 20,8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10,9 9,9 8,9"></polyline></svg></span>';
-                            baselineBtn.title = 'Selecionar Baseline';
-                            baselineBtn.onclick = toggleBaselineSelector;
-                            toolbar.appendChild(baselineBtn);
-                        }}
-                    }}
-                    
-                    // Inicializar quando o DOM estiver pronto
-                    document.addEventListener('DOMContentLoaded', function() {{
-                        addBaselineButton();
-                        
-                        // Se há uma baseline ativa, destacar no seletor
-                        if (currentBaseline) {{
-                            const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
-                            if (dropdown) {{
-                                dropdown.value = currentBaseline;
-                            }}
-                        }}
-                    }});
-
-                    function createBar(task, tipo) {{
-                        const startDate = parseDate(tipo === 'previsto' ? task.start_previsto : task.start_real);
-                        const endDate = parseDate(tipo === 'previsto' ? task.end_previsto : (task.end_real_original_raw || task.end_real));
-
-                        if (!startDate || !endDate) {{
-                            console.log('Datas inválidas para barra:', task.name, tipo);
-                            return null;
+                        if (selGrupoArray.length > 0 && !selGrupoArray.includes('Todos')) {{
+                            filteredTasks = filteredTasks.filter(t => selGrupoArray.includes(t.grupo));
+                            console.log('Após filtro grupo:', filteredTasks.length);
                         }}
                         
-                        const left = getPosition(startDate);
-                        const width = Math.max(getPosition(endDate) - left + (PIXELS_PER_MONTH / 30), 5); // Mínimo de 5px
-                        
-                        if (width <= 0) {{
-                            console.log('Largura inválida para barra:', task.name, tipo, width);
-                            return null;
+                        if (selEtapaArray.length > 0 && !selEtapaArray.includes('Todas')) {{
+                            filteredTasks = filteredTasks.filter(t => selEtapaArray.includes(t.name));
+                            console.log('Após filtro etapa:', filteredTasks.length);
                         }}
                         
-                        const bar = document.createElement('div'); 
-                        bar.className = `gantt-bar ${{tipo}}`;
-                        const coresSetor = coresPorSetor[task.setor] || coresPorSetor['Não especificado'] || {{previsto: '#cccccc', real: '#888888'}};
-                        bar.style.backgroundColor = tipo === 'previsto' ? coresSetor.previsto : coresSetor.real;
-                        bar.style.left = `${{left}}px`; 
-                        bar.style.width = `${{width}}px`;
-                        
-                        // Adicionar rótulo apenas se houver espaço suficiente
-                        if (width > 40) {{
-                            const barLabel = document.createElement('span'); 
-                            barLabel.className = 'bar-label'; 
-                            barLabel.textContent = `${{task.name}} (${{task.progress}}%)`; 
-                            bar.appendChild(barLabel);
+                        if (selConcluidas) {{
+                            filteredTasks = filteredTasks.filter(t => t.progress < 100);
+                            console.log('Após filtro concluídas:', filteredTasks.length);
                         }}
                         
-                        bar.addEventListener('mousemove', e => showTooltip(e, task, tipo));
-                        bar.addEventListener('mouseout', () => hideTooltip());
-                        return bar;
-                    }}
-
-                    function renderOverlapBar(task, row) {{
-                    if (!task.start_real || !(task.end_real_original_raw || task.end_real)) return;
-                        const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
-                        const overlap_start = new Date(Math.max(s_prev, s_real)), overlap_end = new Date(Math.min(e_prev, e_real));
-                        if (overlap_start < overlap_end) {{
-                            const left = getPosition(overlap_start), width = getPosition(overlap_end) - left + (PIXELS_PER_MONTH / 30);
-                            if (width > 0) {{ 
-                                const overlapBar = document.createElement('div'); 
-                                overlapBar.className = 'gantt-bar-overlap'; 
-                                overlapBar.style.left = `${{left}}px`; 
-                                overlapBar.style.width = `${{width}}px`; 
-                                row.appendChild(overlapBar); 
-                            }}
-                        }}
-                    }}
-
-                    function getPosition(date) {{
-                        if (!date) return 0;
-                        const chartStart = parseDate(activeDataMinStr);
-                        if (!chartStart || isNaN(chartStart.getTime())) return 0;
-
-                        const monthsOffset = (date.getUTCFullYear() - chartStart.getUTCFullYear()) * 12 + (date.getUTCMonth() - chartStart.getUTCMonth());
-                        const dayOfMonth = date.getUTCDate() - 1;
-                        const daysInMonth = new Date(date.getUTCFullYear(), date.getUTCMonth() + 1, 0).getUTCDate();
-                        const fractionOfMonth = daysInMonth > 0 ? dayOfMonth / daysInMonth : 0;
-                        return (monthsOffset + fractionOfMonth) * PIXELS_PER_MONTH;
-                    }}
-
-                    function positionTodayLine() {{
-                        const todayLine = document.getElementById('today-line-{project["id"]}');
-                        const today = new Date(), todayUTC = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
-
-                        const chartStart = parseDate(activeDataMinStr);
-                        const chartEnd = parseDate(activeDataMaxStr);
-
-                        if (chartStart && chartEnd && !isNaN(chartStart.getTime()) && !isNaN(chartEnd.getTime()) && todayUTC >= chartStart && todayUTC <= chartEnd) {{ 
-                            const offset = getPosition(todayUTC); 
-                            todayLine.style.left = `${{offset}}px`; 
-                            todayLine.style.display = 'block'; 
-                        }} else {{ 
-                            todayLine.style.display = 'none'; 
-                        }}
-                    }}
-
-                    function positionMetaLine() {{
-                        const metaLine = document.getElementById('meta-line-{project["id"]}'), metaLabel = document.getElementById('meta-line-label-{project["id"]}');
-                        const metaDateStr = projectData[0].meta_assinatura_date;
-                        if (!metaDateStr) {{ metaLine.style.display = 'none'; metaLabel.style.display = 'none'; return; }}
-
-                        const metaDate = parseDate(metaDateStr);
-                        const chartStart = parseDate(activeDataMinStr);
-                        const chartEnd = parseDate(activeDataMaxStr);
-
-                        if (metaDate && chartStart && chartEnd && !isNaN(metaDate.getTime()) && !isNaN(chartStart.getTime()) && !isNaN(chartEnd.getTime()) && metaDate >= chartStart && metaDate <= chartEnd) {{ 
-                            const offset = getPosition(metaDate); 
-                            metaLine.style.left = `${{offset}}px`; 
-                            metaLabel.style.left = `${{offset}}px`; 
-                            metaLine.style.display = 'block'; 
-                            metaLabel.style.display = 'block'; 
-                            metaLabel.textContent = `Meta: ${{metaDate.toLocaleDateString('pt-BR', {{day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'UTC'}})}}`; 
-                        }} else {{ 
-                            metaLine.style.display = 'none'; 
-                            metaLabel.style.display = 'none'; 
-                        }}
-                    }}
-
-                    function showTooltip(e, task, tipo) {{
-                        const tooltip = document.getElementById('tooltip-{project["id"]}');
-                        let content = `<b>${{task.name}}</b><br>`;
-                        if (tipo === 'previsto') {{ content += `Previsto: ${{task.inicio_previsto}} - ${{task.termino_previsto}}<br>Duração: ${{task.duracao_prev_meses}}M`; }} else {{ content += `Real: ${{task.inicio_real}} - ${{task.termino_real}}<br>Duração: ${{task.duracao_real_meses}}M<br>Variação Término: ${{task.vt_text}}<br>Variação Duração: ${{task.vd_text}}`; }}
-                        content += `<br><b>Progresso: ${{task.progress}}%</b><br>Setor: ${{task.setor}}<br>Grupo: ${{task.grupo}}`;
-                        tooltip.innerHTML = content;
-                        tooltip.classList.add('show');
-                        const tooltipWidth = tooltip.offsetWidth;
-                        const tooltipHeight = tooltip.offsetHeight;
-                        const viewportWidth = window.innerWidth;
-                        const viewportHeight = window.innerHeight;
-                        const mouseX = e.clientX; 
-                        const mouseY = e.clientY;
-                        const padding = 15;
-                        let left, top;
-                        if ((mouseX + padding + tooltipWidth) > viewportWidth) {{
-                            left = mouseX - padding - tooltipWidth;
-                        }} else {{
-                            left = mouseX + padding;
-                        }}
-                        if ((mouseY + padding + tooltipHeight) > viewportHeight) {{
-                            top = mouseY - padding - tooltipHeight;
-                        }} else {{
-                            top = mouseY + padding;
-                        }}
-                        if (left < padding) left = padding;
-                        if (top < padding) top = padding;
-                        tooltip.style.left = `${{left}}px`;
-                        tooltip.style.top = `${{top}}px`;
-                    }}
-
-                    function hideTooltip() {{ 
-                        document.getElementById('tooltip-{project["id"]}').classList.remove('show'); 
-                    }}
-
-                    function renderMonthDividers() {{
-                        const chartContainer = document.getElementById('chart-container-{project["id"]}');
-                        chartContainer.querySelectorAll('.month-divider, .month-divider-label').forEach(el => el.remove());
-
-                        let currentDate = parseDate(activeDataMinStr);
-                        const dataMax = parseDate(activeDataMaxStr);
-
-                        if (!currentDate || !dataMax || isNaN(currentDate.getTime()) || isNaN(dataMax.getTime())) return;
-
-                        let totalMonths = 0;
-                        while (currentDate <= dataMax && totalMonths < 240) {{
-                            const left = getPosition(currentDate);
-                            const divider = document.createElement('div'); 
-                            divider.className = 'month-divider';
-                            if (currentDate.getUTCMonth() === 0) divider.classList.add('first');
-                            divider.style.left = `${{left}}px`; 
-                            chartContainer.appendChild(divider);
-                            currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
-                            totalMonths++;
-                        }}
-                    }}
-
-                    function setupEventListeners() {{
-                        const ganttChartContent = document.getElementById('gantt-chart-content-{project["id"]}'), sidebarContent = document.getElementById('gantt-sidebar-content-{project['id']}');
-                        const fullscreenBtn = document.getElementById('fullscreen-btn-{project["id"]}'), toggleBtn = document.getElementById('toggle-sidebar-btn-{project['id']}');
-                        const filterBtn = document.getElementById('filter-btn-{project["id"]}');
-                        const filterMenu = document.getElementById('filter-menu-{project['id']}');
-                        const container = document.getElementById('gantt-container-{project["id"]}');
-
-                        const applyBtn = document.getElementById('filter-apply-btn-{project["id"]}');
-                        if (applyBtn) applyBtn.addEventListener('click', () => applyFiltersAndRedraw());
-
-                        if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => toggleFullscreen());
-
-                        // Adiciona listener para o botão de filtro
-                        if (filterBtn) {{
-                            filterBtn.addEventListener('click', () => {{
-                                filterMenu.classList.toggle('is-open');
-                            }});
-                        }}
-
-                        // Fecha o menu de filtro ao clicar fora
-                        document.addEventListener('click', (event) => {{
-                            if (filterMenu && filterBtn && !filterMenu.contains(event.target) && !filterBtn.contains(event.target)) {{
-                                filterMenu.classList.remove('is-open');
-                            }}
-                        }});
-
-                        if (container) container.addEventListener('fullscreenchange', () => handleFullscreenChange());
-
-                        if (toggleBtn) toggleBtn.addEventListener('click', () => toggleSidebar());
-                        if (ganttChartContent && sidebarContent) {{
-                            let isSyncing = false;
-                            ganttChartContent.addEventListener('scroll', () => {{ if (!isSyncing) {{ isSyncing = true; sidebarContent.scrollTop = ganttChartContent.scrollTop; isSyncing = false; }} }});
-                            sidebarContent.addEventListener('scroll', () => {{ if (!isSyncing) {{ isSyncing = true; ganttChartContent.scrollTop = sidebarContent.scrollTop; isSyncing = false; }} }});
-                            let isDown = false, startX, scrollLeft;
-                            ganttChartContent.addEventListener('mousedown', (e) => {{ isDown = true; ganttChartContent.classList.add('active'); startX = e.pageX - ganttChartContent.offsetLeft; scrollLeft = ganttChartContent.scrollLeft; }});
-                            ganttChartContent.addEventListener('mouseleave', () => {{ isDown = false; ganttChartContent.classList.remove('active'); }});
-                            ganttChartContent.addEventListener('mouseup', () => {{ isDown = false; ganttChartContent.classList.remove('active'); }});
-                            ganttChartContent.addEventListener('mousemove', (e) => {{ if (!isDown) return; e.preventDefault(); const x = e.pageX - ganttChartContent.offsetLeft; const walk = (x - startX) * 2; ganttChartContent.scrollLeft = scrollLeft - walk; }});
-                        }}
-                    }}
-
-                    function toggleSidebar() {{ 
-                        document.getElementById('gantt-sidebar-wrapper-{project["id"]}').classList.toggle('collapsed'); 
-                    }}
-
-                    function updatePulmaoInputVisibility() {{
-                        const radioCom = document.getElementById('filter-pulmao-com-{project["id"]}');
-                        const mesesGroup = document.getElementById('pulmao-meses-group-{project["id"]}');
-                        if (radioCom && mesesGroup) {{ 
-                            if (radioCom.checked) {{
-                                mesesGroup.style.display = 'block';
-                            }} else {{
-                                mesesGroup.style.display = 'none';
-                            }}
-                        }}
-                    }}
-
-                    function resetToInitialState() {{
-                        currentProjectIndex = initialProjectIndex;
-                        const initialProject = allProjectsData[initialProjectIndex];
-
-                        projectData = [JSON.parse(JSON.stringify(initialProject))];
-                        // Reorganizar tasks com estrutura de subetapas
-                        projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
-                        allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
-
-                        tipoVisualizacao = initialTipoVisualizacao;
-                        pulmaoStatus = initialPulmaoStatus;
-
-                        applyInitialPulmaoState();
-
-                        activeDataMinStr = dataMinStr;
-                        activeDataMaxStr = dataMaxStr;
-
-                        if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
-                            const {{ min: newMinStr, max: newMaxStr }} = findNewDateRange(projectData[0].tasks);
-                            const newMin = parseDate(newMinStr);
-                            const newMax = parseDate(newMaxStr);
-                            const originalMin = parseDate(activeDataMinStr);
-                            const originalMax = parseDate(activeDataMaxStr);
-
-                            let finalMinDate = originalMin;
-                            if (newMin && newMin < finalMinDate) {{
-                                finalMinDate = newMin;
-                            }}
-                            let finalMaxDate = originalMax;
-                            if (newMax && newMax > finalMaxDate) {{
-                                finalMaxDate = newMax;
-                            }}
-
-                            finalMinDate = new Date(finalMinDate.getTime());
-                            finalMaxDate = new Date(finalMaxDate.getTime());
-                            finalMinDate.setUTCDate(1);
-                            finalMaxDate.setUTCMonth(finalMaxDate.getUTCMonth() + 1, 0);
-
-                            activeDataMinStr = finalMinDate.toISOString().split('T')[0];
-                            activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
-                        }}
-
-                        document.getElementById('filter-project-{project["id"]}').value = initialProjectIndex;
+                        console.log('Tasks após filtros:', filteredTasks.length);
+                        console.log('Tasks filtradas:', filteredTasks);
                         
-                        // *** CORREÇÃO: Reset Virtual Select ***
-                        if(vsSetor) vsSetor.setValue(["Todos"]);
-                        if(vsGrupo) vsGrupo.setValue(["Todos"]);
-                        if(vsEtapa) vsEtapa.setValue(["Todas"]);
+                        if (filteredTasks.length === 0) {{
+                            console.warn('Nenhuma task passou pelos filtros aplicados');
+                        }}
                         
-                        document.getElementById('filter-concluidas-{project["id"]}').checked = false;
-
-                        const visRadio = document.querySelector('input[name="filter-vis-{project['id']}"][value="' + initialTipoVisualizacao + '"]');
-                        if (visRadio) visRadio.checked = true;
-
-                        const pulmaoRadio = document.querySelector('input[name="filter-pulmao-{project['id']}"][value="' + initialPulmaoStatus + '"]');
-                        if (pulmaoRadio) pulmaoRadio.checked = true;
-
-                        document.getElementById('filter-pulmao-meses-{project["id"]}').value = initialPulmaoMeses;
-
-                        updatePulmaoInputVisibility();
-
-                        renderHeader();
-                        renderMonthDividers();
+                        projectData[0].tasks = filteredTasks;
+                        tipoVisualizacao = selVis;
+                        
                         renderSidebar();
+                        renderHeader();
                         renderChart();
                         positionTodayLine();
                         positionMetaLine();
-                        updateProjectTitle();
+                        
+                    }} catch (error) {{
+                        console.error('Erro ao aplicar filtros:', error);
+                        alert('Erro ao aplicar filtros: ' + error.message);
                     }}
-
-                    function updateProjectTitle() {{
-                        const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
-                        if (projectTitle) {{
-                            projectTitle.textContent = projectData[0].name;
-                        }}
-                    }}
-
-                    function toggleFullscreen() {{
-                        const container = document.getElementById('gantt-container-{project["id"]}');
-                        if (!document.fullscreenElement) {{
-                            container.requestFullscreen().catch(err => alert('Erro: ' + err.message));
+                }}
+                
+                function updatePulmaoInputVisibility() {{
+                    const radioCom = document.getElementById('filter-pulmao-com-{project['id']}');
+                    const mesesGroup = document.getElementById('pulmao-meses-group-{project['id']}');
+                    if (radioCom && mesesGroup) {{
+                        if (radioCom.checked) {{
+                            mesesGroup.style.display = 'block';
                         }} else {{
-                            document.exitFullscreen();
+                            mesesGroup.style.display = 'none';
                         }}
                     }}
-
-
-
-                    function toggleFullscreen() {{
-                        const container = document.getElementById('gantt-container-{project["id"]}');
-                        if (!document.fullscreenElement) {{
-                            container.requestFullscreen().catch(err => console.error('Erro ao tentar entrar em tela cheia: ' + err.message));
-                        }} else {{
-                            document.exitFullscreen();
-                        }}
-                    }}
-
-                    function handleFullscreenChange() {{
-                        const btn = document.getElementById('fullscreen-btn-{project["id"]}');
-                        const container = document.getElementById('gantt-container-{project["id"]}');
-                        if (document.fullscreenElement === container) {{
-                            btn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 9l6 6m0-6l-6 6M3 20.29V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2v-.29"></path></svg></span>';
-                            btn.classList.add('is-fullscreen');
-                        }} else {{
-                            btn.innerHTML = '<span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></span>';
-                            btn.classList.remove('is-fullscreen');
-                            document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
-                        }}
-                    }}
-                    function populateFilters() {{
-                        if (filtersPopulated) return;
-
-                        // Popula o select normal de Projeto
-                        const selProject = document.getElementById('filter-project-{project["id"]}');
-                        allProjectsData.forEach((proj, index) => {{
-                            const isSelected = (index === initialProjectIndex) ? 'selected' : '';
-                            selProject.innerHTML += '<option value="' + index + '" ' + isSelected + '>' + proj.name + '</option>';
-                        }});
-
-                        // Configurações comuns para Virtual Select
-                        const vsConfig = {{
-                            multiple: true,
-                            search: true,
-                            optionsCount: 6,
-                            showResetButton: true,
-                            resetButtonText: 'Limpar',
-                            selectAllText: 'Selecionar Todos',
-                            allOptionsSelectedText: 'Todos',
-                            optionsSelectedText: 'selecionados',
-                            searchPlaceholderText: 'Buscar...',
-                            optionHeight: '30px',
-                            popupDropboxBreakpoint: '3000px',
-                            noOptionsText: 'Nenhuma opção encontrada',
-                            noSearchResultsText: 'Nenhum resultado encontrado',
-                        }};
-
-                        // Prepara opções e inicializa Virtual Select para Setor
-                        const setorOptions = filterOptions.setores.map(s => ({{ label: s, value: s }}));
-                        vsSetor = VirtualSelect.init({{
-                            ...vsConfig,
-                            ele: '#filter-setor-{project["id"]}',
-                            options: setorOptions,
-                            placeholder: "Selecionar Setor(es)",
-                            selectedValue: ["Todos"]
-                        }});
-
-                        // Prepara opções e inicializa Virtual Select para Grupo
-                        const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
-                        vsGrupo = VirtualSelect.init({{
-                            ...vsConfig,
-                            ele: '#filter-grupo-{project["id"]}',
-                            options: grupoOptions,
-                            placeholder: "Selecionar Grupo(s)",
-                            selectedValue: ["Todos"]
-                        }});
-
-                        // Prepara opções e inicializa Virtual Select para Etapa
-                        const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
-                        vsEtapa = VirtualSelect.init({{
-                            ...vsConfig,
-                            ele: '#filter-etapa-{project["id"]}',
-                            options: etapaOptions,
-                            placeholder: "Selecionar Etapa(s)",
-                            selectedValue: ["Todas"]
-                        }});
-
-                        // Configura os radios de visualização
-                        const visRadio = document.querySelector('input[name="filter-vis-{project['id']}"][value="' + initialTipoVisualizacao + '"]');
-                        if (visRadio) visRadio.checked = true;
-
-                        // Configura os radios e input de Pulmão
-                        const radioCom = document.getElementById('filter-pulmao-com-{project["id"]}');
-                        const radioSem = document.getElementById('filter-pulmao-sem-{project["id"]}');
-
-                        radioCom.addEventListener('change', updatePulmaoInputVisibility);
-                        radioSem.addEventListener('change', updatePulmaoInputVisibility);
-
-                        const pulmaoRadioInitial = document.querySelector('input[name="filter-pulmao-{project['id']}"][value="' + initialPulmaoStatus + '"]');
-                        if(pulmaoRadioInitial) pulmaoRadioInitial.checked = true;
-
-                        document.getElementById('filter-pulmao-meses-{project["id"]}').value = initialPulmaoMeses;
-
-                        updatePulmaoInputVisibility();
-
-                        filtersPopulated = true;
-                    }}
-
-                    // *** FUNÇÃO applyFiltersAndRedraw CORRIGIDA ***
-                    // *** FUNÇÃO applyFiltersAndRedraw CORRIGIDA ***
-                    function applyFiltersAndRedraw() {{
-                        try {{
-                            const selProjectIndex = parseInt(document.getElementById('filter-project-{project["id"]}').value, 10);
-                            
-                            // *** LEITURA CORRIGIDA dos Virtual Select ***
-                            const selSetorArray = vsSetor ? vsSetor.getValue() || [] : [];
-                            const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : [];
-                            const selEtapaArray = vsEtapa ? vsEtapa.getValue() || [] : [];
-                            
-                            const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
-                            const selVis = document.querySelector('input[name="filter-vis-{project['id']}"]:checked').value;
-                            const selPulmao = document.querySelector('input[name="filter-pulmao-{project['id']}"]:checked').value;
-                            const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
-
-                            console.log('Filtros aplicados:', {{
-                                setor: selSetorArray,
-                                grupo: selGrupoArray,
-                                etapa: selEtapaArray,
-                                concluidas: selConcluidas,
-                                visualizacao: selVis,
-                                pulmao: selPulmao,
-                                mesesPulmao: selPulmaoMeses
-                            }});
-
-                            // *** FECHAR MENU DE FILTROS ***
-                            document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
-
-                            if (selProjectIndex !== currentProjectIndex) {{
-                                currentProjectIndex = selProjectIndex;
-                                const newProject = allProjectsData[selProjectIndex];
-                                projectData = [JSON.parse(JSON.stringify(newProject))];
-                                // Reorganizar tasks com estrutura de subetapas
-                                projectData[0].tasks = organizarTasksComSubetapas(projectData[0].tasks);
-                                allTasks_baseData = JSON.parse(JSON.stringify(projectData[0].tasks));
-                            }}
-
-                            let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
-
-                            // *** DEBUG DETALHADO DOS GRUPOS ***
-                            console.log('=== DEBUG GRUPOS ===');
-                            console.log('Total de tasks base:', baseTasks.length);
-                            console.log('Grupos disponíveis nas tasks:', [...new Set(baseTasks.map(t => t.grupo))]);
-                            console.log('Filtrando por grupo:', selGrupoArray);
-                            
-                            // Verificar tasks que deveriam passar no filtro
-                            const tasksComGrupoFiltrado = baseTasks.filter(t => {{
-                                const passaFiltro = selGrupoArray.includes(t.grupo);
-                                if (passaFiltro) {{
-                                    console.log('Task que passa no filtro:', t.name, '- Grupo:', t.grupo);
-                                }}
-                                return passaFiltro;
-                            }});
-                            console.log('Tasks que pertencem ao grupo filtrado:', tasksComGrupoFiltrado.length);
-                            console.log('=== FIM DEBUG ===');
-
-                            if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
-                                const offsetMeses = -selPulmaoMeses;
-                                console.log("Aplicando pulmão APENAS no previsto para filtros");
-                                
-                                baseTasks.forEach(task => {{
-                                    const etapaNome = task.name;
-                                    
-                                    if (etapas_sem_alteracao.includes(etapaNome)) {{
-                                        // Não altera datas
-                                    }}
-                                    else if (etapas_pulmao.includes(etapaNome)) {{
-                                        // Apenas datas previstas
-                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                    }}
-                                    else {{
-                                        // Apenas datas previstas
-                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                                        task.end_previsto = addMonths(task.end_previsto, offsetMeses);
-                                        
-                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                        task.termino_previsto = formatDateDisplay(task.end_previsto);
-                                    }}
-                                }});
-                            }}
-
-                            let filteredTasks = baseTasks;
-
-                            // *** LÓGICA DE FILTRO CORRIGIDA ***
-                            // Filtro por Setor
-                            if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
-                                filteredTasks = filteredTasks.filter(t => selSetorArray.includes(t.setor));
-                                console.log('Após filtro setor:', filteredTasks.length);
-                            }}
-                            
-                            // Filtro por Grupo - CORREÇÃO PRINCIPAL
-                            if (selGrupoArray.length > 0 && !selGrupoArray.includes('Todos')) {{
-                                filteredTasks = filteredTasks.filter(t => selGrupoArray.includes(t.grupo));
-                                console.log('Após filtro grupo:', filteredTasks.length);
-                                
-                                // DEBUG adicional
-                                if (filteredTasks.length === 0) {{
-                                    console.warn('⚠️ NENHUMA TASK PASSOU NO FILTRO DE GRUPO!');
-                                    console.log('Grupos filtrados:', selGrupoArray);
-                                    console.log('Grupos disponíveis:', [...new Set(baseTasks.map(t => t.grupo))]);
-                                }}
-                            }}
-                            
-                            // Filtro por Etapa
-                            if (selEtapaArray.length > 0 && !selEtapaArray.includes('Todas')) {{
-                                filteredTasks = filteredTasks.filter(t => selEtapaArray.includes(t.name));
-                                console.log('Após filtro etapa:', filteredTasks.length);
-                            }}
-
-                            // Filtro por Concluídas
-                            if (selConcluidas) {{
-                                filteredTasks = filteredTasks.filter(t => t.progress < 100);
-                                console.log('Após filtro concluídas:', filteredTasks.length);
-                            }}
-
-                            console.log('Tasks após filtros:', filteredTasks.length);
-                            console.log('Tasks filtradas:', filteredTasks);
-
-                            // Se não há tasks após filtrar, mostrar mensagem mas permitir continuar
-                            if (filteredTasks.length === 0) {{
-                                console.warn('Nenhuma task passou pelos filtros aplicados');
-                                // Não interromper o processo, deixar que o renderSidebar mostre a mensagem apropriada
-                            }}
-
-                            // Recalcular range de datas apenas se houver tasks
-                            if (filteredTasks.length > 0) {{
-                                const {{ min: newMinStr, max: newMaxStr }} = findNewDateRange(filteredTasks);
-                                const newMin = parseDate(newMinStr);
-                                const newMax = parseDate(newMaxStr);
-                                const originalMin = parseDate(dataMinStr);
-                                const originalMax = parseDate(dataMaxStr);
-
-                                let finalMinDate = originalMin;
-                                if (newMin && newMin < finalMinDate) {{
-                                    finalMinDate = newMin;
-                                }}
-
-                                let finalMaxDate = originalMax;
-                                if (newMax && newMax > finalMaxDate) {{
-                                    finalMaxDate = newMax;
-                                }}
-
-                                finalMinDate = new Date(finalMinDate.getTime());
-                                finalMaxDate = new Date(finalMaxDate.getTime());
-                                finalMinDate.setUTCDate(1);
-                                finalMaxDate.setUTCMonth(finalMaxDate.getUTCMonth() + 1, 0);
-
-                                activeDataMinStr = finalMinDate.toISOString().split('T')[0];
-                                activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
-                            }}
-
-                            // Atualizar dados e redesenhar
-                            projectData[0].tasks = filteredTasks;
-                            tipoVisualizacao = selVis;
-
-                            renderSidebar();
-                            renderHeader();
-                            renderChart();
-                            positionTodayLine();
-                            positionMetaLine();
-                            updateProjectTitle();
-
-
-
-                        }} catch (error) {{
-                            console.error('Erro ao aplicar filtros:', error);
-                            alert('Erro ao aplicar filtros: ' + error.message);
-                        }}
-                    }}                    // DEBUG: Verificar se há dados antes de inicializar
-                    console.log('Dados do projeto:', projectData);
-                    console.log('Tasks base:', allTasks_baseData);
-                    
-                    // Inicializar o Gantt
-                    initGantt();
-                </script>
-            </body>
-            </html>
-        """
-        # Exibe o componente HTML no Streamlit
-        components.html(gantt_html, height=altura_gantt, scrolling=True)
-        st.markdown("---")
+                }}
+                
+                // DEBUG: Verificar se há dados antes de inicializar
+                console.log('Dados do projeto:', projectData);
+                console.log('Tasks base:', allTasks_baseData);
+                
+                // Inicializar o Gantt
+                initGantt();
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    components.html(gantt_html, height=altura_gantt, scrolling=True)
+    st.markdown("---")
+    
 # --- *** FUNÇÃO gerar_gantt_consolidado MODIFICADA *** ---
 def converter_dados_para_gantt_consolidado(df, etapa_selecionada):
     """
@@ -4401,26 +3763,56 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
 def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_data=None, baseline_name=None):
-    """
-    Decide qual Gantt gerar com base na seleção da etapa inicial.
-    """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
 
-    # Determinar qual empreendimento está sendo visualizado
     empreendimentos_no_df = df["Empreendimento"].unique()
     empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
     
     current_empreendimento = st.session_state.get('current_empreendimento')
     
-    # Aplicar baseline apenas se for específica para este empreendimento
     should_apply_baseline = (
         baseline_data is not None and 
         baseline_name is not None and 
         current_empreendimento == empreendimento_visualizado and
         empreendimento_visualizado != "Múltiplos"
     )
+    
+    if should_apply_baseline:
+        df = apply_baseline_to_dataframe(df, baseline_data)
+        
+        with st.container():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.info(f"**Visualizando:** {baseline_name} | **Projeto:** {empreendimento_visualizado}")
+            with col2:
+                if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
+                    st.session_state.current_baseline = None
+                    st.session_state.current_baseline_data = None
+                    st.session_state.current_empreendimento = None
+                    st.rerun()
+
+    is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
+
+    if is_consolidated_view:
+        gerar_gantt_consolidado(
+            df, 
+            tipo_visualizacao, 
+            df_original_para_ordenacao, 
+            pulmao_status, 
+            pulmao_meses,
+            etapa_selecionada_inicialmente
+        )
+    else:
+        gerar_gantt_por_projeto(
+            df, 
+            tipo_visualizacao, 
+            df_original_para_ordenacao, 
+            pulmao_status, 
+            pulmao_meses,
+            baseline_name=baseline_name if should_apply_baseline else None
+        )
     
     if should_apply_baseline:
         df = apply_baseline_to_dataframe(df, baseline_data)
@@ -5351,15 +4743,7 @@ with st.spinner("Carregando e processando dados..."):
             current_emp = st.session_state.get('current_empreendimento')
             empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
             
-            # Lógica de aplicação da baseline:
-            # 1. Se houver uma baseline ativa na sessão
-            # 2. E o empreendimento da baseline ativa estiver entre os empreendimentos do gráfico
-            #    (Isso garante que a baseline correta seja aplicada quando o filtro de empreendimento muda)
-            current_baseline = st.session_state.get('current_baseline')
-            current_baseline_data = st.session_state.get('current_baseline_data')
-            current_emp = st.session_state.get('current_empreendimento')
-            empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
-
+            # Só passar a baseline se pertencer a um empreendimento no gráfico atual
             if current_emp and current_emp in empreendimentos_no_grafico:
                 baseline_to_use = current_baseline
                 baseline_data_to_use = current_baseline_data
