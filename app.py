@@ -1180,8 +1180,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if version_name in emp_baselines:
                     baselines_data[version_name] = emp_baselines[version_name]['data']
 
-	        # A variável `baseline_options` já foi populada corretamente acima (linha 1172)
-	        # com as opções do `primeiro_empreendimento`.
+	        #// A variável `baseline_options` já foi populada corretamente acima (linha 1172)        # com as opções do `primeiro_empreendimento`.
 	        # A seção abaixo estava sobrescrevendo `baseline_options` com uma lista vazia
 	        # ou com as opções do `empreendimento_atual` (que é o mesmo que `primeiro_empreendimento`
 	        # no modo projeto único), mas o principal problema é a redefinição de `baseline_options`
@@ -1991,8 +1990,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const select = document.getElementById('baseline-select-{project['id']}');
                         const iframe = document.getElementById('hidden-iframe-{project['id']}');
                         const infoDiv = document.getElementById('baseline-info-{project['id']}');
-                        const empreendimento = '{empreendimento_principal}';
-                        
+                        const empreendimento = '{empreendimento_atual}';                     
                         // Só permitir mudança se houver um empreendimento específico
                         if (empreendimento === 'Múltiplos' || !empreendimento) {{
                             select.disabled = true;
@@ -4433,6 +4431,14 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
     empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
     
     current_empreendimento = st.session_state.get('current_empreendimento')
+    
+    # NOVO: Se o empreendimento visualizado mudou, limpar o estado da baseline
+    if current_empreendimento and current_empreendimento != empreendimento_visualizado:
+        st.session_state.current_baseline = None
+        st.session_state.current_baseline_data = None
+        st.session_state.current_empreendimento = None
+        # Não é necessário st.rerun() aqui, pois o Streamlit já vai re-executar
+        # com o novo filtro e a baseline será None na próxima execução.
     
     # Aplicar baseline apenas se for específica para este empreendimento
     should_apply_baseline = (
