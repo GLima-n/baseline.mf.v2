@@ -765,7 +765,9 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                     'etapa': row.get('Etapa', ''),
                     'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
                     'inicio_previsto': None,
-'termino_previsto': None,
+                    'termino_previsto': None,
+                    'inicio_real': None,
+                    'termino_real': None,
                     'percentual_concluido': row.get('% concluído', 0),
                     'setor': row.get('SETOR', ''),
                     'grupo': row.get('GRUPO', ''),
@@ -774,8 +776,11 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 
                 # Converter datas para string com tratamento seguro
                 date_fields = {
+                    # O Planejado da Baseline (P1, P2...) será o Real atual (requisito do usuário)
                     'inicio_previsto': 'Inicio_Real',
                     'termino_previsto': 'Termino_Real', 
+                    'inicio_real': 'Inicio_Real',
+                    'termino_real': 'Termino_Real'
                 }
                 
                 for task_field, df_field in date_fields.items():
@@ -895,16 +900,11 @@ def apply_baseline_to_dataframe(df, baseline_data):
         if mask.any():
             idx = df_baseline[mask].index[0]
             
-            # Atualizar datas previstas da baseline com os dados da baseline (que agora são as datas Reais do snapshot)
+            # Atualizar datas previstas da baseline
             if task['inicio_previsto']:
                 df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
             if task['termino_previsto']:
                 df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
-            
-            # Garantir que as datas Reais (Inicio_Real e Termino_Real) não sejam alteradas
-            # Elas permanecem como estão no df original, refletindo a realidade atual.
-            # O gráfico de Gantt usará Inicio_Prevista/Termino_Prevista para a barra "Previsto" (baseline)
-            # e Inicio_Real/Termino_Real para a barra "Real" (dinâmica).
             
             # Atualizar percentual de conclusão
             if 'percentual_concluido' in task:
@@ -1091,6 +1091,15 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         # --- Processar DF SEM PULMÃO ---
         df_sem_pulmao = df.copy()
         df_gantt_sem_pulmao = df_sem_pulmao.copy()
+
+        # --- APLICAÇÃO DA BASELINE (REQUISITO DO USUÁRIO) ---
+        # A baseline só é aplicada se estiver selecionada E se o empreendimento principal for o mesmo da baseline salva.
+        if st.session_state.get('current_baseline_data') and st.session_state.get('current_empreendimento') == empreendimento_principal:
+            # A função apply_baseline_to_dataframe irá substituir as colunas Inicio_Prevista e Termino_Prevista
+            # pelas datas salvas na baseline.
+            df_gantt_sem_pulmao = apply_baseline_to_dataframe(df_gantt_sem_pulmao, st.session_state.current_baseline_data)
+            st.info(f"Visualizando Baseline: **{st.session_state.current_baseline}**")
+        # --- FIM APLICAÇÃO DA BASELINE ---
 
         for col in ["Inicio_Prevista", "Termino_Prevista", "Inicio_Real", "Termino_Real"]:
             if col in df_gantt_sem_pulmao.columns:
@@ -1684,7 +1693,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                         </div>
-                        <select id="baseline-dropdown-{project['id']}" onchange="changeBaseline(this.value)">
+                        <select id="baseline-dropdown-{project['id']}" onchange="handleBaselineChange(this.value)">
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
