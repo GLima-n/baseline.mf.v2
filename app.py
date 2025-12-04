@@ -1232,7 +1232,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 
                 <style>
                     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                    html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
+                    html, body {{ width: 100%; height: 100%; /* font-family: 'Segoe UI', sans-serif; */ background-color: #f5f5f5; color: #333; overflow: hidden; }}
                     .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
                     .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
                     .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
@@ -1352,7 +1352,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                         z-index: 2147483647; /* Máximo Z-Index possível no navegador */
                         display: none;
-                        font-family: 'Segoe UI', sans-serif;
+                        /* font-family: 'Segoe UI', sans-serif; */
                         min-width: 160px;
                     }}
                     .context-menu-item {{
@@ -3467,7 +3467,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
             <style>
                 /* CSS idêntico ao de gerar_gantt_por_projeto, exceto adaptações para consolidado */
                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
+                html, body {{ width: 100%; height: 100%; /* font-family: 'Segoe UI', sans-serif; */ background-color: #f5f5f5; color: #333; overflow: hidden; }}
                 .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
                 .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
                 .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
@@ -4978,7 +4978,7 @@ with st.spinner("Carregando e processando dados..."):
                     box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
                     z-index: 10000;
                     display: none;
-                    font-family: Arial, sans-serif;
+                    /* font-family: Arial, sans-serif; */
                 }}
                 .context-menu-item {{
                     padding: 12px 20px;
@@ -5047,7 +5047,7 @@ with st.spinner("Carregando e processando dados..."):
                     justify-content: center;
                     align-items: center;
                     z-index: 10001;
-                    font-family: Arial, sans-serif;
+                    /* font-family: Arial, sans-serif; */
                 }}
                 .loading-spinner {{
                     background: white;
