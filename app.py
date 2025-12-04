@@ -893,22 +893,21 @@ def apply_baseline_to_dataframe(df, baseline_data):
     for task in baseline_data['tasks']:
         etapa = task['etapa']
         
-        # Encontrar a linha correspondente no DataFrame
+        # Encontrar as linhas correspondentes no DataFrame (pode haver múltiplas se o DF não estiver agregado)
         mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
                (df_baseline['Etapa'] == etapa)
         
         if mask.any():
-            idx = df_baseline[mask].index[0]
-            
-            # Atualizar datas previstas da baseline
+            # Atualizar datas previstas da baseline em TODAS as linhas que correspondem à etapa
             if task['inicio_previsto']:
-                df_baseline.loc[idx, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
+                df_baseline.loc[mask, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
             if task['termino_previsto']:
-                df_baseline.loc[idx, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
+                df_baseline.loc[mask, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
             
-            # Atualizar percentual de conclusão
+            # Atualizar percentual de conclusão (apenas para a primeira linha, se necessário, mas o foco é a data)
+            # Como a agregação usará o 'max' do percentual, atualizar todas as linhas não deve causar problemas.
             if 'percentual_concluido' in task:
-                df_baseline.loc[idx, '% concluído'] = task['percentual_concluido']
+                df_baseline.loc[mask, '% concluído'] = task['percentual_concluido']
     
     return df_baseline
 
@@ -1092,6 +1091,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         df_sem_pulmao = df.copy()
         df_gantt_sem_pulmao = df_sem_pulmao.copy()
 
+        # Determinar empreendimento principal
+        empreendimentos_no_grafico = df["Empreendimento"].unique()
+        empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
+
         # --- APLICAÇÃO DA BASELINE (REQUISITO DO USUÁRIO) ---
         # A baseline só é aplicada se estiver selecionada E se o empreendimento principal for o mesmo da baseline salva.
         if st.session_state.get('current_baseline_data') and st.session_state.get('current_empreendimento') == empreendimento_principal:
@@ -1109,7 +1112,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             df_gantt_sem_pulmao["% concluído"] = 0
         df_gantt_sem_pulmao["% concluído"] = df_gantt_sem_pulmao["% concluído"].fillna(0).apply(converter_porcentagem)
 
-        # Agrega os dados (usando nomes completos)
+        # A agregação é feita no DataFrame que JÁ PODE TER A BASELINE APLICADA
         df_gantt_agg_sem_pulmao = df_gantt_sem_pulmao.groupby(['Empreendimento', 'Etapa']).agg(
             Inicio_Prevista=('Inicio_Prevista', 'min'),
             Termino_Prevista=('Termino_Prevista', 'max'),
@@ -1120,14 +1123,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         ).reset_index()
 
         df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
-        # Obter baselines disponíveis
-        if not df.empty:
-                # Se estamos em visão consolidada por etapa, pode ter múltiplos empreendimentos
-                # Mas no modo projeto, geralmente temos um empreendimento principal
-                empreendimentos_no_grafico = df["Empreendimento"].unique()
-                empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
-        else:
-            empreendimento_principal = ""
+        
         # Mapear o SETOR e GRUPO
         df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
         df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
