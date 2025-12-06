@@ -849,11 +849,9 @@ def converter_dados_para_gantt(df):
                 baselines_emp = all_baselines_dict[empreendimento]
                 
                 for baseline_name, baseline_info in baselines_emp.items():
-                    # Obter dados da baseline
                     baseline_data = get_baseline_data(empreendimento, baseline_name)
                     
                     if baseline_data:
-                        # baseline_data pode ser dict ou lista
                         if isinstance(baseline_data, dict) and 'tasks' in baseline_data:
                             baseline_tasks = baseline_data['tasks']
                         elif isinstance(baseline_data, list):
@@ -861,28 +859,18 @@ def converter_dados_para_gantt(df):
                         else:
                             baseline_tasks = []
                         
-                        # DEBUG: Mostrar informações da baseline
-                        print(f"\n=== PROCESSANDO BASELINE: {baseline_name} ===")
-                        print(f"Total de tasks na baseline: {len(baseline_tasks)}")
-                        print(f"Primeiras 3 etapas na baseline: {[bt.get('etapa', bt.get('Etapa', '?')) for bt in baseline_tasks[:3]]}")
-                        
-                        matched_count = 0
-                        not_found_count = 0
-                        
-                        # Para cada task no gantt, buscar correspondente na baseline
+                        # Matching de etapas com baselines
                         for task in tasks:
                             task_name = task["name"]
-                            
-                            # Tentar múltiplas variações de nome para matching robusto
                             baseline_task = None
                             
-                            # 1. Tentar nome exato
+                            # Tentar nome exato
                             baseline_task = next(
                                 (bt for bt in baseline_tasks if bt.get('etapa') == task_name or bt.get('Etapa') == task_name),
                                 None
                             )
                             
-                            # 2. Tentar mapeamento reverso (nome completo → sigla)
+                            # Tentar mapeamento reverso (nome completo → sigla)
                             if not baseline_task and task_name in mapeamento_etapas_usuario:
                                 sigla = mapeamento_etapas_usuario[task_name]
                                 baseline_task = next(
@@ -890,7 +878,7 @@ def converter_dados_para_gantt(df):
                                     None
                                 )
                             
-                            # 3. Tentar mapeamento direto (sigla → nome completo)
+                            # Tentar mapeamento direto (sigla → nome completo)
                             if not baseline_task and task_name in mapeamento_reverso:
                                 nome_completo = mapeamento_reverso[task_name]
                                 baseline_task = next(
@@ -898,7 +886,7 @@ def converter_dados_para_gantt(df):
                                     None
                                 )
                             
-                            # 4. Tentar sigla_para_nome_completo
+                            # Tentar sigla_para_nome_completo
                             if not baseline_task and task_name in sigla_para_nome_completo:
                                 nome_alt = sigla_para_nome_completo[task_name]
                                 baseline_task = next(
@@ -906,7 +894,7 @@ def converter_dados_para_gantt(df):
                                     None
                                 )
                             
-                            # 5. Tentar normalizado (fallback)
+                            # Tentar normalizado (fallback)
                             if not baseline_task:
                                 task_name_norm = task_name.strip().upper()
                                 baseline_task = next(
@@ -921,14 +909,6 @@ def converter_dados_para_gantt(df):
                                     "start": baseline_task.get('inicio_previsto', baseline_task.get('Inicio_Prevista')),
                                     "end": baseline_task.get('termino_previsto', baseline_task.get('Termino_Prevista'))
                                 }
-                                matched_count += 1
-                            else:
-                                not_found_count += 1
-                                # DEBUG: Mostrar etapas não encontradas
-                                if not_found_count <= 5:  # Mostrar apenas as primeiras 5
-                                    print(f"⚠️ Não encontrada na baseline: '{task_name}'")
-                        
-                        print(f"✅ Matched: {matched_count} | ❌ Not found: {not_found_count}")
         except Exception as e:
             print(f"Erro ao popular baselines locais: {e}")
             # Se falhar, pelo menos P0 já foi adicionado
@@ -2228,17 +2208,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
                 
                 <script>
-                    // DEBUG: Verificar dados
-                    console.log('Inicializando Gantt para projeto:', '{project["name"]}');
-                    
-                    // DADOS COMPLETOS DE TODAS AS BASELINES (legado - manter por compatibilidade)
                     const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
                     const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
                     
-                    console.log('Dados de baseline carregados:', allBaselinesData);
-                    console.log('Opções de baseline por empreendimento:', baselineOptionsPorEmpreendimento);
-                    
-                    // Variável para compatibilidade com funções legadas
                     let currentBaseline = null;
                     
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
@@ -2297,14 +2269,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         return date.toISOString().split('T')[0];
                     }}
-                    // --- FIM HELPERS DE DATA E PULMÃO ---
-                    
-                    // *** FUNÇÃO BASELINE CLIENT-SIDE COM BASELINES EMBUTIDAS ***
+                    // Função de troca de baseline instantânea (client-side)
                     function switchBaselineLocal(baselineName) {{
-                        console.log('🔄 [BASELINES EMBUTIDAS v18:30] Aplicando:', baselineName);
+                        console.log('🔄 Aplicando baseline:', baselineName);
                         
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
-                            console.error('❌ projectData não disponível');
+                            console.error('❌ Dados do projeto não disponíveis');
                             return;
                         }}
                         
@@ -2319,22 +2289,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }});
                         
-                        console.log(`✅ ${{updatedCount}} tasks atualizadas`);
-                        
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
                             currentDiv.textContent = `Baseline: ${{baselineName}}`;
                         }}
                         
-                        // Redesenhar gráfico localmente (sem reload)
-                        console.log('🎨 Redesenhando gráfico...');
+                        // Redesenhar gráfico
                         try {{
                             renderChart();
                             renderSidebar();
-                            console.log('✅ Gráfico redesenhado com sucesso!');
                         }} catch (e) {{
-                            console.error('❌ Erro ao redesenhar:', e);
-                            // Fallback: reload se redesenho falhar
+                            console.error('Erro ao redesenhar:', e);
                             window.location.reload();
                         }}
                     }}
