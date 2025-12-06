@@ -2185,6 +2185,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados de baseline carregados:', allBaselinesData);
                     console.log('Opções de baseline por empreendimento:', baselineOptionsPorEmpreendimento);
                     
+                    // Variável para compatibilidade com funções legadas
+                    let currentBaseline = null;
+                    
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
 
                     const allProjectsData = {json.dumps(gantt_data_base)};
