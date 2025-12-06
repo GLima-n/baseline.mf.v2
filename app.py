@@ -2131,41 +2131,33 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     function applyBaseline_{project["id"]}(baselineName) {{
                         console.log('🔄 Aplicando baseline:', baselineName);
                         
-                        // Obter dados da baseline
-                        const baselineData = availableBaselines[baselineName];
-                        
-                        if (!baselineData) {{
-                            console.error('❌ Baseline não encontrada:', baselineName);
+                        // Obter empreendimento atual
+                        const projectDropdown = document.getElementById('filter-project-{project["id"]}');
+                        if (!projectDropdown) {{
+                            console.error('❌ Dropdown de projeto não encontrado');
                             return;
                         }}
                         
-                        console.log(`✅ Baseline contém ${{baselineData.length}} etapas`);
+                        const projectIndex = parseInt(projectDropdown.value, 10);
+                        const currentProject = allProjectsData[projectIndex];
+                        const empreendimento = currentProject ? currentProject.name : '';
                         
-                        // Atualizar tasks do gráfico
-                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
-                            console.error('❌ projectData não disponível');
+                        if (!empreendimento) {{
+                            console.error('❌ Empreendimento não identificado');
                             return;
                         }}
                         
-                        const tasks = projectData[0].tasks;
-                        let updatedCount = 0;
+                        console.log('📊 Empreendimento:', empreendimento);
+                        console.log('📊 Baseline:', baselineName);
                         
-                        tasks.forEach(task => {{
-                            // Encontrar task correspondente na baseline
-                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
-                            if (baselineTask) {{
-                                // Atualizar apenas datas previstas
-                                if (baselineTask.inicio_previsto) task.start_date = baselineTask.inicio_previsto;
-                                if (baselineTask.termino_previsto) task.end_date = baselineTask.termino_previsto;
-                                updatedCount++;
-                            }}
-                        }});
+                        // Construir URL com query parameters
+                        const baseUrl = window.location.href.split('?')[0];
+                        const newUrl = `${{baseUrl}}?change_baseline=${{encodeURIComponent(baselineName)}}&baseline_target=${{encodeURIComponent(empreendimento)}}`;
                         
-                        console.log(`✅ ${{updatedCount}} tasks atualizadas`);
+                        console.log('🔄 Redirecionando para:', newUrl);
                         
-                        // Recarregar página para aplicar mudanças
-                        console.log('🔄 Recarregando página...');
-                        window.location.reload();
+                        // Redirecionar (backend Python processará via process_baseline_change)
+                        window.top.location.href = newUrl;
                     }}
                     
                     // Alias para compatibilidade com dropdown existente
