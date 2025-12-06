@@ -2131,42 +2131,72 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     const availableBaselines = {json.dumps(available_baselines_for_js)};
                     console.log('📊 Baselines disponíveis para troca:', Object.keys(availableBaselines));
                     
-                    // *** FUNÇÃO PARA APLICAR BASELINE ***
-                    function applyBaseline_{project["id"]}(baselineName) {{
-                        console.log('🔄 [VERSÃO 2025-12-06 15:26] Aplicando baseline:', baselineName);
-                        
-                        // Obter empreendimento atual
-                        const projectDropdown = document.getElementById('filter-project-{project["id"]}');
-                        if (!projectDropdown) {{
-                            console.error('❌ Dropdown de projeto não encontrado');
-                            return;
-                        }}
-                        
-                        const projectIndex = parseInt(projectDropdown.value, 10);
-                        const currentProject = allProjectsData[projectIndex];
-                        const empreendimento = currentProject ? currentProject.name : '';
-                        
-                        if (!empreendimento) {{
-                            console.error('❌ Empreendimento não identificado');
-                            return;
-                        }}
-                        
-                        console.log('📊 Empreendimento:', empreendimento);
-                        console.log('📊 Baseline:', baselineName);
-                        
-                        // Construir URL com query parameters
-                        const baseUrl = window.location.href.split('?')[0];
-                        const newUrl = `${{baseUrl}}?change_baseline=${{encodeURIComponent(baselineName)}}&baseline_target=${{encodeURIComponent(empreendimento)}}`;
-                        
-                        console.log('🔄 Redirecionando para:', newUrl);
-                        
-                        // Redirecionar (backend Python processará via process_baseline_change)
-                        window.top.location.href = newUrl;
-                    }}
-                    
-                    // Alias para compatibilidade com dropdown existente
+                    // *** FUNÇÃO CLIENT-SIDE PARA TROCAR BASELINE ***
+                    // Versão: 2025-12-06 16:50 - 100% client-side, sem reload
                     function switchBaselineLocal(baselineName) {{
-                        applyBaseline_{project["id"]}(baselineName);
+                        console.log('🔄 [CLIENT-SIDE v16:50] Aplicando baseline:', baselineName);
+                        console.log('📊 Baselines disponíveis:', Object.keys(availableBaselines));
+                        
+                        // Buscar dados da baseline selecionada (já carregados no Python)
+                        const baselineData = availableBaselines[baselineName];
+                        
+                        if (!baselineData) {{
+                            console.error('❌ Baseline não encontrada:', baselineName);
+                            console.log('Disponíveis:', Object.keys(availableBaselines));
+                            return;
+                        }}
+                        
+                        console.log(`✅ Baseline encontrada com ${{baselineData.length}} etapas`);
+                        
+                        // Verificar se projectData está disponível
+                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
+                            console.error('❌ projectData não disponível');
+                            return;
+                        }}
+                        
+                        // Atualizar APENAS datas previstas (start_date, end_date)
+                        // NÃO alterar datas reais (start_real, end_real)
+                        const tasks = projectData[0].tasks;
+                        let updatedCount = 0;
+                        
+                        tasks.forEach(task => {{
+                            // Buscar etapa correspondente na baseline pelo nome
+                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
+                            
+                            if (baselineTask) {{
+                                // Atualizar apenas datas PREVISTAS
+                                if (baselineTask.inicio_previsto) {{
+                                    task.start_date = baselineTask.inicio_previsto;
+                                }}
+                                if (baselineTask.termino_previsto) {{
+                                    task.end_date = baselineTask.termino_previsto;
+                                }}
+                                updatedCount++;
+                            }}
+                        }});
+                        
+                        console.log(`✅ ${{updatedCount}} etapas atualizadas com baseline ${{baselineName}}`);
+                        
+                        // Atualizar indicador visual
+                        const currentBaselineDiv = document.getElementById('current-baseline-{project["id"]}');
+                        if (currentBaselineDiv) {{
+                            currentBaselineDiv.textContent = `Baseline: ${{baselineName}}`;
+                        }}
+                        
+                        // Forçar redesenho do gráfico chamando função existente
+                        try {{
+                            // Tentar chamar função de redesenho se existir
+                            if (typeof applyFiltersAndRedraw === 'function') {{
+                                console.log('🎨 Redesenhando via applyFiltersAndRedraw()');
+                                applyFiltersAndRedraw();
+                            }} else {{
+                                console.log('⚠️ applyFiltersAndRedraw não encontrado, recarregando página');
+                                window.location.reload();
+                            }}
+                        }} catch (e) {{
+                            console.error('❌ Erro ao redesenhar:', e);
+                            window.location.reload();
+                        }}
                     }}
                     
                     // Variável para compatibilidade com código legado
