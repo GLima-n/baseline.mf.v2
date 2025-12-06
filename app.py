@@ -861,6 +861,14 @@ def converter_dados_para_gantt(df):
                         else:
                             baseline_tasks = []
                         
+                        # DEBUG: Mostrar informações da baseline
+                        print(f"\n=== PROCESSANDO BASELINE: {baseline_name} ===")
+                        print(f"Total de tasks na baseline: {len(baseline_tasks)}")
+                        print(f"Primeiras 3 etapas na baseline: {[bt.get('etapa', bt.get('Etapa', '?')) for bt in baseline_tasks[:3]]}")
+                        
+                        matched_count = 0
+                        not_found_count = 0
+                        
                         # Para cada task no gantt, buscar correspondente na baseline
                         for task in tasks:
                             task_name = task["name"]
@@ -889,6 +897,14 @@ def converter_dados_para_gantt(df):
                                     "start": baseline_task.get('inicio_previsto', baseline_task.get('Inicio_Prevista')),
                                     "end": baseline_task.get('termino_previsto', baseline_task.get('Termino_Prevista'))
                                 }
+                                matched_count += 1
+                            else:
+                                not_found_count += 1
+                                # DEBUG: Mostrar etapas não encontradas
+                                if not_found_count <= 5:  # Mostrar apenas as primeiras 5
+                                    print(f"⚠️ Não encontrada na baseline: '{task_name}'")
+                        
+                        print(f"✅ Matched: {matched_count} | ❌ Not found: {not_found_count}")
         except Exception as e:
             print(f"Erro ao popular baselines locais: {e}")
             # Se falhar, pelo menos P0 já foi adicionado
