@@ -310,7 +310,33 @@ def process_baseline_change():
                 st.session_state.current_baseline_data = baseline_data
                 st.session_state.current_empreendimento = empreendimento
                 st.rerun()
+
+def aplicar_baseline_automaticamente(empreendimento):
+    """
+    Callback chamado automaticamente quando usuário troca a baseline no dropdown.
+    Aplica a baseline selecionada sem necessidade de clicar em botão.
+    """
+    selected_baseline = st.session_state.get('quick_baseline_select', 'P0-(padrão)')
+    
+    if selected_baseline == "P0-(padrão)":
+        # Voltar ao padrão (sem baseline)
+        st.session_state.current_baseline = None
+        st.session_state.current_baseline_data = None
+        st.session_state.current_empreendimento = None
+    else:
+        # Carregar baseline selecionada
+        baseline_data = get_baseline_data(empreendimento, selected_baseline)
+        if baseline_data:
+            st.session_state.current_baseline = selected_baseline
+            st.session_state.current_baseline_data = baseline_data
+            st.session_state.current_empreendimento = empreendimento
+        else:
+            # Se não encontrar, voltar para padrão
+            st.session_state.current_baseline = None
+            st.session_state.current_baseline_data = None
+            st.session_state.current_empreendimento = None
             
+
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
     query_params = st.query_params
@@ -3360,6 +3386,37 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         filtersPopulated = true;
                     }}
+                    
+                    //  *** NOVA FUNÇÃO: switch Baseline Local ***
+                    function switchBaselineLocal(selectedBaselineName) {{
+                        console.log('switchBaselineLocal chamado com:', selectedBaselineName);
+                        
+                        // Obter empreendimento atual do dropdown de projeto
+                        const projectDropdown = document.getElementById('filter-project-{project["id"]}');
+                        if (!projectDropdown) {{
+                            console.error('Dropdown de projeto não encontrado');
+                            return;
+                        }}
+                        
+                        const projectIndex = parseInt(projectDropdown.value, 10);
+                        const currentEmpreendimento = ganttDataBase[projectIndex]?.name;
+                        
+                        if (!currentEmpreendimento) {{
+                            console.error('Empreendimento não encontrado');
+                            return;
+                        }}
+                        
+                        console.log('Aplicando baseline:', selectedBaselineName, 'para:', currentEmpreendimento);
+                        
+                        // Construir URL com query parameters para comunicação com Streamlit
+                        const baseUrl = window.location.href.split('?')[0];
+                        const newUrl = `${{baseUrl}}?change_baseline=${{encodeURIComponent(selectedBaselineName)}}&baseline_target=${{encodeURIComponent(currentEmpreendimento)}}`;
+                        
+                        console.log('Redirecionando para:', newUrl);
+                        
+                        // Recarregar página com novos parâmetros
+                        window.top.location.href = newUrl;
+                    }}
 
                     // *** FUNÇÃO applyFiltersAndRedraw ATUALIZADA ***
                     function applyFiltersAndRedraw() {{
@@ -5626,7 +5683,7 @@ with st.spinner("Carregando e processando dados..."):
         
         # SELETOR RÁPIDO DE BASELINE (SEMPRE VISÍVEL)
         st.markdown("### 📊 Aplicar Baseline ao Gráfico")
-        col1, col2, col3 = st.columns([3, 3, 2])
+        col1, col2 = st.columns([3, 3])
         
         with col1:
             if not df_para_exibir.empty:
@@ -5645,38 +5702,20 @@ with st.spinner("Carregando e processando dados..."):
             if selected_quick_emp:
                 baseline_options_quick = get_baseline_options(selected_quick_emp)
                 if baseline_options_quick:
+                    # Aplicação automática via on_change
                     selected_quick_baseline = st.selectbox(
                         "Selecione a Baseline",
                         ["P0-(padrão)"] + baseline_options_quick,
                         key="quick_baseline_select",
-                        help="P0 = sem baseline (padrão atual)"
+                        help="P0 = sem baseline (padrão atual) - Seleção aplicada automaticamente",
+                        on_change=aplicar_baseline_automaticamente,
+                        args=(selected_quick_emp,)
                     )
                 else:
                     st.info("Nenhuma baseline disponível para este empreendimento")
                     selected_quick_baseline = "P0-(padrão)"
             else:
                 selected_quick_baseline = "P0-(padrão)"
-        
-        with col3:
-            st.write("")  # Spacer para alinhar verticalmente
-            st.write("")  # Mais um spacer
-            if st.button("✅ APLICAR BASELINE", use_container_width=True, key="quick_apply_btn", type="primary"):
-                if selected_quick_baseline == "P0-(padrão)":
-                    st.session_state.current_baseline = None
-                    st.session_state.current_baseline_data = None
-                    st.session_state.current_empreendimento = None
-                    st.success("✅ Voltou ao padrão (sem baseline)")
-                    st.rerun()
-                else:
-                    baseline_data = get_baseline_data(selected_quick_emp, selected_quick_baseline)
-                    if baseline_data:
-                        st.session_state.current_baseline = selected_quick_baseline
-                        st.session_state.current_baseline_data = baseline_data
-                        st.session_state.current_empreendimento = selected_quick_emp
-                        st.success(f"✅ Baseline **{selected_quick_baseline}** aplicada ao projeto **{selected_quick_emp}**!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Baseline {selected_quick_baseline} não encontrada")
         
         st.markdown("---")  # Separador visual
         
