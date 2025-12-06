@@ -1,102 +1,29 @@
 import streamlit as st
 import base64
 import os
-import json
 
 def show_welcome_screen():
     """
-    Popup bonito usando overlay CSS puro sem iframe.
+    Popup de login - sempre aparece quando não há email no session_state
     """
     
-    print("="*80)
-    print("🔍 show_welcome_screen() CHAMADO!")
-    print(f"📧 Session state user_email: '{st.session_state.get('user_email', 'VAZIO')}'")
-    print(f"👤 Session state user_name: '{st.session_state.get('user_name', 'VAZIO')}'")
-    print(f"🔗 Query params: {dict(st.query_params)}")
-    
-    # === LIMPEZA FORÇADA VIA URL ===
-    # Se a URL contiver ?clear_login=1, limpa TUDO e mostra o popup
-    if 'clear_login' in st.query_params:
-        print("🧹 LIMPEZA FORÇADA ATIVADA!")
-        
-        # Deletar arquivo
-        config_file = '.streamlit_user_config.json'
-        if os.path.exists(config_file):
-            try:
-                os.remove(config_file)
-                print(f"✅ Arquivo {config_file} DELETADO!")
-            except Exception as e:
-                print(f"❌ Erro ao deletar arquivo: {e}")
-        
-        # Limpar session_state
-        if 'user_email' in st.session_state:
-            del st.session_state['user_email']
-            print("✅ user_email removido do session_state")
-        if 'user_name' in st.session_state:
-            del st.session_state['user_name']
-            print("✅ user_name removido do session_state")
-        
-        # Limpar query params e recarregar
-        st.query_params.clear()
-        print("✅ Query params limpos, fazendo rerun...")
-        st.rerun()
-    
-    # PRIMEIRO: Processar query params se existirem (antes de qualquer verificação)
+    # Processar login do formulário
     if 'popup_name' in st.query_params and 'popup_email' in st.query_params:
-        print("✅ QUERY PARAMS DETECTADOS - Processando login...")
         name = st.query_params['popup_name']
         email = st.query_params['popup_email']
         
         if name and email and len(name) >= 3 and '@' in email:
-            print(f"✅ Salvando: name='{name}', email='{email}'")
+            # Salvar apenas no session_state (temporário)
             st.session_state.user_name = name
             st.session_state.user_email = email
             
-            # Salvar no arquivo
-            try:
-                with open('.streamlit_user_config.json', 'w') as f:
-                    json.dump({'user_name': name, 'user_email': email}, f)
-                print("✅ Arquivo .streamlit_user_config.json CRIADO")
-            except Exception as e:
-                print(f"❌ Erro ao salvar arquivo: {e}")
-            
-            # IMPORTANTE: Limpar params e recarregar IMEDIATAMENTE
+            # Limpar params e recarregar
             st.query_params.clear()
-            print("🔄 Query params limpos, fazendo rerun...")
             st.rerun()
-    else:
-        print("⚠️ Nenhum query param detectado")
     
-    # SEGUNDO: Verificar se já tem email no session_state
+    # Se já tem email no session_state, não mostra popup
     if 'user_email' in st.session_state and st.session_state.user_email:
-        print(f"🚫 JÁ TEM EMAIL NO SESSION_STATE: '{st.session_state.user_email}' - POPUP NÃO SERÁ EXIBIDO")
-        print("="*80)
-        return  # Já tem email
-    else:
-        print("✅ Session_state NÃO tem email ainda")
-    
-    # TERCEIRO: Tentar carregar do arquivo
-    try:
-        config_file = '.streamlit_user_config.json'
-        print(f"🔍 Verificando se existe arquivo '{config_file}'...")
-        if os.path.exists(config_file):
-            print(f"❌ ARQUIVO EXISTE! Carregando...")
-            with open(config_file, 'r') as f:
-                config = json.load(f)
-                print(f"📄 Conteúdo do arquivo: {config}")
-                if config.get('user_email'):
-                    st.session_state.user_name = config.get('user_name', '')
-                    st.session_state.user_email = config['user_email']
-                    print(f"🚫 EMAIL CARREGADO DO ARQUIVO: '{config['user_email']}' - POPUP NÃO SERÁ EXIBIDO")
-                    print("="*80)
-                    return
-        else:
-            print(f"✅ Arquivo NÃO existe - Popup DEVE ser exibido")
-    except Exception as e:
-        print(f"⚠️ Erro ao carregar arquivo: {e}")
-    
-    print("🎯 TODAS AS VERIFICAÇÕES PASSARAM - EXIBINDO POPUP!")
-    print("="*80)
+        return
     
     # Carregar background SVG
     def load_svg_as_base64():
@@ -112,7 +39,7 @@ def show_welcome_screen():
     svg_base64 = load_svg_as_base64()
     bg_style = f"background-image: url('data:image/svg+xml;base64,{svg_base64}');" if svg_base64 else "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
     
-    # CSS e HTML do popup (sem iframe!)
+    # CSS e HTML do popup
     popup_html = f"""
     <style>
         /* Esconder conteúdo principal do Streamlit */
