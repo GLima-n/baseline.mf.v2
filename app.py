@@ -2000,14 +2000,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </svg>
                             </span>
                         </button>
-                        
-                        <!-- Dropdown de Baseline -->
-                        <select id="baseline-select-{project["id"]}" 
-                                onchange="applyBaseline_{project["id"]}(this.value)"
-                                style="margin-left: 10px; padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; font-size: 12px; cursor: pointer;">
-                            <option value="P0-(padrão)">📊 P0-(padrão)</option>
-                        </select>
-                        
                         <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2017,7 +2009,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         </button>
                     </div>
                     <!-- Seletor de Baseline no Menu Flutuante -->
-                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
+                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: block;">
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                         </div>
