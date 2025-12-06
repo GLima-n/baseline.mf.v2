@@ -2013,10 +2013,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                         </div>
-                        <select id="baseline-dropdown-{project['id']}" onchange="switchBaselineLocal(this.value)">
+                        <select id="baseline-dropdown-{project['id']}">
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
+                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value)" 
+                                style="margin-top: 8px; width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                            ✅ Aplicar Baseline
+                        </button>
                     </div>
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                         <div class="filter-group">
