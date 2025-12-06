@@ -2133,7 +2133,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // *** FUNÇÃO PARA APLICAR BASELINE ***
                     function applyBaseline_{project["id"]}(baselineName) {{
-                        console.log('🔄 Aplicando baseline:', baselineName);
+                        console.log('🔄 [VERSÃO 2025-12-06 15:26] Aplicando baseline:', baselineName);
                         
                         // Obter empreendimento atual
                         const projectDropdown = document.getElementById('filter-project-{project["id"]}');
