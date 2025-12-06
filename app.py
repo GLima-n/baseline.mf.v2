@@ -825,9 +825,60 @@ def converter_dados_para_gantt(df):
                 "vt_text": f"{int(vt):+d}d" if pd.notna(vt) else "-",
                 "vd_text": f"{int(vd):+d}d" if pd.notna(vd) else "-",
 
-                "status_color_class": status_color_class
+                "status_color_class": status_color_class,
+                
+                # *** NOVO: Campo para baselines locais (client-side switching) ***
+                "baselines": {}  # Será populado após criar todas tasks do empreendimento
             }
             tasks.append(task)
+
+        # *** POPULAR BASELINES LOCAIS EM CADA TASK ***
+        # Carregar todas as baselines disponíveis para este empreendimento
+        try:
+            all_baselines_dict = load_baselines()  # Carrega do MySQL
+            
+            # P0 = dados atuais (padrão)
+            for task in tasks:
+                task["baselines"]["P0-(padrão)"] = {
+                    "start": task["start_previsto"],
+                    "end": task["end_previsto"]
+                }
+            
+            # Adicionar outras baselines se existirem
+            if empreendimento in all_baselines_dict:
+                baselines_emp = all_baselines_dict[empreendimento]
+                
+                for baseline_name, baseline_info in baselines_emp.items():
+                    # Obter dados da baseline
+                    baseline_data = get_baseline_data(empreendimento, baseline_name)
+                    
+                    if baseline_data:
+                        # baseline_data pode ser dict ou lista
+                        if isinstance(baseline_data, dict) and 'tasks' in baseline_data:
+                            baseline_tasks = baseline_data['tasks']
+                        elif isinstance(baseline_data, list):
+                            baseline_tasks = baseline_data
+                        else:
+                            baseline_tasks = []
+                        
+                        # Para cada task no gantt, buscar correspondente na baseline
+                        for task in tasks:
+                            task_name = task["name"]
+                            
+                            # Buscar task correspondente na baseline
+                            baseline_task = next(
+                                (bt for bt in baseline_tasks if bt.get('etapa') == task_name or bt.get('Etapa') == task_name),
+                                None
+                            )
+                            
+                            if baseline_task:
+                                task["baselines"][baseline_name] = {
+                                    "start": baseline_task.get('inicio_previsto', baseline_task.get('Inicio_Prevista')),
+                                    "end": baseline_task.get('termino_previsto', baseline_task.get('Termino_Prevista'))
+                                }
+        except Exception as e:
+            print(f"Erro ao popular baselines locais: {e}")
+            # Se falhar, pelo menos P0 já foi adicionado
 
         data_meta = obter_data_meta_assinatura_novo(df_emp)
 
@@ -2127,81 +2178,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // DEBUG: Verificar dados
                     console.log('Inicializando Gantt para projeto:', '{project["name"]}');
                     
-                    // *** NOVO: TODAS AS BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE ***
-                    const availableBaselines = {json.dumps(available_baselines_for_js)};
-                    console.log('📊 Baselines disponíveis para troca:', Object.keys(availableBaselines));
-                    
-                    // *** FUNÇÃO CLIENT-SIDE PARA TROCAR BASELINE ***
-                    // Versão: 2025-12-06 16:50 - 100% client-side, sem reload
-                    function switchBaselineLocal(baselineName) {{
-                        console.log('🔄 [CLIENT-SIDE v16:50] Aplicando baseline:', baselineName);
-                        console.log('📊 Baselines disponíveis:', Object.keys(availableBaselines));
-                        
-                        // Buscar dados da baseline selecionada (já carregados no Python)
-                        const baselineData = availableBaselines[baselineName];
-                        
-                        if (!baselineData) {{
-                            console.error('❌ Baseline não encontrada:', baselineName);
-                            console.log('Disponíveis:', Object.keys(availableBaselines));
-                            return;
-                        }}
-                        
-                        console.log(`✅ Baseline encontrada com ${{baselineData.length}} etapas`);
-                        
-                        // Verificar se projectData está disponível
-                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
-                            console.error('❌ projectData não disponível');
-                            return;
-                        }}
-                        
-                        // Atualizar APENAS datas previstas (start_date, end_date)
-                        // NÃO alterar datas reais (start_real, end_real)
-                        const tasks = projectData[0].tasks;
-                        let updatedCount = 0;
-                        
-                        tasks.forEach(task => {{
-                            // Buscar etapa correspondente na baseline pelo nome
-                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
-                            
-                            if (baselineTask) {{
-                                // Atualizar apenas datas PREVISTAS
-                                if (baselineTask.inicio_previsto) {{
-                                    task.start_date = baselineTask.inicio_previsto;
-                                }}
-                                if (baselineTask.termino_previsto) {{
-                                    task.end_date = baselineTask.termino_previsto;
-                                }}
-                                updatedCount++;
-                            }}
-                        }});
-                        
-                        console.log(`✅ ${{updatedCount}} etapas atualizadas com baseline ${{baselineName}}`);
-                        
-                        // Atualizar indicador visual
-                        const currentBaselineDiv = document.getElementById('current-baseline-{project["id"]}');
-                        if (currentBaselineDiv) {{
-                            currentBaselineDiv.textContent = `Baseline: ${{baselineName}}`;
-                        }}
-                        
-                        // Forçar redesenho do gráfico chamando função existente
-                        try {{
-                            // Tentar chamar função de redesenho se existir
-                            if (typeof applyFiltersAndRedraw === 'function') {{
-                                console.log('🎨 Redesenhando via applyFiltersAndRedraw()');
-                                applyFiltersAndRedraw();
-                            }} else {{
-                                console.log('⚠️ applyFiltersAndRedraw não encontrado, recarregando página');
-                                window.location.reload();
-                            }}
-                        }} catch (e) {{
-                            console.error('❌ Erro ao redesenhar:', e);
-                            window.location.reload();
-                        }}
-                    }}
-                    
-                    // Variável para compatibilidade com código legado
-                    const currentBaseline = null; // Baseline não controlada mais por Python
-                    
                     // DADOS COMPLETOS DE TODAS AS BASELINES (legado - manter por compatibilidade)
                     const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
                     const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
@@ -2262,71 +2238,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         date.setUTCMonth(date.getUTCMonth() + months);
                         if (date.getUTCDate() !== originalDay) {{
                             date.setUTCDate(0);
-                        }}
-                        return date.toISOString().split('T')[0];
-                    }}
-                    // --- FIM HELPERS DE DATA E PULMÃO ---
-                    
-                    // *** NOVA FUNÇÃO: TROCA DE BASELINE CLIENT-SIDE ***
-                    function switchBaselineLocal(baselineName) {{
-                        console.log(`🔄 Trocando baseline para: ${{baselineName}}`);
-                        
-                        // 1. Obter dados da baseline selecionada
-                        const baselineData = availableBaselines[baselineName];
-                        
-                        if (!baselineData) {{
-                            console.error(`❌ Baseline ${{baselineName}} não encontrada!`);
-                            console.log('Baselines disponíveis:', Object.keys(availableBaselines));
-                            return;
-                        }}
-                        
-                        console.log(`✅ Baseline encontrada com ${{baselineData.length}} etapas`);
-                        
-                        // 2. Iterar sobre as tasks do gráfico atual
-                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
-                            console.error('❌ projectData não disponível');
-                            return;
-                        }}
-                        
-                        const tasks = projectData[0].tasks;
-                        let updatedCount = 0;
-                       
-                        tasks.forEach(task => {{
-                            // 3. Encontrar task correspondente na baseline (por nome da etapa)
-                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
-                            
-                            if (baselineTask) {{
-                                // 4. Atualizar APENAS datas PREVISTAS (não alterar Real!)
-                                if (baselineTask.inicio_previsto) {{
-                                    task.start_date = baselineTask.inicio_previsto;
-                                }}
-                                if (baselineTask.termino_previsto) {{
-                                    task.end_date = baselineTask.termino_previsto;
-                                }}
-                                
-                                // IMPORTANTE: NÃO alterar start_real e end_real - essas devem permanecer inalteradas!
-                                updatedCount++;
-                            }}
-                        }});
-                        
-                        console.log(`✅ ${{updatedCount}} etapas atualizadas com baseline ${{baselineName}}`);
-                        
-                        // 5. Re-renderizar gráfico para refletir mudanças
-                        renderChart();
-                        renderSidebar();
-                        
-                        // 6. Atualizar indicador visual no dropdown
-                        const currentDiv = document.getElementById('current-baseline-{{project["id"]}}');
-                        if (currentDiv) {{
-                            currentDiv.textContent = `Baseline: ${{baselineName}}`;
-                        }}
-                        
-                        console.log('🎨 Gráfico re-renderizado com nova baseline');
-                    }}
-                    // *** FIM FUNÇÃO TROCA BASELINE ***
-
-                    const filterOptions = {json.dumps(filter_options)};
-
                     let allTasks_baseData = {json.dumps(tasks_base_data)};
 
                     const initialPulmaoStatus = '{pulmao_status}';
