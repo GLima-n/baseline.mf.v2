@@ -1450,39 +1450,33 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 baselines_por_empreendimento[emp] = emp_baselines
         
         # --- NOVO: Preparar TODAS as baselines para troca client-side ---
-        # Carregar dados completos de baselines do empreendimento específico deste gráfico
+        # Carregar dados completos de baselines de TODOS os empreendimentos
         available_baselines_for_js = {}
         
         print("=" * 80)
         print("INÍCIO: Preparando baselines para JavaScript client-side")
         print("=" * 80)
         
-        # Usar empreendimento_principal (do gráfico) ao invés de empreendimento_atual
-        # porque empreendimento_atual pode ser "Múltiplos" na visualização consolidada
-        empreendimento_para_baselines = project['name'] if project else None
+        # Carregar todas as baselines do banco
+        all_baselines_from_db = load_baselines()
+        print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
         
-        print(f"DEBUG: empreendimento_atual = {empreendimento_atual}")
-        print(f"DEBUG: empreendimento_para_baselines (do projeto) = {empreendimento_para_baselines}")
+        # 1. P0 = dados atuais (sem baseline)
+        available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
+        print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
         
-        if empreendimento_para_baselines and empreendimento_para_baselines != "Múltiplos":
-            # 1. P0 = dados atuais (sem baseline)
-            available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
-            print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
-            
-            # 2. Carregar todas as baselines armazenadas
-            all_baselines_from_db = load_baselines()
-            print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
-            
-            if empreendimento_para_baselines in all_baselines_from_db:
-                baselines_dict = all_baselines_from_db[empreendimento_para_baselines]
-                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_para_baselines}")
+        # 2. Carregar baselines de TODOS os empreendimentos disponíveis
+        for empreendimento_loop in todos_empreendimentos:
+            if empreendimento_loop in all_baselines_from_db:
+                baselines_dict = all_baselines_from_db[empreendimento_loop]
+                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_loop}")
                 
                 # Usar a função get_baseline_data que já funciona corretamente
                 for baseline_name in baselines_dict.keys():
                     print(f"DEBUG: Carregando baseline {baseline_name} usando get_baseline_data()")
                     
                     # Usar função existente que já sabe parsear corretamente
-                    baseline_data = get_baseline_data(empreendimento_para_baselines, baseline_name)
+                    baseline_data = get_baseline_data(empreendimento_loop, baseline_name)
                     
                     if baseline_data:
                         try:
@@ -1544,10 +1538,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             continue
                     else:
                         print(f"DEBUG: get_baseline_data retornou None para {baseline_name}")
-            else:
-                print(f"DEBUG: Empreendimento {empreendimento_para_baselines} NÃO encontrado em all_baselines_from_db")
-        else:
-            print(f"DEBUG: Empreendimento é 'Múltiplos' ou None, não carregando baselines")
         
         print(f"DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
         
