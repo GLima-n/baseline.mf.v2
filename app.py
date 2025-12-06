@@ -876,13 +876,37 @@ def converter_dados_para_gantt(df):
                             # Tentar múltiplas variações de nome para matching robusto
                             baseline_task = None
                             
-                            # 1. Tentar nome exato com 'etapa' e 'Etapa'
+                            # 1. Tentar nome exato
                             baseline_task = next(
                                 (bt for bt in baseline_tasks if bt.get('etapa') == task_name or bt.get('Etapa') == task_name),
                                 None
                             )
                             
-                            # 2. Se não encontrou, tentar normalizado (sem espaços extras)
+                            # 2. Tentar mapeamento reverso (nome completo → sigla)
+                            if not baseline_task and task_name in mapeamento_etapas_usuario:
+                                sigla = mapeamento_etapas_usuario[task_name]
+                                baseline_task = next(
+                                    (bt for bt in baseline_tasks if bt.get('etapa') == sigla or bt.get('Etapa') == sigla),
+                                    None
+                                )
+                            
+                            # 3. Tentar mapeamento direto (sigla → nome completo)
+                            if not baseline_task and task_name in mapeamento_reverso:
+                                nome_completo = mapeamento_reverso[task_name]
+                                baseline_task = next(
+                                    (bt for bt in baseline_tasks if bt.get('etapa') == nome_completo or bt.get('Etapa') == nome_completo),
+                                    None
+                                )
+                            
+                            # 4. Tentar sigla_para_nome_completo
+                            if not baseline_task and task_name in sigla_para_nome_completo:
+                                nome_alt = sigla_para_nome_completo[task_name]
+                                baseline_task = next(
+                                    (bt for bt in baseline_tasks if bt.get('etapa') == nome_alt or bt.get('Etapa') == nome_alt),
+                                    None
+                                )
+                            
+                            # 5. Tentar normalizado (fallback)
                             if not baseline_task:
                                 task_name_norm = task_name.strip().upper()
                                 baseline_task = next(
