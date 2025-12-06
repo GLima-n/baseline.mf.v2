@@ -2147,6 +2147,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados de baseline carregados:', allBaselinesData);
                     console.log('Opções de baseline por empreendimento:', baselineOptionsPorEmpreendimento);
                     
+                    // *** NOVO: Criar availableBaselines a partir de allBaselinesData ***
+                    const availableBaselines = {{}};
+                    
+                    // Para cada empreendimento e suas baselines
+                    for (const [empreendimento, baselinesDoEmp] of Object.entries(allBaselinesData)) {{
+                        for (const [baselineName, baselineInfo] of Object.entries(baselinesDoEmp)) {{
+                            // baselineInfo.data contém os dados da baseline
+                            if (baselineInfo.data && baselineInfo.data.tasks) {{
+                                availableBaselines[baselineName] = baselineInfo.data.tasks;
+                                console.log(`Baseline ${{baselineName}} adicionada com ${{baselineInfo.data.tasks.length}} tasks`);
+                            }}
+                        }}
+                    }}
+                    
+                    console.log('availableBaselines criado:', Object.keys(availableBaselines));
+                    
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
 
                     const allProjectsData = {json.dumps(gantt_data_base)};
@@ -3385,37 +3401,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         updatePulmaoInputVisibility();
 
                         filtersPopulated = true;
-                    }}
-                    
-                    //  *** NOVA FUNÇÃO: switch Baseline Local ***
-                    function switchBaselineLocal(selectedBaselineName) {{
-                        console.log('switchBaselineLocal chamado com:', selectedBaselineName);
-                        
-                        // Obter empreendimento atual do dropdown de projeto
-                        const projectDropdown = document.getElementById('filter-project-{project["id"]}');
-                        if (!projectDropdown) {{
-                            console.error('Dropdown de projeto não encontrado');
-                            return;
-                        }}
-                        
-                        const projectIndex = parseInt(projectDropdown.value, 10);
-                        const currentEmpreendimento = ganttDataBase[projectIndex]?.name;
-                        
-                        if (!currentEmpreendimento) {{
-                            console.error('Empreendimento não encontrado');
-                            return;
-                        }}
-                        
-                        console.log('Aplicando baseline:', selectedBaselineName, 'para:', currentEmpreendimento);
-                        
-                        // Construir URL com query parameters para comunicação com Streamlit
-                        const baseUrl = window.location.href.split('?')[0];
-                        const newUrl = `${{baseUrl}}?change_baseline=${{encodeURIComponent(selectedBaselineName)}}&baseline_target=${{encodeURIComponent(currentEmpreendimento)}}`;
-                        
-                        console.log('Redirecionando para:', newUrl);
-                        
-                        // Recarregar página com novos parâmetros
-                        window.top.location.href = newUrl;
                     }}
 
                     // *** FUNÇÃO applyFiltersAndRedraw ATUALIZADA ***
