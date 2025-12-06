@@ -4,17 +4,15 @@ import os
 
 def show_welcome_screen():
     """
-    Popup de login - sempre aparece quando não há email no session_state
+    Popup de login - pede apenas email do usuário
     """
     
     # Processar login do formulário
-    if 'popup_name' in st.query_params and 'popup_email' in st.query_params:
-        name = st.query_params['popup_name']
+    if 'popup_email' in st.query_params:
         email = st.query_params['popup_email']
         
-        if name and email and len(name) >= 3 and '@' in email:
-            # Salvar apenas no session_state (temporário)
-            st.session_state.user_name = name
+        if email and '@' in email:
+            # Salvar apenas email no session_state
             st.session_state.user_email = email
             
             # Limpar params e recarregar
@@ -168,13 +166,10 @@ def show_welcome_screen():
         <div class="popup-card">
             <div class="popup-header">
                 <h2>Bem-vindo ao Painel</h2>
-                <p>Por favor, preencha seus dados para acessar</p>
+                <p>Por favor, informe seu email para acessar</p>
             </div>
             <div class="popup-body">
                 <form method="get">
-                    <div class="input-group">
-                        <input type="text" name="popup_name" placeholder="Nome completo" class="popup-input" required minlength="3" />
-                    </div>
                     <div class="input-group">
                         <input type="email" name="popup_email" placeholder="Email corporativo" class="popup-input" required />
                     </div>
