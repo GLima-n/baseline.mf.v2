@@ -310,7 +310,33 @@ def process_baseline_change():
                 st.session_state.current_baseline_data = baseline_data
                 st.session_state.current_empreendimento = empreendimento
                 st.rerun()
+
+def aplicar_baseline_automaticamente(empreendimento):
+    """
+    Callback chamado automaticamente quando usuário troca a baseline no dropdown.
+    Aplica a baseline selecionada sem necessidade de clicar em botão.
+    """
+    selected_baseline = st.session_state.get('quick_baseline_select', 'P0-(padrão)')
+    
+    if selected_baseline == "P0-(padrão)":
+        # Voltar ao padrão (sem baseline)
+        st.session_state.current_baseline = None
+        st.session_state.current_baseline_data = None
+        st.session_state.current_empreendimento = None
+    else:
+        # Carregar baseline selecionada
+        baseline_data = get_baseline_data(empreendimento, selected_baseline)
+        if baseline_data:
+            st.session_state.current_baseline = selected_baseline
+            st.session_state.current_baseline_data = baseline_data
+            st.session_state.current_empreendimento = empreendimento
+        else:
+            # Se não encontrar, voltar para padrão
+            st.session_state.current_baseline = None
+            st.session_state.current_baseline_data = None
+            st.session_state.current_empreendimento = None
             
+
 # --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
 def process_context_menu_actions(df=None):
     query_params = st.query_params
@@ -1424,39 +1450,33 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 baselines_por_empreendimento[emp] = emp_baselines
         
         # --- NOVO: Preparar TODAS as baselines para troca client-side ---
-        # Carregar dados completos de baselines do empreendimento específico deste gráfico
+        # Carregar dados completos de baselines de TODOS os empreendimentos
         available_baselines_for_js = {}
         
         print("=" * 80)
         print("INÍCIO: Preparando baselines para JavaScript client-side")
         print("=" * 80)
         
-        # Usar empreendimento_principal (do gráfico) ao invés de empreendimento_atual
-        # porque empreendimento_atual pode ser "Múltiplos" na visualização consolidada
-        empreendimento_para_baselines = project['name'] if project else None
+        # Carregar todas as baselines do banco
+        all_baselines_from_db = load_baselines()
+        print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
         
-        print(f"DEBUG: empreendimento_atual = {empreendimento_atual}")
-        print(f"DEBUG: empreendimento_para_baselines (do projeto) = {empreendimento_para_baselines}")
+        # 1. P0 = dados atuais (sem baseline)
+        available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
+        print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
         
-        if empreendimento_para_baselines and empreendimento_para_baselines != "Múltiplos":
-            # 1. P0 = dados atuais (sem baseline)
-            available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
-            print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
-            
-            # 2. Carregar todas as baselines armazenadas
-            all_baselines_from_db = load_baselines()
-            print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
-            
-            if empreendimento_para_baselines in all_baselines_from_db:
-                baselines_dict = all_baselines_from_db[empreendimento_para_baselines]
-                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_para_baselines}")
+        # 2. Carregar baselines de TODOS os empreendimentos disponíveis
+        for empreendimento_loop in todos_empreendimentos:
+            if empreendimento_loop in all_baselines_from_db:
+                baselines_dict = all_baselines_from_db[empreendimento_loop]
+                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_loop}")
                 
                 # Usar a função get_baseline_data que já funciona corretamente
                 for baseline_name in baselines_dict.keys():
                     print(f"DEBUG: Carregando baseline {baseline_name} usando get_baseline_data()")
                     
                     # Usar função existente que já sabe parsear corretamente
-                    baseline_data = get_baseline_data(empreendimento_para_baselines, baseline_name)
+                    baseline_data = get_baseline_data(empreendimento_loop, baseline_name)
                     
                     if baseline_data:
                         try:
@@ -1518,10 +1538,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             continue
                     else:
                         print(f"DEBUG: get_baseline_data retornou None para {baseline_name}")
-            else:
-                print(f"DEBUG: Empreendimento {empreendimento_para_baselines} NÃO encontrado em all_baselines_from_db")
-        else:
-            print(f"DEBUG: Empreendimento é 'Múltiplos' ou None, não carregando baselines")
         
         print(f"DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
         
@@ -1984,6 +2000,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </svg>
                             </span>
                         </button>
+                        
+                        <!-- Dropdown de Baseline -->
+                        <select id="baseline-select-{project["id"]}" 
+                                onchange="applyBaseline_{project["id"]}(this.value)"
+                                style="margin-left: 10px; padding: 6px 12px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.1); color: white; font-size: 12px; cursor: pointer;">
+                            <option value="P0-(padrão)">📊 P0-(padrão)</option>
+                        </select>
+                        
                         <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2110,6 +2134,47 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // *** NOVO: TODAS AS BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE ***
                     const availableBaselines = {json.dumps(available_baselines_for_js)};
                     console.log('📊 Baselines disponíveis para troca:', Object.keys(availableBaselines));
+                    
+                    // *** FUNÇÃO PARA APLICAR BASELINE ***
+                    function applyBaseline_{project["id"]}(baselineName) {{
+                        console.log('🔄 Aplicando baseline:', baselineName);
+                        
+                        // Obter dados da baseline
+                        const baselineData = availableBaselines[baselineName];
+                        
+                        if (!baselineData) {{
+                            console.error('❌ Baseline não encontrada:', baselineName);
+                            return;
+                        }}
+                        
+                        console.log(`✅ Baseline contém ${{baselineData.length}} etapas`);
+                        
+                        // Atualizar tasks do gráfico
+                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
+                            console.error('❌ projectData não disponível');
+                            return;
+                        }}
+                        
+                        const tasks = projectData[0].tasks;
+                        let updatedCount = 0;
+                        
+                        tasks.forEach(task => {{
+                            // Encontrar task correspondente na baseline
+                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
+                            if (baselineTask) {{
+                                // Atualizar apenas datas previstas
+                                if (baselineTask.inicio_previsto) task.start_date = baselineTask.inicio_previsto;
+                                if (baselineTask.termino_previsto) task.end_date = baselineTask.termino_previsto;
+                                updatedCount++;
+                            }}
+                        }});
+                        
+                        console.log(`✅ ${{updatedCount}} tasks atualizadas`);
+                        
+                        // Redesenhar gráfico
+                        drawFullChart();
+                        updateSidebar();
+                    }}
                     
                     // Variável para compatibilidade com código legado
                     const currentBaseline = null; // Baseline não controlada mais por Python
@@ -5626,7 +5691,7 @@ with st.spinner("Carregando e processando dados..."):
         
         # SELETOR RÁPIDO DE BASELINE (SEMPRE VISÍVEL)
         st.markdown("### 📊 Aplicar Baseline ao Gráfico")
-        col1, col2, col3 = st.columns([3, 3, 2])
+        col1, col2 = st.columns([3, 3])
         
         with col1:
             if not df_para_exibir.empty:
@@ -5645,38 +5710,20 @@ with st.spinner("Carregando e processando dados..."):
             if selected_quick_emp:
                 baseline_options_quick = get_baseline_options(selected_quick_emp)
                 if baseline_options_quick:
+                    # Aplicação automática via on_change
                     selected_quick_baseline = st.selectbox(
                         "Selecione a Baseline",
                         ["P0-(padrão)"] + baseline_options_quick,
                         key="quick_baseline_select",
-                        help="P0 = sem baseline (padrão atual)"
+                        help="P0 = sem baseline (padrão atual) - Seleção aplicada automaticamente",
+                        on_change=aplicar_baseline_automaticamente,
+                        args=(selected_quick_emp,)
                     )
                 else:
                     st.info("Nenhuma baseline disponível para este empreendimento")
                     selected_quick_baseline = "P0-(padrão)"
             else:
                 selected_quick_baseline = "P0-(padrão)"
-        
-        with col3:
-            st.write("")  # Spacer para alinhar verticalmente
-            st.write("")  # Mais um spacer
-            if st.button("✅ APLICAR BASELINE", use_container_width=True, key="quick_apply_btn", type="primary"):
-                if selected_quick_baseline == "P0-(padrão)":
-                    st.session_state.current_baseline = None
-                    st.session_state.current_baseline_data = None
-                    st.session_state.current_empreendimento = None
-                    st.success("✅ Voltou ao padrão (sem baseline)")
-                    st.rerun()
-                else:
-                    baseline_data = get_baseline_data(selected_quick_emp, selected_quick_baseline)
-                    if baseline_data:
-                        st.session_state.current_baseline = selected_quick_baseline
-                        st.session_state.current_baseline_data = baseline_data
-                        st.session_state.current_empreendimento = selected_quick_emp
-                        st.success(f"✅ Baseline **{selected_quick_baseline}** aplicada ao projeto **{selected_quick_emp}**!")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Baseline {selected_quick_baseline} não encontrada")
         
         st.markdown("---")  # Separador visual
         
