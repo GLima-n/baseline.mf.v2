@@ -73,6 +73,9 @@ if 'current_baseline_data' not in st.session_state:
 if 'current_empreendimento' not in st.session_state:
     st.session_state.current_empreendimento = None
 
+# Mostrar popup de boas-vindas com campo de email
+show_welcome_screen()
+
 # --- ORDEM DAS ETAPAS (DEFINIDA PELO USUÁRIO) ---
 ORDEM_ETAPAS_GLOBAL = [
     "PROSPEC", "LEGVENDA", "PULVENDA", "PL.LIMP", "LEG.LIMP", "ENG.LIMP", "PE. LIMP.", "ORÇ. LIMP.", "SUP. LIMP.", "EXECLIMP",
@@ -274,9 +277,19 @@ def process_baseline_change():
     """
     query_params = st.query_params
     
-    if 'change_baseline' in query_params and 'empreendimento' in query_params:
+    # Verificar se é um pedido para LIMPAR baseline
+    if 'clear_baseline' in query_params:
+        st.query_params.clear()
+        st.session_state.current_baseline = None
+        st.session_state.current_baseline_data = None
+        st.session_state.current_empreendimento = None
+        st.rerun()
+        return
+    
+    # Usar 'baseline_target' ao invés de 'empreendimento' para evitar conflito com filtros
+    if 'change_baseline' in query_params and 'baseline_target' in query_params:
         baseline_name = query_params['change_baseline']
-        empreendimento = query_params['empreendimento']
+        empreendimento = query_params['baseline_target']
         
         # Limpar os parâmetros IMEDIATAMENTE
         st.query_params.clear()
@@ -291,7 +304,7 @@ def process_baseline_change():
                 st.rerun()
         else:
             # Carregar baseline selecionada
-            baseline_data = load_baseline_data(empreendimento, baseline_name)
+            baseline_data = get_baseline_data(empreendimento, baseline_name)
             if baseline_data:
                 st.session_state.current_baseline = baseline_name
                 st.session_state.current_baseline_data = baseline_data
@@ -452,7 +465,11 @@ def create_baselines_table():
         if 'mock_baselines' not in st.session_state:
             st.session_state.mock_baselines = {}
 
+@st.cache_resource(ttl=3600) # Cache por 1 hora, ou até ser invalidado
 def load_baselines():
+    return _fetch_baselines_from_db()
+
+def _fetch_baselines_from_db():
     conn = get_db_connection()
     if conn:
         baselines = {}
@@ -497,7 +514,31 @@ def load_baselines():
         print("DEBUG: Usando mock_baselines")
         return st.session_state.get('mock_baselines', {})
 
+def converter_df_para_baseline_format(df):
+    """
+    Converte DataFrame agregado para formato de baseline JSON.
+    Retorna lista de dicionários com etapa e datas previstas.
+    """
+    baseline_tasks = []
+    
+    for _, row in df.iterrows():
+        # Obter datas previstas
+        inicio_prev = row.get('Inicio_Prevista')
+        termino_prev = row.get('Termino_Prevista')
+        
+        task = {
+            'etapa': row['Etapa'],
+            'inicio_previsto': inicio_prev.strftime('%Y-%m-%d') if pd.notna(inicio_prev) else None,
+            'termino_previsto': termino_prev.strftime('%Y-%m-%d') if pd.notna(termino_prev) else None
+        }
+        baseline_tasks.append(task)
+    
+    return baseline_tasks
+
+
 def save_baseline(empreendimento, version_name, baseline_data, created_date, tipo_visualizacao):
+    # Invalida o cache antes de salvar para garantir que a próxima leitura pegue o novo dado
+    load_baselines.clear()
     conn = get_db_connection()
     if conn:
         try:
@@ -555,6 +596,7 @@ def save_baseline(empreendimento, version_name, baseline_data, created_date, tip
         return True
 
 def delete_baseline(empreendimento, version_name):
+    """Deleta uma baseline do banco de dados"""
     conn = get_db_connection()
     if conn:
         try:
@@ -562,17 +604,36 @@ def delete_baseline(empreendimento, version_name):
             delete_query = "DELETE FROM gantt_baselines WHERE empreendimento = %s AND version_name = %s"
             cursor.execute(delete_query, (empreendimento, version_name))
             conn.commit()
-            return cursor.rowcount > 0
+            
+            if cursor.rowcount > 0:
+                print(f"✅ Baseline {version_name} excluída com sucesso")
+                return True
+            else:
+                print(f"⚠️ Baseline {version_name} não encontrada no banco")
+                return False
+                
         except Error as e:
+            print(f"❌ Erro SQL ao excluir baseline: {e}")
+            st.error(f"Erro de banco de dados: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ Erro inesperado ao excluir baseline: {e}")
+            st.error(f"Erro inesperado: {e}")
             return False
         finally:
             if conn.is_connected():
                 cursor.close()
                 conn.close()
     else:
-        if empreendimento in st.session_state.mock_baselines and version_name in st.session_state.mock_baselines[empreendimento]:
-            del st.session_state.mock_baselines[empreendimento][version_name]
-            return True
+        # Fallback para modo mock (sem banco de dados)
+        if 'mock_baselines' in st.session_state:
+            if empreendimento in st.session_state.mock_baselines:
+                if version_name in st.session_state.mock_baselines[empreendimento]:
+                    del st.session_state.mock_baselines[empreendimento][version_name]
+                    print(f"✅ Baseline {version_name} excluída do mock")
+                    return True
+        
+        st.error("Erro: Não foi possível conectar ao banco de dados")
         return False
 
 # --- CÓDIGO MODIFICADO ---
@@ -633,21 +694,39 @@ def converter_dados_para_gantt(df):
                     progress_subetapas = subetapas_emp["% concluído"].apply(converter_porcentagem)
                     progress = progress_subetapas.mean()
 
-            # --- CORREÇÃO PRINCIPAL: PARA SUBETAPAS, MANTER APENAS DADOS REAIS ---
+            # Verificar se é subetapa (para skip se não tiver dados reais)
             etapa_eh_subetapa = etapa_nome_completo in ETAPA_PAI_POR_SUBETAPA
             
-            if etapa_eh_subetapa:
+            # NOVA LÓGICA: No modo padrão (sem baseline), subetapas não mostram barras previstas
+            # Apenas quando uma baseline está aplicada é que as subetapas mostram as barras
+            baseline_ativa = st.session_state.get('current_baseline') is not None
+            
+            if etapa_eh_subetapa and not baseline_ativa:
+                # Modo padrão (P0): subetapas não têm barras previstas
                 start_date = None
                 end_date = None
+            
+            # REMOVIDO: O código que zerava start_date e end_date para subetapas
+            # Isso quebrava a baseline porque as datas previstas são necessárias
+            # para mostrar o snapshot da baseline
+            
+            # Skip apenas se subetapa NÃO tem dados reais E não está em uma baseline
+            if etapa_eh_subetapa:
                 if pd.isna(start_real) and pd.isna(end_real_original):
-                    continue
+                    # Se não tem dados reais e não tem previstos também, skip
+                    if pd.isna(start_date) and pd.isna(end_date):
+                        continue
 
             # Lógica para tratar datas vazias (apenas para etapas que não são subetapas)
+            # IMPORTANTE: Se AMBAS as datas previstas estão vazias, não criar datas padrão
+            # Isso permite que etapas não presentes em uma baseline apareçam como linhas vazias
             if not etapa_eh_subetapa:
-                if pd.isna(start_date) or start_date is None: 
-                    start_date = datetime.now()
-                if pd.isna(end_date) or end_date is None: 
-                    end_date = start_date + timedelta(days=30)
+                # Só criar datas padrão se pelo menos UMA das datas previstas existir
+                if pd.notna(start_date) or pd.notna(end_date):
+                    if pd.isna(start_date) or start_date is None: 
+                        start_date = datetime.now()
+                    if pd.isna(end_date) or end_date is None: 
+                        end_date = start_date + timedelta(days=30)
 
             end_real_visual = end_real_original
             if pd.notna(start_real) and progress < 100 and pd.isna(end_real_original):
@@ -737,10 +816,19 @@ def converter_dados_para_gantt(df):
 
 # --- FUNÇÕES DE BASELINE DO GANTT ---
 
-def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
+def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
     """Cria uma linha de base do estado atual do Gantt"""
     
     try:
+        # Se não foi fornecido created_by, tentar capturar automaticamente
+        if not created_by:
+            import os
+            import getpass
+            try:
+                created_by = getpass.getuser()
+            except:
+                created_by = os.environ.get('USERNAME', 'Não informado')
+        
         # Filtrar dados do empreendimento
         df_empreendimento = df[df['Empreendimento'] == empreendimento].copy()
         
@@ -753,9 +841,30 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
             'empreendimento': empreendimento,
             'tipo_visualizacao': tipo_visualizacao,
             'data_criacao': datetime.now().strftime("%d/%m/%Y %H:%M"),
-            'total_tasks': len(df_empreendimento),
+            'created_by': created_by,  # Email ou username do criador
+            'total_tasks': 0,  # Será atualizado dinamicamente com apenas etapas que têm dados reais
             'tasks': []
         }
+        
+        # IMPORTANTE: Calcular datas REAIS para etapas pai a partir das subetapas
+        # Isso garante que as baselines capturem as datas reais calculadas das etapas pai
+        etapas_pai_datas_calculadas = {}
+        for etapa_pai, subetapas in SUBETAPAS.items():
+            # Converter nomes completos para siglas
+            subetapas_siglas = [nome_completo_para_sigla.get(sub, sub) for sub in subetapas]
+            subetapas_df = df_empreendimento[df_empreendimento['Etapa'].isin(subetapas_siglas)]
+            
+            if not subetapas_df.empty:
+                # Calcular datas reais mínima/máxima das subetapas
+                inicio_real_min = subetapas_df['Inicio_Real'].min()
+                termino_real_max = subetapas_df['Termino_Real'].max()
+                
+                # Guardar para usar no loop de criação de tasks
+                etapa_pai_sigla = nome_completo_para_sigla.get(etapa_pai, etapa_pai)
+                etapas_pai_datas_calculadas[etapa_pai_sigla] = {
+                    'inicio_real': inicio_real_min,
+                    'termino_real': termino_real_max
+                }
         
         # Converter tasks para formato serializável com validação
         task_count = 0
@@ -777,6 +886,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                 # Converter datas para string com tratamento seguro
                 date_fields = {
                     # O Planejado da Baseline (P1, P2...) será o Real atual (requisito do usuário)
+                    # MAS se Real não existir, usa Prevista como fallback
                     'inicio_previsto': 'Inicio_Real',
                     'termino_previsto': 'Termino_Real', 
                     'inicio_real': 'Inicio_Real',
@@ -796,12 +906,61 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao):
                             except:
                                 task[task_field] = None
                 
-                baseline_data['tasks'].append(task)
-                task_count += 1
+                # IMPORTANTE: Para etapas PAI, usar datas REAIS calculadas das subetapas
+                etapa_sigla = row.get('Etapa', '')
+                if etapa_sigla in etapas_pai_datas_calculadas:
+                    datas_calculadas = etapas_pai_datas_calculadas[etapa_sigla]
+                    
+                    # Usar datas reais calculadas tanto para inicio_previsto quanto inicio_real
+                    # (seguindo a lógica: baseline captura o "real" como "previsto")
+                    if pd.notna(datas_calculadas['inicio_real']):
+                        task['inicio_previsto'] = datas_calculadas['inicio_real'].strftime("%Y-%m-%d")
+                        task['inicio_real'] = datas_calculadas['inicio_real'].strftime("%Y-%m-%d")
+                    if pd.notna(datas_calculadas['termino_real']):
+                        task['termino_previsto'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
+                        task['termino_real'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
+                
+                # FALLBACK: Se não tem datas Reais, usar Previstas
+                # Isso é importante para etapas que não têm datas próprias E não são pais
+                if task['inicio_previsto'] is None:
+                    date_val = row.get('Inicio_Prevista')
+                    if date_val is not None and pd.notna(date_val):
+                        if hasattr(date_val, 'strftime'):
+                            task['inicio_previsto'] = date_val.strftime("%Y-%m-%d")
+                        else:
+                            try:
+                                parsed_date = pd.to_datetime(date_val)
+                                task['inicio_previsto'] = parsed_date.strftime("%Y-%m-%d")
+                            except:
+                                pass
+                
+                if task['termino_previsto'] is None:
+                    date_val = row.get('Termino_Prevista')
+                    if date_val is not None and pd.notna(date_val):
+                        if hasattr(date_val, 'strftime'):
+                            task['termino_previsto'] = date_val.strftime("%Y-%m-%d")
+                        else:
+                            try:
+                                parsed_date = pd.to_datetime(date_val)
+                                task['termino_previsto'] = parsed_date.strftime("%Y-%m-%d")
+                            except:
+                                pass
+                
+                # Só adicionar a task se tiver dados reais (Inicio_Real ou Termino_Real)
+                # OU se for uma etapa pai com datas calculadas a partir de subetapas
+                has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
+                is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
+                
+                if has_real_data or is_parent_with_calculated_data:
+                    baseline_data['tasks'].append(task)
+                    task_count += 1
                 
             except Exception as task_error:
                 st.warning(f"Erro ao processar task {task_count}: {task_error}")
                 continue
+        
+        # Atualizar o total de tasks com o valor real (apenas etapas com dados reais)
+        baseline_data['total_tasks'] = task_count
         
         if task_count == 0:
             raise Exception("Nenhuma task válida encontrada para salvar")
@@ -875,8 +1034,9 @@ def debug_baseline_system():
     else:
         st.error("❌ Session state: FALHA - unsent_baselines não encontrado")
 
-def load_baseline_data(empreendimento, version_name):
+def get_baseline_data(empreendimento, version_name):
     """Carrega os dados específicos de uma baseline"""
+    # Usa a função load_baselines que é cacheada
     baselines = load_baselines()
     if empreendimento in baselines and version_name in baselines[empreendimento]:
         return baselines[empreendimento][version_name]['data']
@@ -889,23 +1049,49 @@ def apply_baseline_to_dataframe(df, baseline_data):
     
     df_baseline = df.copy()
     
+    # Criar conjunto de etapas que estão na baseline
+    etapas_na_baseline = set()
+    for task in baseline_data['tasks']:
+        etapas_na_baseline.add(task['etapa'])
+    
+    # Para etapas do empreendimento da baseline que NÃO estão na baseline,
+    # limpar as datas previstas para aparecerem como linhas vazias
+    mask_empreendimento = df_baseline['Empreendimento'] == baseline_data['empreendimento']
+    for idx, row in df_baseline[mask_empreendimento].iterrows():
+        etapa = row['Etapa']
+        if etapa not in etapas_na_baseline:
+            # Etapa não está na baseline - limpar datas previstas
+            df_baseline.loc[idx, 'Inicio_Prevista'] = pd.NaT
+            df_baseline.loc[idx, 'Termino_Prevista'] = pd.NaT
+    
     # Para cada task na baseline, atualizar as datas no DataFrame
     for task in baseline_data['tasks']:
         etapa = task['etapa']
         
-        # Encontrar as linhas correspondentes no DataFrame (pode haver múltiplas se o DF não estiver agregado)
+        # Encontrar TODAS as linhas correspondentes no DataFrame
         mask = (df_baseline['Empreendimento'] == baseline_data['empreendimento']) & \
                (df_baseline['Etapa'] == etapa)
         
         if mask.any():
-            # Atualizar datas previstas da baseline em TODAS as linhas que correspondem à etapa
+            # Atualizar TODAS as linhas que correspondem (não só a primeira!)
+            # Atualizar datas previstas da baseline
             if task['inicio_previsto']:
-                df_baseline.loc[mask, 'Inicio_Prevista'] = pd.to_datetime(task['inicio_previsto'])
-            if task['termino_previsto']:
-                df_baseline.loc[mask, 'Termino_Prevista'] = pd.to_datetime(task['termino_previsto'])
+                try:
+                    new_date = pd.to_datetime(task['inicio_previsto'], errors='coerce')
+                    if pd.notna(new_date):
+                        df_baseline.loc[mask, 'Inicio_Prevista'] = new_date
+                except Exception:
+                    pass
             
-            # Atualizar percentual de conclusão (apenas para a primeira linha, se necessário, mas o foco é a data)
-            # Como a agregação usará o 'max' do percentual, atualizar todas as linhas não deve causar problemas.
+            if task['termino_previsto']:
+                try:
+                    new_date = pd.to_datetime(task['termino_previsto'], errors='coerce')
+                    if pd.notna(new_date):
+                        df_baseline.loc[mask, 'Termino_Prevista'] = new_date
+                except Exception:
+                    pass
+            
+            # Atualizar percentual de conclusão
             if 'percentual_concluido' in task:
                 df_baseline.loc[mask, '% concluído'] = task['percentual_concluido']
     
@@ -1091,18 +1277,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         df_sem_pulmao = df.copy()
         df_gantt_sem_pulmao = df_sem_pulmao.copy()
 
-        # Determinar empreendimento principal
-        empreendimentos_no_grafico = df["Empreendimento"].unique()
-        empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
 
-        # --- APLICAÇÃO DA BASELINE (REQUISITO DO USUÁRIO) ---
-        # A baseline só é aplicada se estiver selecionada E se o empreendimento principal for o mesmo da baseline salva.
-        if st.session_state.get('current_baseline_data') and st.session_state.get('current_empreendimento') == empreendimento_principal:
-            # A função apply_baseline_to_dataframe irá substituir as colunas Inicio_Prevista e Termino_Prevista
-            # pelas datas salvas na baseline.
-            df_gantt_sem_pulmao = apply_baseline_to_dataframe(df_gantt_sem_pulmao, st.session_state.current_baseline_data)
-            st.info(f"Visualizando Baseline: **{st.session_state.current_baseline}**")
-        # --- FIM APLICAÇÃO DA BASELINE ---
 
         for col in ["Inicio_Prevista", "Termino_Prevista", "Inicio_Real", "Termino_Real"]:
             if col in df_gantt_sem_pulmao.columns:
@@ -1112,7 +1287,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             df_gantt_sem_pulmao["% concluído"] = 0
         df_gantt_sem_pulmao["% concluído"] = df_gantt_sem_pulmao["% concluído"].fillna(0).apply(converter_porcentagem)
 
-        # A agregação é feita no DataFrame que JÁ PODE TER A BASELINE APLICADA
+        # --- APLICAÇÃO DA BASELINE ANTES DA AGREGAÇÃO ---
+        # Verificar se há uma baseline ativa no session state
+        baseline_name = st.session_state.get('current_baseline')
+        baseline_data = st.session_state.get('current_baseline_data')
+        current_empreendimento_baseline = st.session_state.get('current_empreendimento')
+        
+        # Aplicar baseline ANTES da agregação, se houver
+        if baseline_name and baseline_data and current_empreendimento_baseline:
+            # Aplicar baseline apenas às linhas do empreendimento correspondente
+            df_gantt_sem_pulmao = apply_baseline_to_dataframe(df_gantt_sem_pulmao, baseline_data)
+        # --- FIM APLICAÇÃO DA BASELINE ---
+
+        # Agrega os dados (usando nomes completos)
         df_gantt_agg_sem_pulmao = df_gantt_sem_pulmao.groupby(['Empreendimento', 'Etapa']).agg(
             Inicio_Prevista=('Inicio_Prevista', 'min'),
             Termino_Prevista=('Termino_Prevista', 'max'),
@@ -1121,9 +1308,24 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             **{'% concluído': ('% concluído', 'max')},
             SETOR=('SETOR', 'first')
         ).reset_index()
+        
+        # CRÍTICO: Remover NaT (Not a Time) values para evitar datas inválidas no JavaScript
+        for col in ['Inicio_Prevista', 'Termino_Prevista', 'Inicio_Real', 'Termino_Real']:
+            if col in df_gantt_agg_sem_pulmao.columns:
+                # Substituir NaT por None (que vira null em JSON)
+                df_gantt_agg_sem_pulmao[col] = df_gantt_agg_sem_pulmao[col].apply(
+                    lambda x: None if pd.isna(x) else x
+                )
 
         df_gantt_agg_sem_pulmao["Etapa"] = df_gantt_agg_sem_pulmao["Etapa"].map(sigla_para_nome_completo).fillna(df_gantt_agg_sem_pulmao["Etapa"])
-        
+        # Obter baselines disponíveis
+        if not df.empty:
+                # Se estamos em visão consolidada por etapa, pode ter múltiplos empreendimentos
+                # Mas no modo projeto, geralmente temos um empreendimento principal
+                empreendimentos_no_grafico = df["Empreendimento"].unique()
+                empreendimento_principal = empreendimentos_no_grafico[0] if len(empreendimentos_no_grafico) == 1 else "Múltiplos"
+        else:
+            empreendimento_principal = ""
         # Mapear o SETOR e GRUPO
         df_gantt_agg_sem_pulmao["SETOR"] = df_gantt_agg_sem_pulmao["Etapa"].map(SETOR_POR_ETAPA).fillna(df_gantt_agg_sem_pulmao["SETOR"])
         df_gantt_agg_sem_pulmao["GRUPO"] = df_gantt_agg_sem_pulmao["Etapa"].map(GRUPO_POR_ETAPA).fillna("Não especificado")
@@ -1170,7 +1372,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             st.warning("Nenhuma tarefa disponível para exibir.")
             return
         
-        if titulo_extra:
+        # Add baseline indicator to project title for visual feedback
+        if baseline_name:
+            project["name"] += f" - 📊 {baseline_name}"
+        elif titulo_extra:
             project["name"] += titulo_extra
 
         # --- NOVA LÓGICA: Carregar baselines para TODOS os empreendimentos disponíveis ---
@@ -1217,8 +1422,111 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             emp_baselines = get_baseline_options(emp)
             if emp_baselines:
                 baselines_por_empreendimento[emp] = emp_baselines
-            # Reduz o fator de multiplicação para evitar excesso de espaço
-            altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
+        
+        # --- NOVO: Preparar TODAS as baselines para troca client-side ---
+        # Carregar dados completos de baselines do empreendimento específico deste gráfico
+        available_baselines_for_js = {}
+        
+        print("=" * 80)
+        print("INÍCIO: Preparando baselines para JavaScript client-side")
+        print("=" * 80)
+        
+        # Usar empreendimento_principal (do gráfico) ao invés de empreendimento_atual
+        # porque empreendimento_atual pode ser "Múltiplos" na visualização consolidada
+        empreendimento_para_baselines = project['name'] if project else None
+        
+        print(f"DEBUG: empreendimento_atual = {empreendimento_atual}")
+        print(f"DEBUG: empreendimento_para_baselines (do projeto) = {empreendimento_para_baselines}")
+        
+        if empreendimento_para_baselines and empreendimento_para_baselines != "Múltiplos":
+            # 1. P0 = dados atuais (sem baseline)
+            available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
+            print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
+            
+            # 2. Carregar todas as baselines armazenadas
+            all_baselines_from_db = load_baselines()
+            print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
+            
+            if empreendimento_para_baselines in all_baselines_from_db:
+                baselines_dict = all_baselines_from_db[empreendimento_para_baselines]
+                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_para_baselines}")
+                
+                # Usar a função get_baseline_data que já funciona corretamente
+                for baseline_name in baselines_dict.keys():
+                    print(f"DEBUG: Carregando baseline {baseline_name} usando get_baseline_data()")
+                    
+                    # Usar função existente que já sabe parsear corretamente
+                    baseline_data = get_baseline_data(empreendimento_para_baselines, baseline_name)
+                    
+                    if baseline_data:
+                        try:
+                            # baseline_data pode ser dict ou lista
+                            formatted_tasks = []
+                            
+                            print(f"DEBUG: baseline_data tipo: {type(baseline_data)}")
+                            
+                            # Se for dicionário, precisamos iterar sobre os valores
+                            if isinstance(baseline_data, dict):
+                                print(f"DEBUG: baseline_data é dict com chaves: {list(baseline_data.keys())}")
+                                # O dict pode ter metadados + tasks, vamos pegar apenas 'tasks' se existir
+                                if 'tasks' in baseline_data:
+                                    tasks_list = baseline_data['tasks']
+                                    print(f"DEBUG: Usando baseline_data['tasks'] com {len(tasks_list)} items")
+                                else:
+                                    # Se não tem 'tasks', tenta usar todos os valores
+                                    tasks_list = list(baseline_data.values())
+                                    print(f"DEBUG: Usando all values, {len(tasks_list)} items")
+                            elif isinstance(baseline_data, list):
+                                print(f"DEBUG: baseline_data é list com {len(baseline_data)} items")
+                                tasks_list = baseline_data
+                            else:
+                                print(f"DEBUG: baseline_data tipo inesperado: {type(baseline_data)}, pulando")
+                                tasks_list = []  # Lista vazia para não processar
+                            
+                            print(f"DEBUG: Processando {len(tasks_list)} tasks")
+                            
+                            for i, task in enumerate(tasks_list):
+                                # task pode ser string JSON ou dict
+                                if isinstance(task, str):
+                                    if not task or not task.strip():
+                                        continue
+                                    
+                                    try:
+                                        task_dict = json.loads(task)
+                                    except json.JSONDecodeError as e:
+                                        print(f"DEBUG: Task {i} falhou ao parsear: {e}")
+                                        continue
+                                elif isinstance(task, dict):
+                                    task_dict = task
+                                else:
+                                    print(f"DEBUG: Task {i} tipo inesperado: {type(task)}")
+                                    continue
+                                
+                                if task_dict:  # Só adiciona se não for vazio
+                                    formatted_tasks.append({
+                                        'etapa': task_dict.get('etapa', task_dict.get('Etapa', '')),
+                                        'inicio_previsto': task_dict.get('inicio_previsto', task_dict.get('Inicio_Prevista', task_dict.get('start_date'))),
+                                        'termino_previsto': task_dict.get('termino_previsto', task_dict.get('Termino_Prevista', task_dict.get('end_date')))
+                                    })
+                            
+                            available_baselines_for_js[baseline_name] = formatted_tasks
+                            print(f"DEBUG: Baseline {baseline_name} adicionada com {len(formatted_tasks)} etapas")
+                        except Exception as e:
+                            print(f"Erro ao processar baseline {baseline_name}: {e}")
+                            import traceback
+                            traceback.print_exc()
+                            continue
+                    else:
+                        print(f"DEBUG: get_baseline_data retornou None para {baseline_name}")
+            else:
+                print(f"DEBUG: Empreendimento {empreendimento_para_baselines} NÃO encontrado em all_baselines_from_db")
+        else:
+            print(f"DEBUG: Empreendimento é 'Múltiplos' ou None, não carregando baselines")
+        
+        print(f"DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
+        
+        # Reduz o fator de multiplicação para evitar excesso de espaço
+        altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
 
         # --- Geração do HTML ---
         gantt_html = f"""
@@ -1232,7 +1540,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 
                 <style>
                     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                    html, body {{ width: 100%; height: 100%; /* font-family: 'Segoe UI', sans-serif; */ background-color: #f5f5f5; color: #333; overflow: hidden; }}
+                    html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
                     .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
                     .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
                     .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
@@ -1352,7 +1660,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         box-shadow: 0 4px 15px rgba(0,0,0,0.3);
                         z-index: 2147483647; /* Máximo Z-Index possível no navegador */
                         display: none;
-                        /* font-family: 'Segoe UI', sans-serif; */
+                        font-family: 'Segoe UI', sans-serif;
                         min-width: 160px;
                     }}
                     .context-menu-item {{
@@ -1689,7 +1997,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                         </div>
-                        <select id="baseline-dropdown-{project['id']}" onchange="handleBaselineChange(this.value)">
+                        <select id="baseline-dropdown-{project['id']}" onchange="switchBaselineLocal(this.value)">
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
@@ -1799,12 +2107,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // DEBUG: Verificar dados
                     console.log('Inicializando Gantt para projeto:', '{project["name"]}');
                     
-                    // DADOS DE BASELINE ATUALIZADOS
-                    const baselinesData = {json.dumps(baselines_data)};
-                    const currentBaseline = {json.dumps(baseline_name)};
+                    // *** NOVO: TODAS AS BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE ***
+                    const availableBaselines = {json.dumps(available_baselines_for_js)};
+                    console.log('📊 Baselines disponíveis para troca:', Object.keys(availableBaselines));
                     
+                    // Variável para compatibilidade com código legado
+                    const currentBaseline = null; // Baseline não controlada mais por Python
                     
-                    // DADOS COMPLETOS DE TODAS AS BASELINES
+                    // DADOS COMPLETOS DE TODAS AS BASELINES (legado - manter por compatibilidade)
                     const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
                     const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
                     
@@ -1868,6 +2178,64 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         return date.toISOString().split('T')[0];
                     }}
                     // --- FIM HELPERS DE DATA E PULMÃO ---
+                    
+                    // *** NOVA FUNÇÃO: TROCA DE BASELINE CLIENT-SIDE ***
+                    function switchBaselineLocal(baselineName) {{
+                        console.log(`🔄 Trocando baseline para: ${{baselineName}}`);
+                        
+                        // 1. Obter dados da baseline selecionada
+                        const baselineData = availableBaselines[baselineName];
+                        
+                        if (!baselineData) {{
+                            console.error(`❌ Baseline ${{baselineName}} não encontrada!`);
+                            console.log('Baselines disponíveis:', Object.keys(availableBaselines));
+                            return;
+                        }}
+                        
+                        console.log(`✅ Baseline encontrada com ${{baselineData.length}} etapas`);
+                        
+                        // 2. Iterar sobre as tasks do gráfico atual
+                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
+                            console.error('❌ projectData não disponível');
+                            return;
+                        }}
+                        
+                        const tasks = projectData[0].tasks;
+                        let updatedCount = 0;
+                       
+                        tasks.forEach(task => {{
+                            // 3. Encontrar task correspondente na baseline (por nome da etapa)
+                            const baselineTask = baselineData.find(bt => bt.etapa === task.name);
+                            
+                            if (baselineTask) {{
+                                // 4. Atualizar APENAS datas PREVISTAS (não alterar Real!)
+                                if (baselineTask.inicio_previsto) {{
+                                    task.start_date = baselineTask.inicio_previsto;
+                                }}
+                                if (baselineTask.termino_previsto) {{
+                                    task.end_date = baselineTask.termino_previsto;
+                                }}
+                                
+                                // IMPORTANTE: NÃO alterar start_real e end_real - essas devem permanecer inalteradas!
+                                updatedCount++;
+                            }}
+                        }});
+                        
+                        console.log(`✅ ${{updatedCount}} etapas atualizadas com baseline ${{baselineName}}`);
+                        
+                        // 5. Re-renderizar gráfico para refletir mudanças
+                        renderChart();
+                        renderSidebar();
+                        
+                        // 6. Atualizar indicador visual no dropdown
+                        const currentDiv = document.getElementById('current-baseline-{{project["id"]}}');
+                        if (currentDiv) {{
+                            currentDiv.textContent = `Baseline: ${{baselineName}}`;
+                        }}
+                        
+                        console.log('🎨 Gráfico re-renderizado com nova baseline');
+                    }}
+                    // *** FIM FUNÇÃO TROCA BASELINE ***
 
                     const filterOptions = {json.dumps(filter_options)};
 
@@ -2013,41 +2381,23 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         console.log('Dropdown atualizado com', baselinesDoEmpreendimento.length, 'baselines');
+                        
+                        // IMPORTANTE: Re-adicionar event listener após atualizar dropdown
+                        // (necessário porque innerHTML foi modificado)
+                        dropdown.onchange = function() {{
+                            const selectedBaseline = dropdown.value;
+                            console.log('📊 Baseline selecionada no dropdown:', selectedBaseline);
+                            switchBaselineLocal(selectedBaseline); // ← NOVA FUNÇÃO CLIENT-SIDE
+                        }};
                     }}
                     
-                    function handleBaselineChange(selectedBaseline) {{
-                        const empreendimentoAtual = projectData[0].name;
-                        const timestamp = new Date().getTime();
-                        
-                        // Usar navegação simples
-                        const iframe = document.getElementById('hidden-iframe');
-                        const url = `?change_baseline=${{encodeURIComponent(selectedBaseline)}}&empreendimento=${{encodeURIComponent(empreendimentoAtual)}}&t=${{timestamp}}`;
-                        iframe.src = url;
-                        
-                        // Feedback visual
-                        const dropdown = document.getElementById('baseline-dropdown-{project['id']}');
-                        if (dropdown) {{
-                            dropdown.disabled = true;
-                            dropdown.style.opacity = '0.7';
-                            
-                            // Atualizar texto
-                            const currentDiv = document.getElementById('current-baseline-{project['id']}');
-                            if (currentDiv) {{
-                                currentDiv.textContent = `Carregando: ${{selectedBaseline}}...`;
-                                currentDiv.style.background = '#fff3cd';
-                            }}
-                            
-                            // Reativar após um tempo
-                            setTimeout(() => {{
-                                dropdown.disabled = false;
-                                dropdown.style.opacity = '1';
-                                if (currentDiv) {{
-                                    currentDiv.textContent = `Baseline: ${{selectedBaseline}}`;
-                                    currentDiv.style.background = '#e6f3ff';
-                                }}
-                            }}, 1000);
-                        }}
-                    }}
+                    
+                    // FUNÇÃO GLOBAL para compatibilidade com onchange inline no HTML
+                    // Agora chama diretamente switchBaselineLocal (client-side)
+                    window.handleBaselineChange = function(selectedBaseline) {{
+                        switchBaselineLocal(selectedBaseline);
+                    }};
+                    
                     
                     // *** NOVA FUNÇÃO: Alternar visibilidade do seletor de baseline ***
                     function toggleBaselineSelector() {{
@@ -3467,7 +3817,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
             <style>
                 /* CSS idêntico ao de gerar_gantt_por_projeto, exceto adaptações para consolidado */
                  * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-                html, body {{ width: 100%; height: 100%; /* font-family: 'Segoe UI', sans-serif; */ background-color: #f5f5f5; color: #333; overflow: hidden; }}
+                html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
                 .gantt-container {{ width: 100%; height: 100%; background-color: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; position: relative; display: flex; flex-direction: column; }}
                 .gantt-main {{ display: flex; flex: 1; overflow: hidden; }}
                 .gantt-sidebar-wrapper {{ width: 680px; display: flex; flex-direction: column; flex-shrink: 0; transition: width 0.3s ease-in-out; border-right: 2px solid #e2e8f0; overflow: hidden; }}
@@ -4425,6 +4775,19 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 console.log('Tasks base consolidado (inicial):', allTasks_baseData);
                 console.log('TODOS os dados de etapa (full):', allDataByStage);
                 
+                //  FUNÇÃO GLOBAL PARA APLICAR BASELINE
+                window.handleBaselineChange = function(empreendimento, baselineName) {{
+                    console.log(`📊 Baseline selected: ${{baselineName}} for ${{empreendimento}}`);
+                    
+                    // Update URL parameters to trigger Streamlit rerun
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('change_baseline', baselineName);
+                    url.searchParams.set('empreendimento', empreendimento);
+                    
+                    // Reload page with new parameters
+                    window.location.href = url.toString();
+                }}
+                
                 // Inicializar o Gantt Consolidado
                 initGantt();
             </script>
@@ -4435,42 +4798,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     # st.markdown("---") no consolidado, pois ele não é parte de um loop
 
 # --- FUNÇÃO PRINCIPAL DE GANTT (DISPATCHER) ---
-def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente, baseline_data=None, baseline_name=None):
+def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_ordenacao, pulmao_status, pulmao_meses, etapa_selecionada_inicialmente):
     """
     Decide qual Gantt gerar com base na seleção da etapa inicial.
     """
     if df.empty:
         st.warning("Sem dados disponíveis para exibir o Gantt.")
         return
-
-    # Determinar qual empreendimento está sendo visualizado
-    empreendimentos_no_df = df["Empreendimento"].unique()
-    empreendimento_visualizado = empreendimentos_no_df[0] if len(empreendimentos_no_df) == 1 else "Múltiplos"
-    
-    current_empreendimento = st.session_state.get('current_empreendimento')
-    
-    # Aplicar baseline apenas se for específica para este empreendimento
-    should_apply_baseline = (
-        baseline_data is not None and 
-        baseline_name is not None and 
-        current_empreendimento == empreendimento_visualizado and
-        empreendimento_visualizado != "Múltiplos"
-    )
-    
-    if should_apply_baseline:
-        df = apply_baseline_to_dataframe(df, baseline_data)
-        
-        # Mostrar indicador de baseline ativa
-        with st.container():
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.info(f"**Visualizando:** {baseline_name} | **Projeto:** {empreendimento_visualizado}")
-            with col2:
-                if st.button("Voltar ao Padrão", key="clear_baseline", use_container_width=True):
-                    st.session_state.current_baseline = None
-                    st.session_state.current_baseline_data = None
-                    st.session_state.current_empreendimento = None
-                    st.rerun()
 
     # A decisão do modo é baseada no parâmetro
     is_consolidated_view = etapa_selecionada_inicialmente != "Todos"
@@ -4490,8 +4824,7 @@ def gerar_gantt(df, tipo_visualizacao, filtrar_nao_concluidas, df_original_para_
             tipo_visualizacao, 
             df_original_para_ordenacao, 
             pulmao_status, 
-            pulmao_meses,
-            baseline_name=baseline_name if should_apply_baseline else None
+            pulmao_meses
         )
 # O restante do código Streamlit...
 st.set_page_config(layout="wide", page_title="Dashboard de Gantt Comparativo")
@@ -4978,7 +5311,7 @@ with st.spinner("Carregando e processando dados..."):
                     box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
                     z-index: 10000;
                     display: none;
-                    /* font-family: Arial, sans-serif; */
+                    font-family: Arial, sans-serif;
                 }}
                 .context-menu-item {{
                     padding: 12px 20px;
@@ -5047,7 +5380,7 @@ with st.spinner("Carregando e processando dados..."):
                     justify-content: center;
                     align-items: center;
                     z-index: 10001;
-                    /* font-family: Arial, sans-serif; */
+                    font-family: Arial, sans-serif;
                 }}
                 .loading-spinner {{
                     background: white;
@@ -5254,7 +5587,36 @@ with st.spinner("Carregando e processando dados..."):
         # Copiar o dataframe filtrado para ser usado nas tabelas
         df_detalhes = df_para_exibir.copy()
         # A lógica de pulmão foi removida da sidebar, então não é mais aplicada aqui.
-        tab1, tab2, tab3 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal", "Linhas de Base"])
+        
+        # CONTROLE DE ACESSO PARA ABA "LINHAS DE BASE"
+        def verificar_acesso_baseline():
+            """Verifica se o usuario tem acesso a aba Linhas de Base"""
+            try:
+                # Obter lista de emails autorizados do secrets
+                authorized_emails = st.secrets.get('baseline_access', {}).get('authorized_emails', [])
+                
+                # Obter email do usuario logado
+                user_email = st.session_state.get('user_email', '').strip().lower()
+                
+                # Verificar se o email esta na lista (case-insensitive)
+                authorized_emails_lower = [email.strip().lower() for email in authorized_emails]
+                
+                return user_email in authorized_emails_lower
+            except Exception as e:
+                # Se houver erro ao carregar secrets, nao mostra a aba
+                print(f"Erro ao verificar acesso baseline: {e}")
+                return False
+        
+        # Criar tabs baseado no acesso do usuário
+        has_baseline_access = verificar_acesso_baseline()
+        
+        if has_baseline_access:
+            # Usuário autorizado - mostra todas as 3 tabs
+            tab1, tab2, tab3 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal", "Linhas de Base"])
+        else:
+            # Usuário não autorizado - mostra apenas 2 tabs
+            tab1, tab2 = st.tabs(["Gráfico de Gantt", "Tabelão Horizontal"])
+            tab3 = None  # Define como None para evitar erros
 
     with tab1:
         st.subheader("Gantt Comparativo")
@@ -5262,27 +5624,83 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
+        # SELETOR RÁPIDO DE BASELINE (SEMPRE VISÍVEL)
+        st.markdown("### 📊 Aplicar Baseline ao Gráfico")
+        col1, col2, col3 = st.columns([3, 3, 2])
+        
+        with col1:
+            if not df_para_exibir.empty:
+                empreendimentos_disponiveis = sorted(df_para_exibir["Empreendimento"].unique().tolist())
+                selected_quick_emp = st.selectbox(
+                    "Selecione o Empreendimento",
+                    empreendimentos_disponiveis,
+                    key="quick_baseline_emp",
+                    help="Escolha o projeto para aplicar a baseline"
+                )
+            else:
+                st.warning("Nenhum empreendimento disponível")
+                selected_quick_emp = None
+        
+        with col2:
+            if selected_quick_emp:
+                baseline_options_quick = get_baseline_options(selected_quick_emp)
+                if baseline_options_quick:
+                    selected_quick_baseline = st.selectbox(
+                        "Selecione a Baseline",
+                        ["P0-(padrão)"] + baseline_options_quick,
+                        key="quick_baseline_select",
+                        help="P0 = sem baseline (padrão atual)"
+                    )
+                else:
+                    st.info("Nenhuma baseline disponível para este empreendimento")
+                    selected_quick_baseline = "P0-(padrão)"
+            else:
+                selected_quick_baseline = "P0-(padrão)"
+        
+        with col3:
+            st.write("")  # Spacer para alinhar verticalmente
+            st.write("")  # Mais um spacer
+            if st.button("✅ APLICAR BASELINE", use_container_width=True, key="quick_apply_btn", type="primary"):
+                if selected_quick_baseline == "P0-(padrão)":
+                    st.session_state.current_baseline = None
+                    st.session_state.current_baseline_data = None
+                    st.session_state.current_empreendimento = None
+                    st.success("✅ Voltou ao padrão (sem baseline)")
+                    st.rerun()
+                else:
+                    baseline_data = get_baseline_data(selected_quick_emp, selected_quick_baseline)
+                    if baseline_data:
+                        st.session_state.current_baseline = selected_quick_baseline
+                        st.session_state.current_baseline_data = baseline_data
+                        st.session_state.current_empreendimento = selected_quick_emp
+                        st.success(f"✅ Baseline **{selected_quick_baseline}** aplicada ao projeto **{selected_quick_emp}**!")
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Baseline {selected_quick_baseline} não encontrada")
+        
+        st.markdown("---")  # Separador visual
+        
+        # INDICADOR DE STATUS DA BASELINE
+        baseline_status_name = st.session_state.get('current_baseline')
+        baseline_status_emp = st.session_state.get('current_empreendimento')
+        if baseline_status_name:
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                st.success(f"✅ **Baseline ativa:** {baseline_status_name} para o projeto **{baseline_status_emp}**")
+            with col2:
+                if st.button("🔄 Limpar", use_container_width=True, key="clear_baseline_status"):
+                    st.session_state.current_baseline = None
+                    st.session_state.current_baseline_data = None
+                    st.session_state.current_empreendimento = None
+                    st.rerun()
+        
+        
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
         else:
             df_para_gantt = filter_dataframe(df_data, selected_ugb, selected_emp, selected_grupo, selected_setor)
             
-            # Obter estado atual da baseline
-            current_baseline = st.session_state.get('current_baseline')
-            current_baseline_data = st.session_state.get('current_baseline_data')
-            
-            # Verificar se a baseline atual pertence a algum empreendimento no gráfico
-            current_emp = st.session_state.get('current_empreendimento')
-            empreendimentos_no_grafico = df_para_gantt["Empreendimento"].unique()
-            
-            # Só passar a baseline se pertencer a um empreendimento no gráfico atual
-            if current_emp and current_emp in empreendimentos_no_grafico:
-                baseline_to_use = current_baseline
-                baseline_data_to_use = current_baseline_data
-            else:
-                baseline_to_use = None
-                baseline_data_to_use = None
-            
+            # gerar_gantt now reads baseline from session state internally
             gerar_gantt(
                 df_para_gantt.copy(),
                 tipo_visualizacao, 
@@ -5290,9 +5708,7 @@ with st.spinner("Carregando e processando dados..."):
                 df_data, 
                 pulmao_status, 
                 pulmao_meses,
-                selected_etapa_nome,
-                baseline_data=baseline_data_to_use,
-                baseline_name=baseline_to_use
+                selected_etapa_nome
             )
             # Botão para limpar baseline (se houver uma ativa)
                                                                                                                                                       
@@ -5743,175 +6159,156 @@ with st.spinner("Carregando e processando dados..."):
                     hide_index=True,
                     use_container_width=True
                 )
+    
+
+    # Tab3 - Linhas de Base (apenas para usuarios autorizados)
+    if tab3 is not None:
+        with tab3:
+            st.title("Gerenciamento de Linhas de Base")
+            
+            # Seleção de empreendimento
+            empreendimentos_baseline = df_data['Empreendimento'].unique().tolist() if not df_data.empty else []
+            
+            if not empreendimentos_baseline:
+                st.warning("Nenhum empreendimento disponível")
+            else:
+                selected_empreendimento_baseline = st.selectbox(
+                    "Selecione o Empreendimento",
+                    empreendimentos_baseline,
+                    key="baseline_emp_tab3"
+                )
                 
-                st.markdown("""<div style="margin-top: 10px; font-size: 12px; color: #555;">
-                    <strong>Legenda:</strong> 
-                    <span style="color: #2EAF5B; font-weight: bold;">■ Concluído antes do prazo</span> | 
-                    <span style="color: #C30202; font-weight: bold;">■ Concluído com atraso</span> | 
-                    <span style="color: #A38408; font-weight: bold;">■ Aguardando atualização</span> | 
-                    <span style="color: #000000; font-weight: bold;">■ Em andamento</span> | 
-                    <span style="color: #999; font-style: italic;"> - Dados não disponíveis</span>
-                </div>""", unsafe_allow_html=True)
-    with tab3:
-        st.subheader("Gerenciamento de Linhas de Base")
-        
-        # Seleção de empreendimento
-        empreendimentos_baseline = df_data['Empreendimento'].unique().tolist() if not df_data.empty else []
-
-        if not empreendimentos_baseline:
-            st.info("Nenhum empreendimento disponível")
-            st.stop()
-
-        selected_empreendimento_baseline = st.selectbox(
-            "Empreendimento",
-            empreendimentos_baseline,
-            key="baseline_emp_tab3"
-        )
-        
-        # Criação de nova baseline
-        with st.container(border=True):
-            st.markdown("#### Nova Linha de Base")
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.caption(f"Empreendimento: **{selected_empreendimento_baseline}**")
-            with col2:
-                if st.button("Criar Baseline", use_container_width=True, type="primary", key="create_baseline_main"):
-                    try:
-                        version_name = take_gantt_baseline(df_data, selected_empreendimento_baseline, tipo_visualizacao)
-                        st.success(f"Baseline **{version_name}** criada")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro: {e}")
-        
-        # Aplicar baseline no gráfico
-        baseline_options = get_baseline_options(selected_empreendimento_baseline)
-        if baseline_options:
-            with st.container(border=True):
-                st.markdown("#### Aplicar no Gráfico")
+                st.divider()
+                
+                # === CRIAR BASELINE ===
+                st.subheader("📝 Criar Nova Baseline")
+                
+                user_email = st.session_state.get('user_email', '')
+                user_name = st.session_state.get('user_name', '')
+                
                 col1, col2 = st.columns([3, 1])
-                with col1:
-                    selected_baseline = st.selectbox(
-                        "Selecionar baseline",
-                        ["P0-(padrão)"] + baseline_options,
-                        key="apply_baseline_tab3"
-                    )
-                with col2:
-                    if st.button("Aplicar", use_container_width=True, key="apply_baseline_btn"):
-                        if selected_baseline != "P0-(padrão)":
-                            baseline_data = load_baseline_data(selected_empreendimento_baseline, selected_baseline)
-                            if baseline_data:
-                                st.success(f"Baseline **{selected_baseline}** aplicada")
-        
-        # Linhas de base pendentes
-        baselines = load_baselines()
-        unsent_baselines = st.session_state.get('unsent_baselines', {})
-        emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
-        
-        if emp_unsent:
-            with st.container(border=True):
-                st.markdown(f"#### Pendentes de Envio ({len(emp_unsent)})")
                 
-                for i, version_name in enumerate(emp_unsent):
-                    col1, col2, col3 = st.columns([3, 1, 1])
+                with col1:
+                    st.write(f"**Empreendimento:** {selected_empreendimento_baseline}")
+                    if user_name:
+                        st.write(f"**Responsável:** {user_name}")
+                
+                with col2:
+                    if st.button("Criar Baseline", use_container_width=True, type="primary", key="create_baseline_main"):
+                        try:
+                            version_name = take_gantt_baseline(
+                                df_data, 
+                                selected_empreendimento_baseline, 
+                                tipo_visualizacao,
+                                created_by=user_email if user_email else "usuario"
+                            )
+                            st.success(f"✅ Baseline {version_name} criada!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erro: {e}")
+                
+                st.divider()
+                
+                # === APLICAR BASELINE ===
+                st.subheader("📊 Aplicar Baseline ao Gráfico")
+                
+                baseline_options = get_baseline_options(selected_empreendimento_baseline)
+                
+                if baseline_options:
+                    col1, col2 = st.columns([3, 1])
                     
                     with col1:
-                        baseline_info = baselines.get(selected_empreendimento_baseline, {}).get(version_name, {})
+                        selected_baseline = st.selectbox(
+                            "Selecione a baseline",
+                            ["P0 (Padrão)"] + baseline_options,
+                            key="apply_baseline_tab3"
+                        )
+                    
+                    with col2:
+                        if st.button("Aplicar", use_container_width=True, key="apply_baseline_btn"):
+                            if selected_baseline == "P0 (Padrão)":
+                                st.session_state.current_baseline = None
+                                st.session_state.current_baseline_data = None
+                                st.session_state.current_empreendimento = None
+                                st.success("Voltou ao padrão")
+                                st.rerun()
+                            else:
+                                baseline_data = get_baseline_data(selected_empreendimento_baseline, selected_baseline)
+                                if baseline_data:
+                                    st.session_state.current_baseline = selected_baseline
+                                    st.session_state.current_baseline_data = baseline_data
+                                    st.session_state.current_empreendimento = selected_empreendimento_baseline
+                                    st.success(f"Baseline {selected_baseline} aplicada!")
+                                    st.rerun()
+                                else:
+                                    st.error("Baseline não encontrada")
+                else:
+                    st.info("Nenhuma baseline disponível. Crie uma acima.")
+                
+                st.divider()
+                
+                # === LISTA DE BASELINES ===
+                st.subheader("📋 Baselines Existentes")
+                
+                baselines = load_baselines()
+                unsent_baselines = st.session_state.get('unsent_baselines', {})
+                emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
+                emp_baselines = baselines.get(selected_empreendimento_baseline, {})
+                
+                if emp_baselines:
+                    for i, version_name in enumerate(sorted(emp_baselines.keys(), reverse=True)):
+                        is_unsent = version_name in emp_unsent
+                        baseline_info = emp_baselines[version_name]
                         data_criacao = baseline_info.get('date', 'N/A')
-                        st.write(f"**{version_name}**")
-                        st.caption(f"Criada em: {data_criacao}")
+                        baseline_data_info = baseline_info.get('data', {})
+                        created_by = baseline_data_info.get('created_by', 'N/A')
+                        
+                        col1, col2, col3 = st.columns([4, 2, 1])
+                        
+                        with col1:
+                            status = "🟡 Pendente" if is_unsent else "🟢 Enviada"
+                            st.write(f"**{version_name}** - {status}")
+                            st.caption(f"Criado por: {created_by} | Data: {data_criacao}")
+                        
+                        with col2:
+                            st.write("")  # Espaçamento
+                        
+                        with col3:
+                            if st.button("Excluir", key=f"del_{i}", use_container_width=True):
+                                if delete_baseline(selected_empreendimento_baseline, version_name):
+                                    if 'unsent_baselines' in st.session_state:
+                                        if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
+                                            st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
+                                    st.success("Excluída")
+                                    st.rerun()
+                                else:
+                                    st.error("Erro ao excluir")
+                        
+                        if i < len(emp_baselines) - 1:
+                            st.divider()
                     
-                    with col2:
-                        if st.button("Enviar", key=f"send_{i}", help="Enviar para AWS", use_container_width=True):
-                            if send_to_aws(selected_empreendimento_baseline, version_name):
-                                st.success("Enviada")
-                                st.rerun()
-                    
-                    with col3:
-                        if st.button("Excluir", key=f"del_unsent_{i}", help="Excluir", use_container_width=True):
-                            if delete_baseline(selected_empreendimento_baseline, version_name):
-                                st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                st.success("Excluída")
-                                st.rerun()
-                    
-                    if i < len(emp_unsent) - 1:
-                        st.divider()
-        
-        # Todas as linhas de base
-        emp_baselines = baselines.get(selected_empreendimento_baseline, {})
-        
-        if emp_baselines:
-            with st.container(border=True):
-                st.markdown(f"#### Todas as Baselines ({len(emp_baselines)})")
-                
-                for i, version_name in enumerate(sorted(emp_baselines.keys(), reverse=True)):
-                    is_unsent = version_name in emp_unsent
-                    baseline_info = emp_baselines[version_name]
-                    data_criacao = baseline_info.get('date', 'N/A')
-                    
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    
+                    # Estatísticas simples
+                    st.divider()
+                    col1, col2, col3 = st.columns(3)
                     with col1:
-                        status = "Pendente" if is_unsent else "Enviada"
-                        st.write(f"**{version_name}**")
-                        st.caption(f"{status} | Criada em: {data_criacao}")
-                    
+                        st.metric("Total", len(emp_baselines))
                     with col2:
-                        if st.button("Visualizar", key=f"view_{i}", help="Visualizar", use_container_width=True, disabled=True):
-                            pass
-                    
+                        st.metric("Pendentes", len(emp_unsent))
                     with col3:
-                        if st.button("Excluir", key=f"del_all_{i}", help="Excluir", use_container_width=True):
-                            if delete_baseline(selected_empreendimento_baseline, version_name):
-                                if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
-                                    st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                st.success("Excluída")
-                                st.rerun()
-                    
-                    if i < len(emp_baselines) - 1:
-                        st.divider()
-        else:
-            with st.container(border=True):
-                st.info("Nenhuma linha de base criada para este empreendimento")
-        
-        # Estatísticas
-        if emp_baselines:
-            with st.container(border=True):
-                st.markdown("#### Estatísticas")
-                col1, col2, col3 = st.columns(3)
-                
-                with col1:
-                    total = len(emp_baselines)
-                    st.metric("Total", total)
-                
-                with col2:
-                    pendentes = len(emp_unsent)
-                    st.metric("Pendentes", pendentes)
-                
-                with col3:
-                    enviadas = total - pendentes
-                    st.metric("Enviadas", enviadas)
+                        st.metric("Enviadas", len(emp_baselines) - len(emp_unsent))
+                else:
+                    st.info("Nenhuma baseline criada ainda")
 
-        # Ações de sistema
-        with st.expander("Ações do Sistema"):
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Verificar Sistema", use_container_width=True, key="debug_system"):
-                    debug_baseline_system()
-            with col2:
-                if st.button("Atualizar Dados", use_container_width=True, key="refresh_data"):
-                    st.rerun()
-
-                # Verificação de implementação (opcional)
 def verificar_implementacao_baseline():
-    """Verifica se todas as funções de baseline foram implementadas"""
+    """Verifica se todas as funcoes de baseline foram implementadas"""
     funcoes_necessarias = [
-        'get_db_connection', 'create_baselines_table', 'load_baselines',
-        'save_baseline', 'delete_baseline', 'take_gantt_baseline', 'send_to_aws'
+            'get_db_connection', 'create_baselines_table', 'load_baselines',
+            'save_baseline', 'delete_baseline', 'take_gantt_baseline', 'send_to_aws'
     ]
     
     for func in funcoes_necessarias:
-        if func not in globals():
-            st.error(f"❌ Função {func} não encontrada na implementação")
+            if func not in globals():
+                st.error(f"❌ Função {func} não encontrada na implementação")
             return False
     
     return True
@@ -5920,7 +6317,7 @@ def verificar_implementacao_baseline():
 if __name__ == "__main__":
     # Verificar implementação (pode remover depois)
     if 'df_data' in globals() and not df_data.empty:
-        verificar_implementacao_baseline()
+            verificar_implementacao_baseline()
 
     else:
-        st.error("❌ Não foi possível carregar ou gerar os dados.")
+            st.error("❌ Não foi possível carregar ou gerar os dados.")
