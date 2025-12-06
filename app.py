@@ -2238,6 +2238,43 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         date.setUTCMonth(date.getUTCMonth() + months);
                         if (date.getUTCDate() !== originalDay) {{
                             date.setUTCDate(0);
+                        }}
+                        return date.toISOString().split('T')[0];
+                    }}
+                    // --- FIM HELPERS DE DATA E PULMÃO ---
+                    
+                    // *** FUNÇÃO BASELINE CLIENT-SIDE COM BASELINES EMBUTIDAS ***
+                    function switchBaselineLocal(baselineName) {{
+                        console.log('🔄 [BASELINES EMBUTIDAS v18:30] Aplicando:', baselineName);
+                        
+                        if (!projectData || !projectData[0] || !projectData[0].tasks) {{
+                            console.error('❌ projectData não disponível');
+                            return;
+                        }}
+                        
+                        const tasks = projectData[0].tasks;
+                        let updatedCount = 0;
+                        
+                        tasks.forEach(task => {{
+                            if (task.baselines && task.baselines[baselineName]) {{
+                                task.start_previsto = task.baselines[baselineName].start;
+                                task.end_previsto = task.baselines[baselineName].end;
+                                updatedCount++;
+                            }}
+                        }});
+                        
+                        console.log(`✅ ${{updatedCount}} tasks atualizadas`);
+                        
+                        const currentDiv = document.getElementById('current-baseline-{project["id"]}');
+                        if (currentDiv) {{
+                            currentDiv.textContent = `Baseline: ${{baselineName}}`;
+                        }}
+                        
+                        window.location.reload();
+                    }}
+                    
+                    const filterOptions = {json.dumps(filter_options)};
+
                     let allTasks_baseData = {json.dumps(tasks_base_data)};
 
                     const initialPulmaoStatus = '{pulmao_status}';
