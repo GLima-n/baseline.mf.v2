@@ -2147,22 +2147,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados de baseline carregados:', allBaselinesData);
                     console.log('Opções de baseline por empreendimento:', baselineOptionsPorEmpreendimento);
                     
-                    // *** NOVO: Criar availableBaselines a partir de allBaselinesData ***
-                    const availableBaselines = {{}};
-                    
-                    // Para cada empreendimento e suas baselines
-                    for (const [empreendimento, baselinesDoEmp] of Object.entries(allBaselinesData)) {{
-                        for (const [baselineName, baselineInfo] of Object.entries(baselinesDoEmp)) {{
-                            // baselineInfo.data contém os dados da baseline
-                            if (baselineInfo.data && baselineInfo.data.tasks) {{
-                                availableBaselines[baselineName] = baselineInfo.data.tasks;
-                                console.log(`Baseline ${{baselineName}} adicionada com ${{baselineInfo.data.tasks.length}} tasks`);
-                            }}
-                        }}
-                    }}
-                    
-                    console.log('availableBaselines criado:', Object.keys(availableBaselines));
-                    
                     const coresPorSetor = {json.dumps(StyleConfig.CORES_POR_SETOR)};
 
                     const allProjectsData = {json.dumps(gantt_data_base)};
