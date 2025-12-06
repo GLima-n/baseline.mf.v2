@@ -2273,7 +2273,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             currentDiv.textContent = `Baseline: ${{baselineName}}`;
                         }}
                         
-                        window.location.reload();
+                        // Redesenhar gráfico localmente (sem reload)
+                        console.log('🎨 Redesenhando gráfico...');
+                        try {{
+                            renderChart();
+                            renderSidebar();
+                            console.log('✅ Gráfico redesenhado com sucesso!');
+                        }} catch (e) {{
+                            console.error('❌ Erro ao redesenhar:', e);
+                            // Fallback: reload se redesenho falhar
+                            window.location.reload();
+                        }}
                     }}
                     
                     const filterOptions = {json.dumps(filter_options)};
