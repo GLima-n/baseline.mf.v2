@@ -6184,14 +6184,13 @@ with st.spinner("Carregando e processando dados..."):
                 st.subheader("📝 Criar Nova Baseline")
                 
                 user_email = st.session_state.get('user_email', '')
-                user_name = st.session_state.get('user_name', '')
                 
                 col1, col2 = st.columns([3, 1])
                 
                 with col1:
                     st.write(f"**Empreendimento:** {selected_empreendimento_baseline}")
-                    if user_name:
-                        st.write(f"**Responsável:** {user_name}")
+                    if user_email:
+                        st.write(f"**Responsável:** {user_email}")
                 
                 with col2:
                     if st.button("Criar Baseline", use_container_width=True, type="primary", key="create_baseline_main"):
