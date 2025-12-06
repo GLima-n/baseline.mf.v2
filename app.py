@@ -865,11 +865,24 @@ def converter_dados_para_gantt(df):
                         for task in tasks:
                             task_name = task["name"]
                             
-                            # Buscar task correspondente na baseline
+                            # Tentar múltiplas variações de nome para matching robusto
+                            baseline_task = None
+                            
+                            # 1. Tentar nome exato com 'etapa' e 'Etapa'
                             baseline_task = next(
                                 (bt for bt in baseline_tasks if bt.get('etapa') == task_name or bt.get('Etapa') == task_name),
                                 None
                             )
+                            
+                            # 2. Se não encontrou, tentar normalizado (sem espaços extras)
+                            if not baseline_task:
+                                task_name_norm = task_name.strip().upper()
+                                baseline_task = next(
+                                    (bt for bt in baseline_tasks 
+                                     if (bt.get('etapa', '').strip().upper() == task_name_norm or 
+                                         bt.get('Etapa', '').strip().upper() == task_name_norm)),
+                                    None
+                                )
                             
                             if baseline_task:
                                 task["baselines"][baseline_name] = {
