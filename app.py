@@ -2163,9 +2163,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         console.log(`✅ ${{updatedCount}} tasks atualizadas`);
                         
-                        // Redesenhar gráfico
-                        drawFullChart();
-                        updateSidebar();
+                        // Recarregar página para aplicar mudanças
+                        console.log('🔄 Recarregando página...');
+                        window.location.reload();
+                    }}
+                    
+                    // Alias para compatibilidade com dropdown existente
+                    function switchBaselineLocal(baselineName) {{
+                        applyBaseline_{project["id"]}(baselineName);
                     }}
                     
                     // Variável para compatibilidade com código legado
