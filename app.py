@@ -1533,80 +1533,50 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             if emp_baselines:
                 baselines_por_empreendimento[emp] = emp_baselines
         
-        # --- NOVO: Preparar TODAS as baselines para troca client-side ---
-        # Carregar dados completos de baselines de TODOS os empreendimentos
+        # --- PREPARAR BASELINES PARA JAVASCRIPT ---
         available_baselines_for_js = {}
         
-        print("=" * 80)
-        print("INÍCIO: Preparando baselines para JavaScript client-side")
-        print("=" * 80)
-        
-        # Carregar todas as baselines do banco
         all_baselines_from_db = load_baselines()
-        print(f"DEBUG: all_baselines_from_db keys = {list(all_baselines_from_db.keys())}")
         
-        # 1. P0 = dados atuais (sem baseline)
+        # P0 = dados atuais (sem baseline)
         available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
-        print(f"DEBUG: P0 adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
         
-        # 2. Carregar baselines de TODOS os empreendimentos disponíveis
+        # Carregar baselines de todos os empreendimentos
         for empreendimento_loop in todos_empreendimentos:
             if empreendimento_loop in all_baselines_from_db:
                 baselines_dict = all_baselines_from_db[empreendimento_loop]
-                print(f"DEBUG: {len(baselines_dict)} baselines encontradas para {empreendimento_loop}")
                 
-                # Usar a função get_baseline_data que já funciona corretamente
                 for baseline_name in baselines_dict.keys():
-                    print(f"DEBUG: Carregando baseline {baseline_name} usando get_baseline_data()")
-                    
-                    # Usar função existente que já sabe parsear corretamente
                     baseline_data = get_baseline_data(empreendimento_loop, baseline_name)
                     
                     if baseline_data:
                         try:
-                            # baseline_data pode ser dict ou lista
                             formatted_tasks = []
                             
-                            print(f"DEBUG: baseline_data tipo: {type(baseline_data)}")
-                            
-                            # Se for dicionário, precisamos iterar sobre os valores
                             if isinstance(baseline_data, dict):
-                                print(f"DEBUG: baseline_data é dict com chaves: {list(baseline_data.keys())}")
-                                # O dict pode ter metadados + tasks, vamos pegar apenas 'tasks' se existir
                                 if 'tasks' in baseline_data:
                                     tasks_list = baseline_data['tasks']
-                                    print(f"DEBUG: Usando baseline_data['tasks'] com {len(tasks_list)} items")
                                 else:
-                                    # Se não tem 'tasks', tenta usar todos os valores
                                     tasks_list = list(baseline_data.values())
-                                    print(f"DEBUG: Usando all values, {len(tasks_list)} items")
                             elif isinstance(baseline_data, list):
-                                print(f"DEBUG: baseline_data é list com {len(baseline_data)} items")
                                 tasks_list = baseline_data
                             else:
-                                print(f"DEBUG: baseline_data tipo inesperado: {type(baseline_data)}, pulando")
-                                tasks_list = []  # Lista vazia para não processar
-                            
-                            print(f"DEBUG: Processando {len(tasks_list)} tasks")
+                                tasks_list = []
                             
                             for i, task in enumerate(tasks_list):
-                                # task pode ser string JSON ou dict
                                 if isinstance(task, str):
                                     if not task or not task.strip():
                                         continue
-                                    
                                     try:
                                         task_dict = json.loads(task)
-                                    except json.JSONDecodeError as e:
-                                        print(f"DEBUG: Task {i} falhou ao parsear: {e}")
+                                    except json.JSONDecodeError:
                                         continue
                                 elif isinstance(task, dict):
                                     task_dict = task
                                 else:
-                                    print(f"DEBUG: Task {i} tipo inesperado: {type(task)}")
                                     continue
                                 
-                                if task_dict:  # Só adiciona se não for vazio
+                                if task_dict:
                                     formatted_tasks.append({
                                         'etapa': task_dict.get('etapa', task_dict.get('Etapa', '')),
                                         'inicio_previsto': task_dict.get('inicio_previsto', task_dict.get('Inicio_Prevista', task_dict.get('start_date'))),
@@ -1614,16 +1584,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     })
                             
                             available_baselines_for_js[baseline_name] = formatted_tasks
-                            print(f"DEBUG: Baseline {baseline_name} adicionada com {len(formatted_tasks)} etapas")
                         except Exception as e:
                             print(f"Erro ao processar baseline {baseline_name}: {e}")
-                            import traceback
-                            traceback.print_exc()
                             continue
-                    else:
-                        print(f"DEBUG: get_baseline_data retornou None para {baseline_name}")
         
-        print(f"DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
         
         # Reduz o fator de multiplicação para evitar excesso de espaço
         altura_gantt = max(400, min(800, (num_tasks * 25) + 200))  # Limita a altura máxima
@@ -2092,8 +2056,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </span>
                         </button>
                     </div>
-                    <!-- Seletor de Baseline no Menu Flutuante -->
-                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: block;">
+                    <!-- Seletor de Baseline (OCULTO) -->
+                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
                         </div>
