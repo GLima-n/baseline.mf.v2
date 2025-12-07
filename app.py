@@ -2693,12 +2693,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
                         }}
 
-                        // *** ADICIONAR BOTÃO DE BASELINE ***
-                        addBaselineButtonToToolbar();
-                        
-                        // *** ATUALIZAR DROPDOWN DE BASELINE ***
-                        const currentProjectName = projectData[0].name;
-                        updateBaselineDropdownForProject(currentProjectName);
 
                         renderSidebar();
                         renderHeader();
