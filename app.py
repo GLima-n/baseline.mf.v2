@@ -2258,10 +2258,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     function updateBaselineDropdownForProject(projectName) {{
                         // Não faz nada - dropdown já está populado no HTML
+                        
+                        // IMPORTANTE: Remover qualquer event listener onchange que possa ter sido adicionado
+                        const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                        if (dropdown) {{
+                            // Clonar o elemento para remover TODOS os event listeners
+                            const newDropdown = dropdown.cloneNode(true);
+                            dropdown.parentNode.replaceChild(newDropdown, dropdown);
+                            console.log('🔒 Event listeners removidos do dropdown de baseline');
+                        }}
                     }}
+                    
+                    // Flag de controle para evitar execução automática
+                    let baselineChangeInProgress = false;
                     
                     // Função de troca de baseline instantânea (client-side)
                     function switchBaselineLocal(baselineName) {{
+                        // Proteção: só executa se não estiver sendo chamada automaticamente
+                        if (baselineChangeInProgress) {{
+                            console.log('⚠️ Mudança de baseline já em progresso, ignorando chamada duplicada');
+                            return;
+                        }}
+                        
+                        baselineChangeInProgress = true;
                         console.log('🔄 Aplicando baseline:', baselineName);
                         
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
@@ -2292,6 +2311,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }} catch (e) {{
                             console.error('Erro ao redesenhar:', e);
                             window.location.reload();
+                        }} finally {{
+                            // Resetar flag para permitir futuras mudanças
+                            baselineChangeInProgress = false;
                         }}
                     }}
                     
