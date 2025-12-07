@@ -2523,10 +2523,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // *** RASTREAMENTO DE BASELINE ATIVA ***
                     let currentActiveBaseline = 'P0-(padrão)'; // Baseline atualmente aplicada
-                    
-                    // *** DEFINIÇÕES PARA PULMÃO ***
-                    const etapas_sem_alteracao = []; // Etapas que não são afetadas pelo pulmão (vazio = todas são afetadas)
-                    const etapas_pulmao = []; // Etapas que só têm início alterado (vazio = todas têm início e fim alterados)
 
                     function parseDate(dateStr) {{ 
                         if (!dateStr) return null; 
@@ -3821,18 +3817,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
                     
-                    // *** EVENT LISTENERS PARA CONTROLES DE PULMÃO ***
-                    document.querySelectorAll('input[name="filter-pulmao-{project['id']}"]').forEach(radio => {{
-                        radio.addEventListener('change', function() {{
-                            const pulmaoMesesGroup = document.getElementById('pulmao-meses-group-{project['id']}');
-                            if (this.value === 'Com Pulmão') {{
-                                pulmaoMesesGroup.style.display = 'block';
-                            }} else {{
-                                pulmaoMesesGroup.style.display = 'none';
-                            }}
-                        }});
-                    }});
-                    
                     // Inicializar o Gantt
                     initGantt();
                 </script>
@@ -4375,7 +4359,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="filter-group">
                         <label>Simulação Pulmão</label>
                         <div class="filter-group-radio">
-                            <input type="radio" id="filter-pulmao-sem-{project['id']}" name="filter-pulmao-{project['id']}" value="Sem Pulmão" checked>
+                            <input type="radio" id="filter-pulmao-sem-{project['id']}" name="filter-pulmao-{project['id']}" value="Sem Pulmão">
                             <label for="filter-pulmao-sem-{project['id']}">Sem Pulmão</label>
                         </div>
                         <div class="filter-group-radio">
