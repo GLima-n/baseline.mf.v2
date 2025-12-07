@@ -6490,43 +6490,6 @@ with st.spinner("Carregando e processando dados..."):
                 
                 st.divider()
                 
-                # === APLICAR BASELINE ===
-                st.subheader("📊 Aplicar Baseline ao Gráfico")
-                
-                baseline_options = get_baseline_options(selected_empreendimento_baseline)
-                
-                if baseline_options:
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        selected_baseline = st.selectbox(
-                            "Selecione a baseline",
-                            ["P0 (Padrão)"] + baseline_options,
-                            key="apply_baseline_tab3"
-                        )
-                    
-                    with col2:
-                        if st.button("Aplicar", use_container_width=True, key="apply_baseline_btn"):
-                            if selected_baseline == "P0 (Padrão)":
-                                st.session_state.current_baseline = None
-                                st.session_state.current_baseline_data = None
-                                st.session_state.current_empreendimento = None
-                                st.success("Voltou ao padrão")
-                                st.rerun()
-                            else:
-                                baseline_data = get_baseline_data(selected_empreendimento_baseline, selected_baseline)
-                                if baseline_data:
-                                    st.session_state.current_baseline = selected_baseline
-                                    st.session_state.current_baseline_data = baseline_data
-                                    st.session_state.current_empreendimento = selected_empreendimento_baseline
-                                    st.success(f"Baseline {selected_baseline} aplicada!")
-                                    st.rerun()
-                                else:
-                                    st.error("Baseline não encontrada")
-                else:
-                    st.info("Nenhuma baseline disponível. Crie uma acima.")
-                
-                st.divider()
                 
                 # === LISTA DE BASELINES ===
                 st.subheader("📋 Baselines Existentes")
