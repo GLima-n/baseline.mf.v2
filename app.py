@@ -2084,7 +2084,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
                         <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value, 'MANUAL_CLICK')">
-                            ✅ Aplicar Baseline
+                            Aplicar Linha de Base
                         </button>
                     </div>
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
