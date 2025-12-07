@@ -1637,7 +1637,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
                     /* Novos estilos para seletor de baseline - Alinhado com menu de filtros */
                     .baseline-selector {{
-                        display: none;
+                        display: block;
                         position: absolute;
                         top: 10px;
                         right: 50px;
@@ -1650,9 +1650,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         border: 1px solid #e2e8f0;
                     }}
                     
-                    .baseline-selector.is-open {{
-                        display: block;
-                    }}
                     
                     .baseline-selector label {{
                         display: block;
