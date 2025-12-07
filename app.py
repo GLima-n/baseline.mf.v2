@@ -909,6 +909,13 @@ def converter_dados_para_gantt(df):
                                     "start": baseline_task.get('inicio_previsto', baseline_task.get('Inicio_Prevista')),
                                     "end": baseline_task.get('termino_previsto', baseline_task.get('Termino_Prevista'))
                                 }
+                            else:
+                                # CORREÇÃO: Marcar explicitamente que esta tarefa não existe nesta baseline
+                                # Isso permite que o JavaScript diferencie "sem dados" de "não processado"
+                                task["baselines"][baseline_name] = {
+                                    "start": None,
+                                    "end": None
+                                }
         except Exception as e:
             print(f"Erro ao popular baselines locais: {e}")
             # Se falhar, pelo menos P0 já foi adicionado
@@ -2356,14 +2363,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         const tasks = projectData[0].tasks;
                         let updatedCount = 0;
+                        let clearedCount = 0;
                         
                         tasks.forEach(task => {{
                             if (task.baselines && task.baselines[baselineName]) {{
-                                task.start_previsto = task.baselines[baselineName].start;
-                                task.end_previsto = task.baselines[baselineName].end;
-                                updatedCount++;
+                                const baselineData = task.baselines[baselineName];
+                                
+                                // CORREÇÃO: Verificar se a baseline tem dados válidos (não-null)
+                                // Se start e end são null, significa que a tarefa NÃO existia nesta baseline
+                                if (baselineData.start !== null && baselineData.end !== null) {{
+                                    // Tarefa existe na baseline - aplicar datas
+                                    task.start_previsto = baselineData.start;
+                                    task.end_previsto = baselineData.end;
+                                    updatedCount++;
+                                }} else {{
+                                    // Tarefa NÃO existe na baseline - limpar datas previstas
+                                    task.start_previsto = null;
+                                    task.end_previsto = null;
+                                    clearedCount++;
+                                }}
                             }}
                         }});
+                        
+                        console.log(`✅ Baseline aplicada: ${{updatedCount}} tarefas atualizadas, ${{clearedCount}} tarefas limpas`);
                         
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
