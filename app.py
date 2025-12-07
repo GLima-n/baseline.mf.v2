@@ -978,11 +978,23 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
         
         # Converter tasks para formato serializável com validação
         task_count = 0
-        for _, row in df_empreendimento.iterrows():
+        
+        # 🔍 DEBUG: Log inicial
+        print(f"\n{'='*80}")
+        print(f"🔍 DEBUG: Iniciando criação de baseline para '{empreendimento}'")
+        print(f"🔍 Total de linhas no DataFrame filtrado: {len(df_empreendimento)}")
+        print(f"{'='*80}\n")
+        
+        for idx, row in df_empreendimento.iterrows():
             try:
+                etapa_sigla = row.get('Etapa', '')
+                
+                # 🔍 DEBUG: Log início do processamento da etapa
+                print(f"\n--- Processando Etapa: {etapa_sigla} ---")
+                
                 task = {
-                    'etapa': row.get('Etapa', ''),
-                    'etapa_nome_completo': sigla_para_nome_completo.get(row.get('Etapa', ''), row.get('Etapa', '')),
+                    'etapa': etapa_sigla,
+                    'etapa_nome_completo': sigla_para_nome_completo.get(etapa_sigla, etapa_sigla),
                     'inicio_previsto': None,
                     'termino_previsto': None,
                     'inicio_real': None,
@@ -992,6 +1004,12 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                     'grupo': row.get('GRUPO', ''),
                     'ugb': row.get('UGB', '')
                 }
+                
+                # 🔍 DEBUG: Log valores do DataFrame
+                print(f"  DataFrame - Inicio_Real: {row.get('Inicio_Real')}")
+                print(f"  DataFrame - Termino_Real: {row.get('Termino_Real')}")
+                print(f"  DataFrame - Inicio_Prevista: {row.get('Inicio_Prevista')}")
+                print(f"  DataFrame - Termino_Prevista: {row.get('Termino_Prevista')}")
                 
                 # Converter datas para string com tratamento seguro
                 date_fields = {
@@ -1016,10 +1034,17 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                             except:
                                 task[task_field] = None
                 
+                # 🔍 DEBUG: Log após preenchimento inicial
+                print(f"  Task - inicio_real: {task['inicio_real']}")
+                print(f"  Task - termino_real: {task['termino_real']}")
+                
                 # IMPORTANTE: Para etapas PAI, usar datas REAIS calculadas das subetapas
-                etapa_sigla = row.get('Etapa', '')
                 if etapa_sigla in etapas_pai_datas_calculadas:
                     datas_calculadas = etapas_pai_datas_calculadas[etapa_sigla]
+                    
+                    print(f"  ✅ É ETAPA PAI - usando datas calculadas das subetapas")
+                    print(f"     inicio_real calculado: {datas_calculadas.get('inicio_real')}")
+                    print(f"     termino_real calculado: {datas_calculadas.get('termino_real')}")
                     
                     # Usar datas reais calculadas tanto para inicio_previsto quanto inicio_real
                     # (seguindo a lógica: baseline captura o "real" como "previsto")
@@ -1035,10 +1060,15 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                 has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
                 is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
                 
+                # 🔍 DEBUG: Log da verificação
+                print(f"  📊 VERIFICAÇÃO:")
+                print(f"     has_real_data: {has_real_data}")
+                print(f"     is_parent_with_calculated_data: {is_parent_with_calculated_data}")
+                print(f"     RESULTADO: {'✅ SERÁ SALVA' if (has_real_data or is_parent_with_calculated_data) else '❌ SERÁ PULADA'}")
+                
                 # Se NÃO tem dados reais E NÃO é etapa pai, SKIP (não salva na baseline)
                 if not (has_real_data or is_parent_with_calculated_data):
-                    # DEBUG: Opcional - descomentar para ver quais etapas foram puladas
-                    # print(f"DEBUG: Etapa '{etapa_sigla}' PULADA - sem dados reais")
+                    print(f"  ❌ Etapa '{etapa_sigla}' PULADA - sem dados reais\n")
                     continue  # ← Pula para próxima etapa sem adicionar na baseline
                 
                 # FALLBACK: Se não tem datas Reais, usar Previstas
@@ -1047,6 +1077,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                 if task['inicio_previsto'] is None:
                     date_val = row.get('Inicio_Prevista')
                     if date_val is not None and pd.notna(date_val):
+                        print(f"  ⚠️ FALLBACK: inicio_previsto usando Inicio_Prevista")
                         if hasattr(date_val, 'strftime'):
                             task['inicio_previsto'] = date_val.strftime("%Y-%m-%d")
                         else:
@@ -1059,6 +1090,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                 if task['termino_previsto'] is None:
                     date_val = row.get('Termino_Prevista')
                     if date_val is not None and pd.notna(date_val):
+                        print(f"  ⚠️ FALLBACK: termino_previsto usando Termino_Prevista")
                         if hasattr(date_val, 'strftime'):
                             task['termino_previsto'] = date_val.strftime("%Y-%m-%d")
                         else:
@@ -1071,6 +1103,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                 # Adicionar task (já passou na verificação de dados reais)
                 baseline_data['tasks'].append(task)
                 task_count += 1
+                print(f"  ✅ Etapa '{etapa_sigla}' ADICIONADA à baseline (#{task_count})\n")
                 
             except Exception as task_error:
                 st.warning(f"Erro ao processar task {task_count}: {task_error}")
