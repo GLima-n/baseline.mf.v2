@@ -5924,58 +5924,6 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
-        # SELETOR RÁPIDO DE BASELINE (SEMPRE VISÍVEL)
-        st.markdown("### 📊 Aplicar Baseline ao Gráfico")
-        col1, col2 = st.columns([3, 3])
-        
-        with col1:
-            if not df_para_exibir.empty:
-                empreendimentos_disponiveis = sorted(df_para_exibir["Empreendimento"].unique().tolist())
-                selected_quick_emp = st.selectbox(
-                    "Selecione o Empreendimento",
-                    empreendimentos_disponiveis,
-                    key="quick_baseline_emp",
-                    help="Escolha o projeto para aplicar a baseline"
-                )
-            else:
-                st.warning("Nenhum empreendimento disponível")
-                selected_quick_emp = None
-        
-        with col2:
-            if selected_quick_emp:
-                baseline_options_quick = get_baseline_options(selected_quick_emp)
-                if baseline_options_quick:
-                    # Aplicação automática via on_change
-                    selected_quick_baseline = st.selectbox(
-                        "Selecione a Baseline",
-                        ["P0-(padrão)"] + baseline_options_quick,
-                        key="quick_baseline_select",
-                        help="P0 = sem baseline (padrão atual) - Seleção aplicada automaticamente",
-                        on_change=aplicar_baseline_automaticamente,
-                        args=(selected_quick_emp,)
-                    )
-                else:
-                    st.info("Nenhuma baseline disponível para este empreendimento")
-                    selected_quick_baseline = "P0-(padrão)"
-            else:
-                selected_quick_baseline = "P0-(padrão)"
-        
-        st.markdown("---")  # Separador visual
-        
-        # INDICADOR DE STATUS DA BASELINE
-        baseline_status_name = st.session_state.get('current_baseline')
-        baseline_status_emp = st.session_state.get('current_empreendimento')
-        if baseline_status_name:
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.success(f"✅ **Baseline ativa:** {baseline_status_name} para o projeto **{baseline_status_emp}**")
-            with col2:
-                if st.button("🔄 Limpar", use_container_width=True, key="clear_baseline_status"):
-                    st.session_state.current_baseline = None
-                    st.session_state.current_baseline_data = None
-                    st.session_state.current_empreendimento = None
-                    st.rerun()
-        
         
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
