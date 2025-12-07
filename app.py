@@ -2065,7 +2065,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
-                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value)" 
+                        <button onclick="applyBaselineAndClose_{project['id']}()" 
                                 style="margin-top: 8px; width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
                             ✅ Aplicar Baseline
                         </button>
@@ -2268,6 +2268,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
+                    // Função que aplica baseline e fecha o menu de filtros
+                    function applyBaselineAndClose_{project["id"]}() {{
+                        const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                        if (dropdown) {{
+                            const selectedBaseline = dropdown.value;
+                            switchBaselineLocal(selectedBaseline);
+                            
+                            // Fechar menu de filtros após aplicar
+                            const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                            if (filterMenu) {{
+                                filterMenu.style.display = 'none';
+                            }}
+                        }}
+                    }}
+                    
                     const filterOptions = {json.dumps(filter_options)};
 
                     let allTasks_baseData = {json.dumps(tasks_base_data)};
@@ -2412,14 +2427,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         console.log('Dropdown atualizado com', baselinesDoEmpreendimento.length, 'baselines');
-                        
-                        // IMPORTANTE: Re-adicionar event listener após atualizar dropdown
-                        // (necessário porque innerHTML foi modificado)
-                        dropdown.onchange = function() {{
-                            const selectedBaseline = dropdown.value;
-                            console.log('📊 Baseline selecionada no dropdown:', selectedBaseline);
-                            switchBaselineLocal(selectedBaseline); // ← NOVA FUNÇÃO CLIENT-SIDE
-                        }};
                     }}
                     
                     
