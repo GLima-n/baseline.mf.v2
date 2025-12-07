@@ -2523,6 +2523,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // *** RASTREAMENTO DE BASELINE ATIVA ***
                     let currentActiveBaseline = 'P0-(padrão)'; // Baseline atualmente aplicada
+                    
+                    // *** DEFINIÇÕES PARA PULMÃO ***
+                    const etapas_sem_alteracao = []; // Etapas que não são afetadas pelo pulmão (vazio = todas são afetadas)
+                    const etapas_pulmao = []; // Etapas que só têm início alterado (vazio = todas têm início e fim alterados)
 
                     function parseDate(dateStr) {{ 
                         if (!dateStr) return null; 
@@ -2938,10 +2942,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
 
                     function applyInitialPulmaoState() {{
-                        // Definições para pulmão
-                        const etapas_sem_alteracao = []; // Etapas que não são afetadas pelo pulmão
-                        const etapas_pulmao = []; // Etapas que só têm início alterado
-                        
                         if (initialPulmaoStatus === 'Com Pulmão' && initialPulmaoMeses > 0) {{
                             const offsetMeses = -initialPulmaoMeses;
                             let baseTasks = projectData[0].tasks;
@@ -3688,6 +3688,27 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             console.log('Total de tasks base:', baseTasks.length);
                             console.log('Grupos disponíveis nas tasks:', [...new Set(baseTasks.map(t => t.grupo))]);
                             console.log('Filtrando por grupo:', selGrupoArray);
+                            
+                            // Verificar tasks que deveriam passar no filtro
+                            const tasksComGrupoFiltrado = baseTasks.filter(t => {{
+                                const passaFiltro = selGrupoArray.includes(t.grupo);
+                                if (passaFiltro) {{
+                                    console.log('Task que passa no filtro:', t.name, '- Grupo:', t.grupo);
+                                }}
+                                return passaFiltro;
+                            }});
+                            console.log('Tasks que pertencem ao grupo filtrado:', tasksComGrupoFiltrado.length);
+                            console.log('=== FIM DEBUG ===');
+
+                            if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
+                                const offsetMeses = -selPulmaoMeses;
+                                console.log("Aplicando pulmão APENAS no previsto para filtros");
+                                
+                                baseTasks.forEach(task => {{
+                                    const etapaNome = task.name;
+                                    
+                                    if (etapas_sem_alteracao.includes(etapaNome)) {{
+                                        // Não altera datas
                                     }}
                                     else if (etapas_pulmao.includes(etapaNome)) {{
                                         // Apenas datas previstas
@@ -3703,7 +3724,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         task.termino_previsto = formatDateDisplay(task.end_previsto);
                                     }}
                                 }});
-                           
+                            }}
+
                             let filteredTasks = baseTasks;
 
                             // *** LÓGICA DE FILTRO CORRIGIDA ***
