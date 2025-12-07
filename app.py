@@ -2048,6 +2048,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </svg>
                             </span>
                         </button>
+                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baseline" onclick="toggleBaselineMenu()">
+                            <span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14,2 14,8 20,8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                </svg>
+                            </span>
+                        </button>
                         <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2056,20 +2066,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </span>
                         </button>
                     </div>
-                    <!-- Seletor de Baseline (OCULTO) -->
-                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
-                        <div class="baseline-current" id="current-baseline-{project['id']}">
-                            {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
+                    
+                    <!-- Menu flutuante de Baseline (separado, mas mesmo estilo do menu de filtros) -->
+                    <div class="floating-filter-menu" id="baseline-menu-{project['id']}" style="display: none;">
+                        <div class="filter-group">
+                            <label for="baseline-dropdown-{project['id']}">📊 Selecionar Baseline</label>
+                            <select id="baseline-dropdown-{project['id']}" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px;">
+                                <option value="P0-(padrão)">P0-(padrão)</option>
+                                {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
+                            </select>
+                            <div id="current-baseline-{project['id']}" style="margin-top: 8px; padding: 8px; background: #f7fafc; border-radius: 4px; font-size: 12px; color: #2d3748; border-left: 3px solid #3b82f6;">
+                                <strong>Ativa:</strong> {f"{baseline_name}" if baseline_name else "P0-(padrão)"}
+                            </div>
                         </div>
-                        <select id="baseline-dropdown-{project['id']}">
-                            <option value="P0-(padrão)">P0-(padrão)</option>
-                            {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
-                        </select>
-                        <button onclick="applyBaselineAndClose_{project['id']}()" 
-                                style="margin-top: 8px; width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
-                            ✅ Aplicar Baseline
-                        </button>
+                        <button class="filter-apply-btn" onclick="applyBaselineAndClose_{project['id']}()">✅ Aplicar Baseline</button>
                     </div>
+                    
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                         <div class="filter-group">
                             <label for="filter-project-{project['id']}">Empreendimento</label>
@@ -2268,20 +2280,47 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
-                    // Função que aplica baseline e fecha o menu de filtros
-                    function applyBaselineAndClose_{project["id"]}() {{
-                        const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
-                        if (dropdown) {{
-                            const selectedBaseline = dropdown.value;
-                            switchBaselineLocal(selectedBaseline);
+                    // Toggle menu de baseline
+                    function toggleBaselineMenu() {{
+                        const baselineMenu = document.getElementById('baseline-menu-{project["id"]}');
+                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                        
+                        if (baselineMenu) {{
+                            const isVisible = baselineMenu.style.display === 'block';
+                            baselineMenu.style.display = isVisible ? 'none' : 'block';
                             
-                            // Fechar menu de filtros após aplicar
-                            const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                            if (filterMenu) {{
+                            // Fechar menu de filtros se estiver aberto
+                            if (!isVisible && filterMenu) {{
                                 filterMenu.style.display = 'none';
                             }}
                         }}
                     }}
+                    
+                    // Aplicar baseline e fechar menu
+                    function applyBaselineAndClose_{project["id"]}() {{
+                        const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                        if (dropdown) {{
+                            switchBaselineLocal(dropdown.value);
+                            
+                            // Fechar menu
+                            const baselineMenu = document.getElementById('baseline-menu-{project["id"]}');
+                            if (baselineMenu) {{
+                                baselineMenu.style.display = 'none';
+                            }}
+                        }}
+                    }}
+                    
+                    // Fechar menus ao clicar fora
+                    document.addEventListener('click', function(e) {{
+                        const baselineMenu = document.getElementById('baseline-menu-{project["id"]}');
+                        const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
+                        
+                        if (baselineMenu && baselineBtn) {{
+                            if (!baselineMenu.contains(e.target) && !baselineBtn.contains(e.target)) {{
+                                baselineMenu.style.display = 'none';
+                            }}
+                        }}
+                    }});
                     
                     const filterOptions = {json.dumps(filter_options)};
 
