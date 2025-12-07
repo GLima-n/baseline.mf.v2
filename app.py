@@ -2310,7 +2310,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
-                            currentDiv.textContent = `Baseline: ${{baselineName}}`;
+                            currentDiv.textContent = `Baseline Ativa: ${{baselineName}}`;
+                        }}
+                        
+                        // Fechar o seletor de baseline (igual ao menu de filtros)
+                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                        if (baselineSelector) {{
+                            baselineSelector.classList.remove('is-open');
                         }}
                         
                         // Redesenhar gráfico
