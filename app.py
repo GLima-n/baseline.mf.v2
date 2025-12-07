@@ -2071,12 +2071,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="floating-filter-menu" id="baseline-menu-{project['id']}" style="display: none;">
                         <div class="filter-group">
                             <label for="baseline-dropdown-{project['id']}">Selecionar Baseline</label>
-                            <select id="baseline-dropdown-{project['id']}" style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px;">
+                            <select id="baseline-dropdown-{project['id']}" 
+                                    onchange="updateBaselineIndicator_{project['id']}(this.value)"
+                                    style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px;">
                                 <option value="P0-(padrão)">P0-(padrão)</option>
                                 {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                             </select>
-                            <div id="current-baseline-{project['id']}" style="margin-top: 8px; padding: 8px; background: {'#fef3c7' if baseline_name and baseline_name != 'P0-(padrão)' else '#f7fafc'}; border-radius: 4px; font-size: 12px; color: #2d3748; border-left: 3px solid: {'#f59e0b' if baseline_name and baseline_name != 'P0-(padrão)' else '#4a5568'};">
-                                <strong>Ativa:</strong> {f"{baseline_name}" if baseline_name else "P0-(padrão)"}
+                            <div id="current-baseline-{project['id']}" 
+                                 style="margin-top: 10px; padding: 10px 12px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 6px; font-size: 12px; color: #475569; border-left: 3px solid #64748b; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div style="width: 6px; height: 6px; border-radius: 50%; background: #64748b; transition: background 0.3s ease;"></div>
+                                    <span><strong>Ativa:</strong> {f"{baseline_name}" if baseline_name else "P0-(padrão)"}</span>
+                                </div>
                             </div>
                         </div>
                         <button class="filter-apply-btn" onclick="applyBaselineAndClose_{project['id']}()">Aplicar Baseline</button>
@@ -2296,24 +2302,45 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
+                    // Atualizar indicador visual ao selecionar baseline (feedback instantâneo)
+                    function updateBaselineIndicator_{project["id"]}(selectedBaseline) {{
+                        const currentDiv = document.getElementById('current-baseline-{project["id"]}');
+                        if (!currentDiv) return;
+                        
+                        const dot = currentDiv.querySelector('div[style*="border-radius: 50%"]');
+                        
+                        // Animação de pulso suave
+                        currentDiv.style.transform = 'scale(0.98)';
+                        currentDiv.style.opacity = '0.7';
+                        
+                        setTimeout(() => {{
+                            currentDiv.style.transform = 'scale(1)';
+                            currentDiv.style.opacity = '1';
+                            
+                            if (selectedBaseline && selectedBaseline !== 'P0-(padrão)') {{
+                                // Baseline diferente - Verde esmeralda moderno
+                                currentDiv.style.background = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
+                                currentDiv.style.borderLeftColor = '#10b981';
+                                currentDiv.style.color = '#065f46';
+                                currentDiv.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.15)';
+                                if (dot) dot.style.background = '#10b981';
+                            }} else {{
+                                // P0 - Slate minimalista
+                                currentDiv.style.background = 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
+                                currentDiv.style.borderLeftColor = '#64748b';
+                                currentDiv.style.color = '#475569';
+                                currentDiv.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                                if (dot) dot.style.background = '#64748b';
+                            }}
+                        }}, 150);
+                    }}
+                    
                     // Aplicar baseline e fechar menu
                     function applyBaselineAndClose_{project["id"]}() {{
                         const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
                         if (dropdown) {{
                             const selectedBaseline = dropdown.value;
                             switchBaselineLocal(selectedBaseline);
-                            
-                            // Atualizar cor do indicador baseado na baseline selecionada
-                            const currentDiv = document.getElementById('current-baseline-{project["id"]}');
-                            if (currentDiv) {{
-                                if (selectedBaseline && selectedBaseline !== 'P0-(padrão)') {{
-                                    currentDiv.style.background = '#fef3c7'; // Amarelo claro
-                                    currentDiv.style.borderLeftColor = '#f59e0b'; // Laranja/amarelo
-                                }} else {{
-                                    currentDiv.style.background = '#f7fafc'; // Cinza claro
-                                    currentDiv.style.borderLeftColor = '#4a5568'; // Azul escuro (cor do gráfico)
-                                }}
-                            }}
                             
                             // Fechar menu
                             const baselineMenu = document.getElementById('baseline-menu-{project["id"]}');
