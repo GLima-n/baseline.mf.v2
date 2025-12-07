@@ -3602,25 +3602,34 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
                     
                     // Toggle menu de filtros
-                    filterBtn.addEventListener('click', (e) => {{
-                        e.stopPropagation();
-                        filterMenu.classList.toggle('is-open');
-                        baselineSelector.classList.remove('is-open');  // Fecha baseline ao abrir filtros
-                    }});
+                    if (filterBtn) {{
+                        filterBtn.addEventListener('click', (e) => {{
+                            e.stopPropagation();
+                            filterMenu.classList.toggle('is-open');
+                            baselineSelector.classList.remove('is-open');  // Fecha baseline ao abrir filtros
+                        }});
+                    }}
                     
                     // Toggle seletor de baseline
-                    baselineBtn.addEventListener('click', (e) => {{
-                        e.stopPropagation();
-                        baselineSelector.classList.toggle('is-open');
-                        filterMenu.classList.remove('is-open');  // Fecha filtros ao abrir baseline
-                    }});
+                    if (baselineBtn) {{
+                        baselineBtn.addEventListener('click', (e) => {{
+                            e.stopPropagation();
+                            baselineSelector.classList.toggle('is-open');
+                            filterMenu.classList.remove('is-open');  // Fecha filtros ao abrir baseline
+                        }});
+                    }}
                     
                     // Fechar menus ao clicar fora
                     document.addEventListener('click', (e) => {{
-                        if (!filterMenu.contains(e.target) && e.target !== filterBtn) {{
+                        // Verificar se clicou no botão de filtros ou em seus filhos (SVG)
+                        const clickedFilterBtn = e.target.closest('#filter-btn-{project["id"]}');
+                        // Verificar se clicou no botão de baseline ou em seus filhos (SVG)
+                        const clickedBaselineBtn = e.target.closest('#baseline-btn-{project["id"]}');
+                        
+                        if (!filterMenu.contains(e.target) && !clickedFilterBtn) {{
                             filterMenu.classList.remove('is-open');
                         }}
-                        if (!baselineSelector.contains(e.target) && e.target !== baselineBtn) {{
+                        if (!baselineSelector.contains(e.target) && !clickedBaselineBtn) {{
                             baselineSelector.classList.remove('is-open');
                         }}
                     }});
