@@ -1030,8 +1030,20 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                         task['termino_previsto'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
                         task['termino_real'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
                 
+                # ✅ VERIFICAÇÃO CRÍTICA: Só continuar se tiver dados reais
+                # DEVE acontecer ANTES do fallback para Previstas
+                has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
+                is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
+                
+                # Se NÃO tem dados reais E NÃO é etapa pai, SKIP (não salva na baseline)
+                if not (has_real_data or is_parent_with_calculated_data):
+                    # DEBUG: Opcional - descomentar para ver quais etapas foram puladas
+                    # print(f"DEBUG: Etapa '{etapa_sigla}' PULADA - sem dados reais")
+                    continue  # ← Pula para próxima etapa sem adicionar na baseline
+                
                 # FALLBACK: Se não tem datas Reais, usar Previstas
                 # Isso é importante para etapas que não têm datas próprias E não são pais
+                # NOTA: Só chega aqui se a etapa passou na verificação acima
                 if task['inicio_previsto'] is None:
                     date_val = row.get('Inicio_Prevista')
                     if date_val is not None and pd.notna(date_val):
@@ -1056,14 +1068,9 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                             except:
                                 pass
                 
-                # Só adicionar a task se tiver dados reais (Inicio_Real ou Termino_Real)
-                # OU se for uma etapa pai com datas calculadas a partir de subetapas
-                has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
-                is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
-                
-                if has_real_data or is_parent_with_calculated_data:
-                    baseline_data['tasks'].append(task)
-                    task_count += 1
+                # Adicionar task (já passou na verificação de dados reais)
+                baseline_data['tasks'].append(task)
+                task_count += 1
                 
             except Exception as task_error:
                 st.warning(f"Erro ao processar task {task_count}: {task_error}")
