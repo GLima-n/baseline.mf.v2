@@ -2257,6 +2257,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     let projectData = {json.dumps([project])};
 
+                    // 🔍 BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE
+                    const allBaselinesData = {json.dumps(available_baselines_for_js, ensure_ascii=False)};
+                    console.log('🔍 DEBUG: Baselines carregadas no JavaScript:', Object.keys(allBaselinesData));
+                    console.log('🔍 DEBUG: Total de baselines:', Object.keys(allBaselinesData).length);
+
                     // Datas originais (Python)
                     const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
                     const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
@@ -2389,19 +2394,51 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
                             console.error('❌ Dados do projeto não disponíveis');
+                            baselineChangeInProgress = false;
                             return;
                         }}
                         
+                        // 🔍 OBTER DADOS DA BASELINE DO allBaselinesData
+                        const baselineData = allBaselinesData[baselineName];
+                        
+                        if (!baselineData) {{
+                            console.error('❌ Baseline não encontrada:', baselineName);
+                            console.log('🔍 Baselines disponíveis:', Object.keys(allBaselinesData));
+                            baselineChangeInProgress = false;
+                            return;
+                        }}
+                        
+                        console.log('🔍 Baseline carregada com', baselineData.length, 'etapas');
+                        
                         const tasks = projectData[0].tasks;
                         let updatedCount = 0;
+                        let skippedCount = 0;
                         
+                        // 🎯 NOVA LÓGICA: Verificar SE etapa existe na baseline
                         tasks.forEach(task => {{
-                            if (task.baselines && task.baselines[baselineName]) {{
-                                task.start_previsto = task.baselines[baselineName].start;
-                                task.end_previsto = task.baselines[baselineName].end;
+                            // Procurar essa etapa NA BASELINE (usando allBaselinesData)
+                            const etapaBaseline = baselineData.find(b => 
+                                b.etapa === task.etapa || 
+                                b.etapa === task.name ||
+                                b.etapa === task.name.toUpperCase()
+                            );
+                            
+                            if (etapaBaseline) {{
+                                // ✅ Etapa ESTÁ na baseline - mostrar barra previsto
+                                task.start_previsto = etapaBaseline.inicio_previsto;
+                                task.end_previsto = etapaBaseline.termino_previsto;
                                 updatedCount++;
+                                console.log('✅', task.name, '- Baseline aplicada');
+                            }} else {{
+                                // ❌ Etapa NÃO está na baseline - ESCONDER barra previsto
+                                task.start_previsto = null;
+                                task.end_previsto = null;
+                                skippedCount++;
+                                console.log('❌', task.name, '- SEM barra previsto (não está na baseline)');
                             }}
                         }});
+                        
+                        console.log(`📊 Resultado: ${{updatedCount}} etapas com baseline, ${{skippedCount}} etapas sem baseline`);
                         
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
@@ -2420,6 +2457,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         try {{
                             renderChart();
                             renderSidebar();
+                            console.log('✅ Gráfico redesenhado com baseline aplicada');
                         }} catch (e) {{
                             console.error('Erro ao redesenhar:', e);
                             window.location.reload();
