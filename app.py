@@ -1621,18 +1621,32 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
                     
                     /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
-                    /* Novos estilos para seletor de baseline */
+                    /* Novos estilos para seletor de baseline - Alinhado com menu de filtros */
                     .baseline-selector {{
+                        display: none;
                         position: absolute;
-                        top: 60px;
+                        top: 10px;
                         right: 50px;
-                        z-index: 100;
-                        background: rgba(255, 255, 255, 0.95);
-                        border-radius: 6px;
-                        padding: 10px;
-                        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                        width: 280px;
+                        background: white;
+                        border-radius: 8px;
+                        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                        z-index: 99;
+                        padding: 15px;
                         border: 1px solid #e2e8f0;
-                        min-width: 200px;
+                    }}
+                    
+                    .baseline-selector.is-open {{
+                        display: block;
+                    }}
+                    
+                    .baseline-selector label {{
+                        display: block;
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: #4a5568;
+                        margin-bottom: 4px;
+                        text-transform: uppercase;
                     }}
                     
                     .baseline-selector select {{
@@ -1640,34 +1654,37 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         padding: 6px 8px;
                         border: 1px solid #cbd5e0;
                         border-radius: 4px;
-                        font-size: 12px;
+                        font-size: 13px;
                         background: white;
+                        margin-bottom: 12px;
+                    }}
+                    
+                    .baseline-selector button {{
+                        width: 100%;
+                        padding: 8px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: white;
+                        background-color: #2d3748;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-top: 5px;
+                        transition: background-color 0.2s;
+                    }}
+                    
+                    .baseline-selector button:hover {{
+                        background-color: #1a202c;
                     }}
                     
                     .baseline-current {{
                         background: #e6f3ff;
-                        padding: 4px 8px;
+                        padding: 6px 10px;
                         border-radius: 4px;
-                        font-size: 11px;
-                        margin-bottom: 8px;
-                        border-left: 3px solid #3b82f6;
-                    }}
-                    
-                    .baseline-option {{
-                        padding: 6px 8px;
-                        cursor: pointer;
-                        border-radius: 3px;
                         font-size: 12px;
-                        margin: 2px 0;
-                    }}
-                    
-                    .baseline-option:hover {{
-                        background: #f1f5f9;
-                    }}
-                    
-                    .baseline-option.active {{
-                        background: #3b82f6;
-                        color: white;
+                        margin-bottom: 12px;
+                        border-left: 3px solid #3b82f6;
+                        font-weight: 500;
                     }}
 
                     .baseline-selector-container {{
@@ -2048,6 +2065,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </svg>
                             </span>
                         </button>
+                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baselines">
+                            <span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M3 3h18v18H3z"></path>
+                                    <path d="M7 7h10M7 12h10M7 17h10"></path>
+                                </svg>
+                            </span>
+                        </button>
                         <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2056,17 +2081,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </span>
                         </button>
                     </div>
-                    <!-- Seletor de Baseline (OCULTO) -->
-                    <div class="baseline-selector" id="baseline-selector-{project['id']}" style="display: none;">
+                    <!-- Seletor de Baseline -->
+                    <div class="baseline-selector" id="baseline-selector-{project['id']}">
                         <div class="baseline-current" id="current-baseline-{project['id']}">
-                            {f"Baseline: {baseline_name}" if baseline_name else "Baseline: P0-(padrão)"}
+                            {f"Baseline Ativa: {baseline_name}" if baseline_name else "Baseline Ativa: P0-(padrão)"}
                         </div>
+                        <label for="baseline-dropdown-{project['id']}">Selecionar Baseline</label>
                         <select id="baseline-dropdown-{project['id']}">
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
-                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value)" 
-                                style="margin-top: 8px; width: 100%; padding: 8px; background: #3b82f6; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 600;">
+                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value)">
                             ✅ Aplicar Baseline
                         </button>
                     </div>
@@ -3569,6 +3594,36 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
+                    
+                    // Event listeners para os botões da toolbar
+                    const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+                    const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
+                    const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                    const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                    
+                    // Toggle menu de filtros
+                    filterBtn.addEventListener('click', (e) => {{
+                        e.stopPropagation();
+                        filterMenu.classList.toggle('is-open');
+                        baselineSelector.classList.remove('is-open');  // Fecha baseline ao abrir filtros
+                    }});
+                    
+                    // Toggle seletor de baseline
+                    baselineBtn.addEventListener('click', (e) => {{
+                        e.stopPropagation();
+                        baselineSelector.classList.toggle('is-open');
+                        filterMenu.classList.remove('is-open');  // Fecha filtros ao abrir baseline
+                    }});
+                    
+                    // Fechar menus ao clicar fora
+                    document.addEventListener('click', (e) => {{
+                        if (!filterMenu.contains(e.target) && e.target !== filterBtn) {{
+                            filterMenu.classList.remove('is-open');
+                        }}
+                        if (!baselineSelector.contains(e.target) && e.target !== baselineBtn) {{
+                            baselineSelector.classList.remove('is-open');
+                        }}
+                    }});
                     
                     // Inicializar o Gantt
                     initGantt();
