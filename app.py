@@ -1550,32 +1550,51 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         # --- PREPARAR BASELINES PARA JAVASCRIPT ---
         available_baselines_for_js = {}
         
+        print("=" * 80)
+        print("🔍 INÍCIO: Preparando baselines para JavaScript client-side")
+        print("=" * 80)
+        
         all_baselines_from_db = load_baselines()
         
         # P0 = dados atuais (sem baseline)
         available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
+        print(f"🔍 DEBUG: P0-(padrão) adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
         
         # Carregar baselines de todos os empreendimentos
+        print(f"🔍 DEBUG: Empreendimentos a processar: {todos_empreendimentos}")
+        print(f"🔍 DEBUG: Baselines disponíveis no DB: {list(all_baselines_from_db.keys())}")
+        
         for empreendimento_loop in todos_empreendimentos:
             if empreendimento_loop in all_baselines_from_db:
                 baselines_dict = all_baselines_from_db[empreendimento_loop]
+                print(f"🔍 DEBUG: Processando {len(baselines_dict)} baselines para '{empreendimento_loop}'")
                 
                 for baseline_name in baselines_dict.keys():
+                    print(f"🔍 DEBUG: Carregando baseline '{baseline_name}'...")
                     baseline_data = get_baseline_data(empreendimento_loop, baseline_name)
                     
                     if baseline_data:
                         try:
                             formatted_tasks = []
                             
+                            print(f"   🔍 baseline_data tipo: {type(baseline_data)}")
+                            
                             if isinstance(baseline_data, dict):
+                                print(f"   🔍 baseline_data é dict com chaves: {list(baseline_data.keys())}")
                                 if 'tasks' in baseline_data:
                                     tasks_list = baseline_data['tasks']
+                                    print(f"   🔍 Usando baseline_data['tasks'] com {len(tasks_list)} items")
                                 else:
                                     tasks_list = list(baseline_data.values())
+                                    print(f"   🔍 Usando all values, {len(tasks_list)} items")
                             elif isinstance(baseline_data, list):
+                                print(f"   🔍 baseline_data é list com {len(baseline_data)} items")
                                 tasks_list = baseline_data
                             else:
+                                print(f"   ⚠️ baseline_data tipo inesperado: {type(baseline_data)}, pulando")
                                 tasks_list = []
+                            
+                            print(f"   🔍 Processando {len(tasks_list)} tasks...")
                             
                             for i, task in enumerate(tasks_list):
                                 if isinstance(task, str):
@@ -1583,14 +1602,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         continue
                                     try:
                                         task_dict = json.loads(task)
-                                    except json.JSONDecodeError:
+                                    except json.JSONDecodeError as e:
+                                        print(f"   ⚠️ Task {i} falhou ao parsear: {e}")
                                         continue
                                 elif isinstance(task, dict):
                                     task_dict = task
                                 else:
+                                    print(f"   ⚠️ Task {i} tipo inesperado: {type(task)}")
                                     continue
                                 
-                                if task_dict:
+                                if task_dict:  # Só adiciona se não for vazio
                                     formatted_tasks.append({
                                         'etapa': task_dict.get('etapa', task_dict.get('Etapa', '')),
                                         'inicio_previsto': task_dict.get('inicio_previsto', task_dict.get('Inicio_Prevista', task_dict.get('start_date'))),
@@ -1598,9 +1619,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     })
                             
                             available_baselines_for_js[baseline_name] = formatted_tasks
+                            print(f"   ✅ Baseline '{baseline_name}' adicionada com {len(formatted_tasks)} etapas")
                         except Exception as e:
-                            print(f"Erro ao processar baseline {baseline_name}: {e}")
+                            print(f"   ❌ Erro ao processar baseline {baseline_name}: {e}")
+                            import traceback
+                            traceback.print_exc()
                             continue
+                    else:
+                        print(f"   ⚠️ get_baseline_data retornou None para '{baseline_name}'")
+            else:
+                print(f"🔍 DEBUG: Empreendimento '{empreendimento_loop}' NÃO encontrado em all_baselines_from_db")
+        
+        print(f"🔍 DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
+        print("=" * 80)
         
         
         # Reduz o fator de multiplicação para evitar excesso de espaço
