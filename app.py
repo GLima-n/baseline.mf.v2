@@ -2083,7 +2083,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
                         </select>
-                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value)">
+                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value, 'MANUAL_CLICK')">
                             ✅ Aplicar Baseline
                         </button>
                     </div>
@@ -2273,7 +2273,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     let baselineChangeInProgress = false;
                     
                     // Função de troca de baseline instantânea (client-side)
-                    function switchBaselineLocal(baselineName) {{
+                    // IMPORTANTE: Segundo parâmetro é um token de segurança
+                    function switchBaselineLocal(baselineName, securityToken) {{
+                        // 🛡️ PROTEÇÃO: Só executa se chamada manualmente via botão com token correto
+                        if (securityToken !== 'MANUAL_CLICK') {{
+                            console.warn('⛔ Tentativa de aplicar baseline sem autorização bloqueada!');
+                            console.warn('   Baseline tentada:', baselineName);
+                            console.warn('   Token recebido:', securityToken);
+                            return;  // BLOQUEIA a execução
+                        }}
+                        
                         // Proteção: só executa se não estiver sendo chamada automaticamente
                         if (baselineChangeInProgress) {{
                             console.log('⚠️ Mudança de baseline já em progresso, ignorando chamada duplicada');
@@ -2281,7 +2290,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         baselineChangeInProgress = true;
-                        console.log('🔄 Aplicando baseline:', baselineName);
+                        console.log('✅ Aplicando baseline AUTORIZADA:', baselineName);
                         
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
                             console.error('❌ Dados do projeto não disponíveis');
