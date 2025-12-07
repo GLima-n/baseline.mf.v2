@@ -2523,6 +2523,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // *** RASTREAMENTO DE BASELINE ATIVA ***
                     let currentActiveBaseline = 'P0-(padrão)'; // Baseline atualmente aplicada
+                    
+                    // *** DEFINIÇÕES PARA PULMÃO ***
+                    const etapas_sem_alteracao = []; // Etapas que não são afetadas pelo pulmão (vazio = todas são afetadas)
+                    const etapas_pulmao = []; // Etapas que só têm início alterado (vazio = todas têm início e fim alterados)
 
                     function parseDate(dateStr) {{ 
                         if (!dateStr) return null; 
