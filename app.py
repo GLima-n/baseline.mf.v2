@@ -2317,6 +2317,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
                         if (baselineSelector) {{
                             baselineSelector.classList.remove('is-open');
+                            baselineSelector.style.display = 'none';  // Force close
                         }}
                         
                         // Redesenhar gráfico
