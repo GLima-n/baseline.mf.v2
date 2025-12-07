@@ -2797,8 +2797,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         addBaselineButtonToToolbar();
                         
                         // *** ATUALIZAR DROPDOWN DE BASELINE ***
-                        const currentProjectName = projectData[0].name;
-                        updateBaselineDropdownForProject(currentProjectName);
 
                         renderSidebar();
                         renderHeader();
