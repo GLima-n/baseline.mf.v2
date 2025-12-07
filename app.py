@@ -1747,7 +1747,81 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         line-height: 1.3;
                     }}
                     
+                    
                     .baseline-disabled {{
+                        opacity: 0.5;
+                        pointer-events: none;
+                    }}
+                    
+                    /* CSS para Seletor Duplo (Empreendimento + Baseline) */
+                    .baseline-selectors-container {{
+                        display: flex;
+                        flex-direction: column;
+                        gap: 12px;
+                        margin-bottom: 12px;
+                    }}
+                    
+                    .selector-group {{
+                        display: flex;
+                        flex-direction: column;
+                        gap: 4px;
+                    }}
+                    
+                    .selector-group label {{
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: #4a5568;
+                        text-transform: uppercase;
+                    }}
+                    
+                    .empreendimento-select, 
+                    .baseline-select {{
+                        width: 100%;
+                        padding: 6px 8px;
+                        border: 1px solid #cbd5e0;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        background: white;
+                        cursor: pointer;
+                        transition: border-color 0.2s, box-shadow 0.2s;
+                    }}
+                    
+                    .empreendimento-select:hover,
+                    .baseline-select:hover {{
+                        border-color: #a0aec0;
+                    }}
+                    
+                    .empreendimento-select:focus,
+                    .baseline-select:focus {{
+                        outline: none;
+                        border-color: #4CAF50;
+                        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.1);
+                    }}
+                    
+                    .baseline-select:disabled {{
+                        background-color: #f7fafc;
+                        cursor: not-allowed;
+                        opacity: 0.6;
+                    }}
+                    
+                    .baseline-apply-btn {{
+                        width: 100%;
+                        padding: 8px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        color: white;
+                        background-color: #2d3748;
+                        border: none;
+                        border-radius: 4px;
+                        cursor: pointer;
+                        margin-top: 5px;
+                        transition: background-color 0.2s;
+                    }}
+                    
+                    .baseline-apply-btn:hover {{
+                        background-color: #1a202c;
+                    }}
+                    
                         background: #f5f5f5;
                         opacity: 0.7;
                     }}
@@ -2096,17 +2170,26 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </span>
                         </button>
                     </div>
-                    <!-- Seletor de Baseline -->
+                    <!-- Seletor Duplo de Baseline (Empreendimento + Baseline) -->
                     <div class="baseline-selector" id="baseline-selector-{project['id']}">
                         <div class="baseline-current" id="current-baseline-{project['id']}">
-                            {f"Baseline Ativa: {baseline_name}" if baseline_name else "Baseline Ativa: P0-(padrão)"}
+                            {f"📸 {baseline_name} - {current_empreendimento_baseline}" if baseline_name and current_empreendimento_baseline else "Baseline: P0-(padrão)"}
                         </div>
-                        <label for="baseline-dropdown-{project['id']}">Selecionar Linha de Base</label>
-                        <select id="baseline-dropdown-{project['id']}">
-                            <option value="P0-(padrão)">P0-(padrão)</option>
-                            {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
-                        </select>
-                        <button onclick="switchBaselineLocal(document.getElementById('baseline-dropdown-{project['id']}').value, 'MANUAL_CLICK')">
+                        <div class="baseline-selectors-container">
+                            <div class="selector-group">
+                                <label for="empreendimento-dropdown-{project['id']}">🏢 Empreendimento</label>
+                                <select id="empreendimento-dropdown-{project['id']}" class="empreendimento-select">
+                                    <!-- Populado via JavaScript -->
+                                </select>
+                            </div>
+                            <div class="selector-group">
+                                <label for="baseline-dropdown-{project['id']}">📸 Baseline</label>
+                                <select id="baseline-dropdown-{project['id']}" class="baseline-select">
+                                    <option value="P0-(padrão)">P0-(padrão)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="baseline-apply-btn" onclick="applySelectedBaseline('{project['id']}')">
                             Aplicar Linha de Base
                         </button>
                     </div>
@@ -2277,6 +2360,95 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // Funções stub (vazias) - a funcionalidade já existe no HTML
                     function addBaselineButtonToToolbar() {{
                         // Não faz nada - botão já existe no HTML
+                    }}
+                    
+                    // *** FUNÇÃO: Inicializar Seletores de Empreendimento e Baseline ***
+                    function initializeBaselineSelectors(projectId) {{
+                        const empDropdown = document.getElementById(`empreendimento-dropdown-${{projectId}}`);
+                        const baselineDropdown = document.getElementById(`baseline-dropdown-${{projectId}}`);
+                        
+                        if (!empDropdown || !baselineDropdown) return;
+                        
+                        // Popular dropdown de empreendimentos
+                        const todosEmpreendimentos = Object.keys(baselineOptionsPorEmpreendimento || {{}});
+                        
+                        empDropdown.innerHTML = '';
+                        todosEmpreendimentos.forEach(emp => {{
+                            const option = document.createElement('option');
+                            option.value = emp;
+                            option.textContent = emp;
+                            empDropdown.appendChild(option);
+                        }});
+                        
+                        // Selecionar primeiro empreendimento se disponível
+                        if (todosEmpreendimentos.length \u003e 0) {{
+                            empDropdown.value = todosEmpreendimentos[0];
+                            updateBaselineDropdown(projectId, todosEmpreendimentos[0]);
+                        }}
+                        
+                        // Event listener para mudança de empreendimento
+                        empDropdown.addEventListener('change', function() {{
+                            const selectedEmp = this.value;
+                            updateBaselineDropdown(projectId, selectedEmp);
+                            // Reset baseline para P0 ao mudar empreendimento
+                            baselineDropdown.value = 'P0-(padrão)';
+                        }});
+                    }}
+                    
+                    // *** FUNÇÃO: Atualizar dropdown de baselines baseado no empreendimento selecionado ***
+                    function updateBaselineDropdown(projectId, empreendimento) {{
+                        const baselineDropdown = document.getElementById(`baseline-dropdown-${{projectId}}`);
+                        if (!baselineDropdown) return;
+                        
+                        // Limpar opções existentes
+                        baselineDropdown.innerHTML = '\u003coption value=\"P0-(padrão)\"\u003eP0-(padrão)\u003c/option\u003e';
+                        
+                        // Buscar baselines do empreendimento selecionado
+                        const baselinesoDoEmp = baselineOptionsPorEmpreendimento[empreendimento] || [];
+                        
+                        // Adicionar opções de baseline
+                        baselinesoDoEmp.forEach(baselineName => {{
+                            if (baselineName !== 'P0-(padrão)') {{
+                                const option = document.createElement('option');
+                                option.value = baselineName;
+                                option.textContent = baselineName;
+                                baselineDropdown.appendChild(option);
+                            }}
+                        }});
+                        
+                        // Desabilitar se não há baselines  {{
+                            baselineDropdown.disabled = true;
+                            baselineDropdown.title = 'Nenhuma baseline disponível para este empreendimento';
+                        }} else {{
+                            baselineDropdown.disabled = false;
+                            baselineDropdown.title = 'Selecione uma baseline';
+                        }}
+                    }}
+                    
+                    // *** FUNÇÃO: Aplicar baseline selecionada ***
+                    function applySelectedBaseline(projectId) {{
+                        const empDropdown = document.getElementById(`empreendimento-dropdown-${{projectId}}`);
+                        const baselineDropdown = document.getElementById(`baseline-dropdown-${{projectId}}`);
+                        
+                        if (!empDropdown || !baselineDropdown) return;
+                        
+                        const selectedEmp = empDropdown.value;
+                        const selectedBaseline = baselineDropdown.value;
+                        
+                        // Atualizar via query params para Streamlit processar
+                        const newUrl = `?change_baseline=${{selectedBaseline}}\u0026baseline_target=${{encodeURIComponent(selectedEmp)}}`;
+                        window.location.href = newUrl;
+                    }}
+                    
+                    // *** INICIALIZAR SELETORES APÓS DEFINIÇÃO DAS FUNÇÕES ***
+                    // Inicializar dropdowns quando o script carregar
+                    const projectId ='{project['id']}';
+                    if (document.readyState === 'loading') {{
+                        document.addEventListener('DOMContentLoaded', function() {{
+                            initializeBaselineSelectors(projectId);
+                        }});
+                    }} else {{
+                        initializeBaselineSelectors(projectId);
                     }}
                     
                     // *** NOVA FUNÇÃO: Atualizar campos de exibição da sidebar ***
