@@ -2058,20 +2058,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
                 <div class="gantt-container" id="gantt-container-{project['id']}">
                     <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
-                        <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros" 
-                                onclick="toggleMenu('filter-menu-{project["id"]}', 'baseline-selector-{project["id"]}')">
+                        <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-                                </svg>
-                            </span>
-                        </button>
-                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baselines"
-                                onclick="toggleMenu('baseline-selector-{project["id"]}', 'filter-menu-{project["id"]}')">
-                            <span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M3 3h18v18H3z"></path>
-                                    <path d="M7 7h10M7 12h10M7 17h10"></path>
                                 </svg>
                             </span>
                         </button>
@@ -2199,19 +2189,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
                 
                 <script>
-                    // Função global para toggle de menus (DEVE estar no início!)
-                    window.toggleMenu = function(menuToOpenId, menuToCloseId) {{
-                        const menuToOpen = document.getElementById(menuToOpenId);
-                        const menuToClose = document.getElementById(menuToCloseId);
-                        
-                        if (menuToOpen) {{
-                            menuToOpen.classList.toggle('is-open');
-                        }}
-                        if (menuToClose) {{
-                            menuToClose.classList.remove('is-open');
-                        }}
-                    }};
-                    
                     const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
                     const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
                     
@@ -3609,22 +3586,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
-                    
-                    // Fechar menus ao clicar fora
-                    document.addEventListener('click', function(e) {{
-                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                        const filterBtn = document.getElementById('filter-btn-{project["id"]}');
-                        const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
-                        
-                        // Fechar se clicou fora de ambos os menus e botões
-                        if (filterMenu && !filterMenu.contains(e.target) && !filterBtn.contains(e.target)) {{
-                            filterMenu.classList.remove('is-open');
-                        }}
-                        if (baselineSelector && !baselineSelector.contains(e.target) && !baselineBtn.contains(e.target)) {{
-                            baselineSelector.classList.remove('is-open');
-                        }}
-                    }});
                     
                     // Inicializar o Gantt
                     initGantt();
