@@ -2332,6 +2332,40 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
+                    // *** FUNÇÃO: Reaplicar baseline ativa após filtros ***
+                    function reapplyActiveBaseline(tasks) {{
+                        if (currentActiveBaseline === 'P0-(padrão)') {{
+                            // P0 = dados originais, nada a fazer
+                            console.log('📋 Baseline P0 ativa - usando dados originais');
+                            return;
+                        }}
+                        
+                        console.log(`🔄 Reaplicando baseline: ${{currentActiveBaseline}}`);
+                        let reappliedCount = 0;
+                        let clearedCount = 0;
+                        
+                        tasks.forEach(task => {{
+                            if (task.baselines && task.baselines[currentActiveBaseline]) {{
+                                const baselineData = task.baselines[currentActiveBaseline];
+                                
+                                if (baselineData.start !== null && baselineData.end !== null) {{
+                                    task.start_previsto = baselineData.start;
+                                    task.end_previsto = baselineData.end;
+                                    reappliedCount++;
+                                }} else {{
+                                    task.start_previsto = null;
+                                    task.end_previsto = null;
+                                    clearedCount++;
+                                }}
+                                
+                                // Recalcular campos de exibição
+                                updateTaskDisplayFields(task);
+                            }}
+                        }});
+                        
+                        console.log(`✅ Baseline ${{currentActiveBaseline}} reaplicada: ${{reappliedCount}} atualizadas, ${{clearedCount}} limpas`);
+                    }}
+                    
                     function updateBaselineDropdownForProject(projectName) {{
                         console.log('📋 updateBaselineDropdownForProject chamada para:', projectName);
                         
@@ -2409,6 +2443,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         baselineChangeInProgress = true;
                         console.log('✅ Aplicando baseline AUTORIZADA:', baselineName);
                         
+                        // *** SALVAR BASELINE ATIVA ***
+                        currentActiveBaseline = baselineName;
+                        console.log(`📌 Baseline ativa definida como: ${{baselineName}}`);
+                        
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
                             console.error('❌ Dados do projeto não disponíveis');
                             return;
@@ -2482,6 +2520,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // *** Variáveis Globais para Virtual Select ***
                     let vsSetor, vsGrupo, vsEtapa;
                     // *** FIM: Variáveis Globais para Virtual Select ***
+                    
+                    // *** RASTREAMENTO DE BASELINE ATIVA ***
+                    let currentActiveBaseline = 'P0-(padrão)'; // Baseline atualmente aplicada
 
                     function parseDate(dateStr) {{ 
                         if (!dateStr) return null; 
@@ -3754,6 +3795,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             // Atualizar dados e redesenhar
                             projectData[0].tasks = filteredTasks;
                             tipoVisualizacao = selVis;
+                            
+                            // *** REAPLICAR BASELINE ATIVA APÓS FILTROS ***
+                            reapplyActiveBaseline(projectData[0].tasks);
 
                             renderSidebar();
                             renderHeader();
