@@ -2048,7 +2048,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </svg>
                             </span>
                         </button>
-                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baseline" onclick="toggleBaselineMenu()">
+                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Linha de Base" onclick="toggleBaselineMenu()">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -2067,10 +2067,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         </button>
                     </div>
                     
-                    <!-- Menu flutuante de Baseline (separado, mas mesmo estilo do menu de filtros) -->
+                    <!-- Menu flutuante de Linha de Base (separado, mas mesmo estilo do menu de filtros) -->
                     <div class="floating-filter-menu" id="baseline-menu-{project['id']}" style="display: none;">
                         <div class="filter-group">
-                            <label for="baseline-dropdown-{project['id']}">Selecionar Baseline</label>
+                            <label for="baseline-dropdown-{project['id']}">Selecionar Linha de Base</label>
                             <select id="baseline-dropdown-{project['id']}" 
                                     onchange="updateBaselineIndicator_{project['id']}(this.value)"
                                     style="width: 100%; padding: 6px 8px; border: 1px solid #cbd5e0; border-radius: 4px; font-size: 13px;">
@@ -2085,7 +2085,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                             </div>
                         </div>
-                        <button class="filter-apply-btn" onclick="applyBaselineAndClose_{project['id']}()">Aplicar Baseline</button>
+                        <button class="filter-apply-btn" onclick="applyBaselineAndClose_{project['id']}()">Aplicar Linha de Base</button>
                     </div>
                     
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
@@ -2203,6 +2203,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     const initialProjectIndex = {correct_project_index_for_js};
 
                     let projectData = {json.dumps([project])};
+                    
+                    // Rastrear baseline atualmente aplicada ao gráfico
+                    let appliedBaseline_{project["id"]} = '{baseline_name if baseline_name else "P0-(padrão)"}';
 
                     // Datas originais (Python)
                     const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
@@ -2317,15 +2320,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             currentDiv.style.transform = 'scale(1)';
                             currentDiv.style.opacity = '1';
                             
-                            if (selectedBaseline && selectedBaseline !== 'P0-(padrão)') {{
-                                // Baseline diferente - Verde esmeralda moderno
+                            // Comparar baseline selecionada com a aplicada
+                            if (selectedBaseline !== appliedBaseline_{project["id"]}) {{
+                                // DIFERENTE da aplicada - Verde (mudança pendente)
                                 currentDiv.style.background = 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)';
                                 currentDiv.style.borderLeftColor = '#10b981';
                                 currentDiv.style.color = '#065f46';
                                 currentDiv.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.15)';
                                 if (dot) dot.style.background = '#10b981';
                             }} else {{
-                                // P0 - Slate minimalista
+                                // IGUAL à aplicada - Slate (sem mudança)
                                 currentDiv.style.background = 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)';
                                 currentDiv.style.borderLeftColor = '#64748b';
                                 currentDiv.style.color = '#475569';
@@ -2341,6 +2345,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         if (dropdown) {{
                             const selectedBaseline = dropdown.value;
                             switchBaselineLocal(selectedBaseline);
+                            
+                            // Atualizar baseline aplicada
+                            appliedBaseline_{project["id"]} = selectedBaseline;
+                            
+                            // Atualizar visual para refletir que agora está aplicada
+                            updateBaselineIndicator_{project["id"]}(selectedBaseline);
                             
                             // Fechar menu
                             const baselineMenu = document.getElementById('baseline-menu-{project["id"]}');
