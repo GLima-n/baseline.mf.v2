@@ -2250,6 +2250,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         return date.toISOString().split('T')[0];
                     }}
+                    
+                    // Funções stub (vazias) - a funcionalidade já existe no HTML
+                    function addBaselineButtonToToolbar() {{
+                        // Não faz nada - botão já existe no HTML
+                    }}
+                    
+                    function updateBaselineDropdownForProject(projectName) {{
+                        // Não faz nada - dropdown já está populado no HTML
+                    }}
+                    
                     // Função de troca de baseline instantânea (client-side)
                     function switchBaselineLocal(baselineName) {{
                         console.log('🔄 Aplicando baseline:', baselineName);
@@ -2693,6 +2703,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
                         }}
 
+
+                        // *** ADICIONAR BOTÃO DE BASELINE ***
+                        addBaselineButtonToToolbar();
+                        
+                        // *** ATUALIZAR DROPDOWN DE BASELINE ***
+                        const currentProjectName = projectData[0].name;
+                        updateBaselineDropdownForProject(currentProjectName);
 
                         renderSidebar();
                         renderHeader();
