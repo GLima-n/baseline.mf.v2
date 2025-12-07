@@ -1056,14 +1056,28 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                             except:
                                 pass
                 
+                # 🔍 DEBUG: Mostrar estado antes da verificação
+                print(f"\n🔍 ETAPA: {etapa_sigla}")
+                print(f"   task['inicio_real'] = {task['inicio_real']}")
+                print(f"   task['termino_real'] = {task['termino_real']}")
+                print(f"   task['inicio_previsto'] = {task['inicio_previsto']}")
+                print(f"   task['termino_previsto'] = {task['termino_previsto']}")
+                
                 # Só adicionar a task se tiver dados reais (Inicio_Real ou Termino_Real)
                 # OU se for uma etapa pai com datas calculadas a partir de subetapas
                 has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
                 is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
                 
+                print(f"   has_real_data = {has_real_data}")
+                print(f"   is_parent_with_calculated_data = {is_parent_with_calculated_data}")
+                print(f"   DECISÃO: {'✅ SALVAR' if (has_real_data or is_parent_with_calculated_data) else '❌ NÃO SALVAR'}")
+                
                 if has_real_data or is_parent_with_calculated_data:
                     baseline_data['tasks'].append(task)
                     task_count += 1
+                    print(f"   ✅ Adicionada à baseline (total: {task_count})")
+                else:
+                    print(f"   ❌ NÃO adicionada (sem dados reais)")
                 
             except Exception as task_error:
                 st.warning(f"Erro ao processar task {task_count}: {task_error}")
