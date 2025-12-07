@@ -2276,34 +2276,47 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             return;
                         }}
                         
-                        // Armazenar o valor original ANTES de clonar
+                        // Armazenar baseline original
                         const originalBaselineValue = dropdown.value;
                         console.log('🔍 Baseline original:', originalBaselineValue);
                         
-                        // Clonar o dropdown para remover event listeners externos
+                        // Clonar dropdown para remover event listeners externos
                         const newDropdown = dropdown.cloneNode(true);
                         dropdown.parentNode.replaceChild(newDropdown, dropdown);
-                        console.log('🔒 Event listeners externos removidos do dropdown');
+                        console.log('🔒 Event listeners externos removidos');
                         
-                        // Adicionar nosso próprio listener no dropdown NOVO
-                        newDropdown.addEventListener('change', function() {{
-                            const selectedValue = this.value;
-                            console.log('📊 Dropdown mudou de:', originalBaselineValue, 'para:', selectedValue);
+                        // NOVA ABORDAGEM: Monitor contínuo em vez de event listener
+                        // Isso evita que o event listener seja sobrescrito por código externo
+                        let lastKnownValue = originalBaselineValue;
+                        
+                        const monitorInterval = setInterval(function() {{
+                            const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                            const indicator = document.getElementById('current-baseline-{project["id"]}');
                             
-                            if (selectedValue !== originalBaselineValue) {{
-                                // Baseline diferente selecionada - muda para laranja
-                                currentIndicator.classList.add('changed');
-                                currentIndicator.textContent = `Nova seleção: ${{selectedValue}}`;
-                                console.log('🟠 Indicador mudado para LARANJA (baseline diferente)');
-                            }} else {{
-                                // Voltou para a baseline original - muda para azul
-                                currentIndicator.classList.remove('changed');
-                                currentIndicator.textContent = `Baseline Ativa: ${{selectedValue}}`;
-                                console.log('🔵 Indicador mudado para AZUL (baseline original)');
+                            if (!dropdown || !indicator) {{
+                                clearInterval(monitorInterval);
+                                return;
                             }}
-                        }});
+                            
+                            const currentValue = dropdown.value;
+                            
+                            // Detectar mudança de valor
+                            if (currentValue !== lastKnownValue) {{
+                                lastKnownValue = currentValue;
+                                
+                                if (currentValue !== originalBaselineValue) {{
+                                    indicator.classList.add('changed');
+                                    indicator.textContent = `Nova seleção: ${{currentValue}}`;
+                                    console.log('🟠 MUDANÇA DETECTADA: Indicador → LARANJA (baseline diferente)');
+                                }} else {{
+                                    indicator.classList.remove('changed');
+                                    indicator.textContent = `Baseline Ativa: ${{currentValue}}`;
+                                    console.log('🔵 MUDANÇA DETECTADA: Indicador → AZUL (baseline original)');
+                                }}
+                            }}
+                        }}, 100); // Verifica a cada 100ms
                         
-                        console.log('✅ Event listener adicionado com sucesso');
+                        console.log('✅ Monitor contínuo iniciado');
                     }}
                     
                     // Flag de controle para evitar execução automática
