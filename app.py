@@ -2416,7 +2416,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }});
                         
-                        // Desabilitar se não há baselines  {{
+                        // Desabilitar se não há baselines
+                        if (baselinesoDoEmp.length === 0) {{
                             baselineDropdown.disabled = true;
                             baselineDropdown.title = 'Nenhuma baseline disponível para este empreendimento';
                         }} else {{
