@@ -2199,6 +2199,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
                 
                 <script>
+                    // Função global para toggle de menus (DEVE estar no início!)
+                    window.toggleMenu = function(menuToOpenId, menuToCloseId) {{
+                        const menuToOpen = document.getElementById(menuToOpenId);
+                        const menuToClose = document.getElementById(menuToCloseId);
+                        
+                        if (menuToOpen) {{
+                            menuToOpen.classList.toggle('is-open');
+                        }}
+                        if (menuToClose) {{
+                            menuToClose.classList.remove('is-open');
+                        }}
+                    }};
+                    
                     const allBaselinesData = JSON.parse(document.getElementById('all-baselines-data').textContent);
                     const baselineOptionsPorEmpreendimento = JSON.parse(document.getElementById('baseline-options-por-empreendimento').textContent);
                     
@@ -3596,19 +3609,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Dados do projeto:', projectData);
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
-                    
-                    // Função global para toggle de menus
-                    window.toggleMenu = function(menuToOpenId, menuToCloseId) {{
-                        const menuToOpen = document.getElementById(menuToOpenId);
-                        const menuToClose = document.getElementById(menuToCloseId);
-                        
-                        if (menuToOpen) {{
-                            menuToOpen.classList.toggle('is-open');
-                        }}
-                        if (menuToClose) {{
-                            menuToClose.classList.remove('is-open');
-                        }}
-                    }};
                     
                     // Fechar menus ao clicar fora
                     document.addEventListener('click', function(e) {{
