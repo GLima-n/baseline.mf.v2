@@ -2257,13 +2257,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     let projectData = {json.dumps([project])};
 
-                    // 🔍 BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE
-                    // TEMPORARIAMENTE COMENTADO PARA DEBUG
-                    // var allBaselinesData = {json.dumps(available_baselines_for_js, ensure_ascii=False)};
-                    var allBaselinesData = {{}};  // Placeholder vazio para testes
-                    console.log('🔍 DEBUG: Baselines carregadas no JavaScript:', Object.keys(allBaselinesData));
-                    console.log('🔍 DEBUG: Total de baselines:', Object.keys(allBaselinesData).length);
-
                     // Datas originais (Python)
                     const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
                     const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
