@@ -2808,6 +2808,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         positionTodayLine();
                         positionMetaLine();
                         populateFilters();
+                        
+                        // Inicializar monitoramento do dropdown de baseline
+                        updateBaselineDropdownForProject(projectData[0].name);
                     }}
 
                     function applyInitialPulmaoState() {{
