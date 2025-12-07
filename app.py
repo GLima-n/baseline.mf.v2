@@ -2258,7 +2258,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     let projectData = {json.dumps([project])};
 
                     // 🔍 BASELINES DISPONÍVEIS PARA TROCA CLIENT-SIDE
-                    var allBaselinesData = {json.dumps(available_baselines_for_js if 'available_baselines_for_js' in locals() else {{}}, ensure_ascii=False)};
+                    var allBaselinesData = {json.dumps(available_baselines_for_js, ensure_ascii=False)};
                     console.log('🔍 DEBUG: Baselines carregadas no JavaScript:', Object.keys(allBaselinesData));
                     console.log('🔍 DEBUG: Total de baselines:', Object.keys(allBaselinesData).length);
 
