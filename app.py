@@ -965,7 +965,7 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
             subetapas_df = df_empreendimento[df_empreendimento['Etapa'].isin(subetapas_siglas)]
             
             if not subetapas_df.empty:
-                # Calcular datas reais m mínima/máxima das subetapas
+                # Calcular datas reais mínima/máxima das subetapas
                 inicio_real_min = subetapas_df['Inicio_Real'].min()
                 termino_real_max = subetapas_df['Termino_Real'].max()
                 
@@ -1030,8 +1030,20 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                         task['termino_previsto'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
                         task['termino_real'] = datas_calculadas['termino_real'].strftime("%Y-%m-%d")
                 
+                # ✅ VERIFICAÇÃO CRÍTICA: Só continuar se tiver dados reais
+                # DEVE acontecer ANTES do fallback para Previstas
+                has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
+                is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
+                
+                # Se NÃO tem dados reais E NÃO é etapa pai, SKIP (não salva na baseline)
+                if not (has_real_data or is_parent_with_calculated_data):
+                    # DEBUG: Opcional - descomentar para ver quais etapas foram puladas
+                    # print(f"DEBUG: Etapa '{etapa_sigla}' PULADA - sem dados reais")
+                    continue  # ← Pula para próxima etapa sem adicionar na baseline
+                
                 # FALLBACK: Se não tem datas Reais, usar Previstas
                 # Isso é importante para etapas que não têm datas próprias E não são pais
+                # NOTA: Só chega aqui se a etapa passou na verificação acima
                 if task['inicio_previsto'] is None:
                     date_val = row.get('Inicio_Prevista')
                     if date_val is not None and pd.notna(date_val):
@@ -1056,28 +1068,9 @@ def take_gantt_baseline(df, empreendimento, tipo_visualizacao, created_by=None):
                             except:
                                 pass
                 
-                # 🔍 DEBUG: Mostrar estado antes da verificação
-                print(f"\n🔍 ETAPA: {etapa_sigla}")
-                print(f"   task['inicio_real'] = {task['inicio_real']}")
-                print(f"   task['termino_real'] = {task['termino_real']}")
-                print(f"   task['inicio_previsto'] = {task['inicio_previsto']}")
-                print(f"   task['termino_previsto'] = {task['termino_previsto']}")
-                
-                # Só adicionar a task se tiver dados reais (Inicio_Real ou Termino_Real)
-                # OU se for uma etapa pai com datas calculadas a partir de subetapas
-                has_real_data = (task['inicio_real'] is not None or task['termino_real'] is not None)
-                is_parent_with_calculated_data = etapa_sigla in etapas_pai_datas_calculadas
-                
-                print(f"   has_real_data = {has_real_data}")
-                print(f"   is_parent_with_calculated_data = {is_parent_with_calculated_data}")
-                print(f"   DECISÃO: {'✅ SALVAR' if (has_real_data or is_parent_with_calculated_data) else '❌ NÃO SALVAR'}")
-                
-                if has_real_data or is_parent_with_calculated_data:
-                    baseline_data['tasks'].append(task)
-                    task_count += 1
-                    print(f"   ✅ Adicionada à baseline (total: {task_count})")
-                else:
-                    print(f"   ❌ NÃO adicionada (sem dados reais)")
+                # Adicionar task (já passou na verificação de dados reais)
+                baseline_data['tasks'].append(task)
+                task_count += 1
                 
             except Exception as task_error:
                 st.warning(f"Erro ao processar task {task_count}: {task_error}")
@@ -1550,51 +1543,32 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         # --- PREPARAR BASELINES PARA JAVASCRIPT ---
         available_baselines_for_js = {}
         
-        print("=" * 80)
-        print("🔍 INÍCIO: Preparando baselines para JavaScript client-side")
-        print("=" * 80)
-        
         all_baselines_from_db = load_baselines()
         
         # P0 = dados atuais (sem baseline)
         available_baselines_for_js["P0-(padrão)"] = converter_df_para_baseline_format(df_gantt_agg_sem_pulmao)
-        print(f"🔍 DEBUG: P0-(padrão) adicionado com {len(available_baselines_for_js['P0-(padrão)'])} etapas")
         
         # Carregar baselines de todos os empreendimentos
-        print(f"🔍 DEBUG: Empreendimentos a processar: {todos_empreendimentos}")
-        print(f"🔍 DEBUG: Baselines disponíveis no DB: {list(all_baselines_from_db.keys())}")
-        
         for empreendimento_loop in todos_empreendimentos:
             if empreendimento_loop in all_baselines_from_db:
                 baselines_dict = all_baselines_from_db[empreendimento_loop]
-                print(f"🔍 DEBUG: Processando {len(baselines_dict)} baselines para '{empreendimento_loop}'")
                 
                 for baseline_name in baselines_dict.keys():
-                    print(f"🔍 DEBUG: Carregando baseline '{baseline_name}'...")
                     baseline_data = get_baseline_data(empreendimento_loop, baseline_name)
                     
                     if baseline_data:
                         try:
                             formatted_tasks = []
                             
-                            print(f"   🔍 baseline_data tipo: {type(baseline_data)}")
-                            
                             if isinstance(baseline_data, dict):
-                                print(f"   🔍 baseline_data é dict com chaves: {list(baseline_data.keys())}")
                                 if 'tasks' in baseline_data:
                                     tasks_list = baseline_data['tasks']
-                                    print(f"   🔍 Usando baseline_data['tasks'] com {len(tasks_list)} items")
                                 else:
                                     tasks_list = list(baseline_data.values())
-                                    print(f"   🔍 Usando all values, {len(tasks_list)} items")
                             elif isinstance(baseline_data, list):
-                                print(f"   🔍 baseline_data é list com {len(baseline_data)} items")
                                 tasks_list = baseline_data
                             else:
-                                print(f"   ⚠️ baseline_data tipo inesperado: {type(baseline_data)}, pulando")
                                 tasks_list = []
-                            
-                            print(f"   🔍 Processando {len(tasks_list)} tasks...")
                             
                             for i, task in enumerate(tasks_list):
                                 if isinstance(task, str):
@@ -1602,16 +1576,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         continue
                                     try:
                                         task_dict = json.loads(task)
-                                    except json.JSONDecodeError as e:
-                                        print(f"   ⚠️ Task {i} falhou ao parsear: {e}")
+                                    except json.JSONDecodeError:
                                         continue
                                 elif isinstance(task, dict):
                                     task_dict = task
                                 else:
-                                    print(f"   ⚠️ Task {i} tipo inesperado: {type(task)}")
                                     continue
                                 
-                                if task_dict:  # Só adiciona se não for vazio
+                                if task_dict:
                                     formatted_tasks.append({
                                         'etapa': task_dict.get('etapa', task_dict.get('Etapa', '')),
                                         'inicio_previsto': task_dict.get('inicio_previsto', task_dict.get('Inicio_Prevista', task_dict.get('start_date'))),
@@ -1619,19 +1591,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     })
                             
                             available_baselines_for_js[baseline_name] = formatted_tasks
-                            print(f"   ✅ Baseline '{baseline_name}' adicionada com {len(formatted_tasks)} etapas")
                         except Exception as e:
-                            print(f"   ❌ Erro ao processar baseline {baseline_name}: {e}")
-                            import traceback
-                            traceback.print_exc()
+                            print(f"Erro ao processar baseline {baseline_name}: {e}")
                             continue
-                    else:
-                        print(f"   ⚠️ get_baseline_data retornou None para '{baseline_name}'")
-            else:
-                print(f"🔍 DEBUG: Empreendimento '{empreendimento_loop}' NÃO encontrado em all_baselines_from_db")
-        
-        print(f"🔍 DEBUG: available_baselines_for_js final = {list(available_baselines_for_js.keys())}")
-        print("=" * 80)
         
         
         # Reduz o fator de multiplicação para evitar excesso de espaço
@@ -2257,16 +2219,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     let projectData = {json.dumps([project])};
 
-                    // 🔍 BASELINES DISPONÍVEIS (com fallback seguro)
-                    let allBaselinesData = {{}};
-                    try {{
-                        allBaselinesData = {json.dumps(available_baselines_for_js, ensure_ascii=False)};
-                        console.log('✅ Baselines carregadas:', Object.keys(allBaselinesData).length);
-                    }} catch(e) {{
-                        console.warn('⚠️ Erro ao carregar baselines:', e);
-                        allBaselinesData = {{}};
-                    }}
-
                     // Datas originais (Python)
                     const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
                     const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
@@ -2399,51 +2351,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         if (!projectData || !projectData[0] || !projectData[0].tasks) {{
                             console.error('❌ Dados do projeto não disponíveis');
-                            baselineChangeInProgress = false;
                             return;
                         }}
-                        
-                        // 🔍 OBTER DADOS DA BASELINE DO allBaselinesData
-                        const baselineData = allBaselinesData[baselineName];
-                        
-                        if (!baselineData) {{
-                            console.error('❌ Baseline não encontrada:', baselineName);
-                            console.log('🔍 Baselines disponíveis:', Object.keys(allBaselinesData));
-                            baselineChangeInProgress = false;
-                            return;
-                        }}
-                        
-                        console.log('🔍 Baseline carregada com', baselineData.length, 'etapas');
                         
                         const tasks = projectData[0].tasks;
                         let updatedCount = 0;
-                        let skippedCount = 0;
                         
-                        // 🎯 NOVA LÓGICA: Verificar SE etapa existe na baseline
                         tasks.forEach(task => {{
-                            // Procurar essa etapa NA BASELINE (usando allBaselinesData)
-                            const etapaBaseline = baselineData.find(b => 
-                                b.etapa === task.etapa || 
-                                b.etapa === task.name ||
-                                b.etapa === task.name.toUpperCase()
-                            );
-                            
-                            if (etapaBaseline) {{
-                                // ✅ Etapa ESTÁ na baseline - mostrar barra previsto
-                                task.start_previsto = etapaBaseline.inicio_previsto;
-                                task.end_previsto = etapaBaseline.termino_previsto;
+                            if (task.baselines && task.baselines[baselineName]) {{
+                                task.start_previsto = task.baselines[baselineName].start;
+                                task.end_previsto = task.baselines[baselineName].end;
                                 updatedCount++;
-                                console.log('✅', task.name, '- Baseline aplicada');
-                            }} else {{
-                                // ❌ Etapa NÃO está na baseline - ESCONDER barra previsto
-                                task.start_previsto = null;
-                                task.end_previsto = null;
-                                skippedCount++;
-                                console.log('❌', task.name, '- SEM barra previsto (não está na baseline)');
                             }}
                         }});
-                        
-                        console.log(`📊 Resultado: ${{updatedCount}} etapas com baseline, ${{skippedCount}} etapas sem baseline`);
                         
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
@@ -2462,7 +2382,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         try {{
                             renderChart();
                             renderSidebar();
-                            console.log('✅ Gráfico redesenhado com baseline aplicada');
                         }} catch (e) {{
                             console.error('Erro ao redesenhar:', e);
                             window.location.reload();
