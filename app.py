@@ -1678,13 +1678,42 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     .baseline-current {{
-                        background: #e6f3ff;
-                        padding: 6px 10px;
-                        border-radius: 4px;
-                        font-size: 12px;
+                        padding: 10px 12px;
+                        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+                        color: white;
+                        border-radius: 6px;
+                        font-size: 13px;
+                        font-weight: 600;
                         margin-bottom: 12px;
-                        border-left: 3px solid #3b82f6;
-                        font-weight: 500;
+                        display: flex;
+                        align-items: center;
+                        gap: 8px;
+                        box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+                        transition: all 0.3s ease;
+                    }}
+                    
+                    .baseline-current::before {{
+                        content: "📊";
+                        font-size: 16px;
+                    }}
+                    
+                    .baseline-current.changed {{
+                        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+                        box-shadow: 0 2px 4px rgba(245, 158, 11, 0.3);
+                        animation: pulse 1.5s ease-in-out infinite;
+                    }}
+                    
+                    .baseline-current.changed::before {{
+                        content: "⚠️";
+                    }}
+                    
+                    @keyframes pulse {{
+                        0%, 100% {{
+                            transform: scale(1);
+                        }}
+                        50% {{
+                            transform: scale(1.02);
+                        }}
                     }}
 
                     .baseline-selector-container {{
@@ -2078,7 +2107,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         <div class="baseline-current" id="current-baseline-{project['id']}">
                             {f"Baseline Ativa: {baseline_name}" if baseline_name else "Baseline Ativa: P0-(padrão)"}
                         </div>
-                        <label for="baseline-dropdown-{project['id']}">Selecionar Baseline</label>
+                        <label for="baseline-dropdown-{project['id']}">Selecionar Linha de Base</label>
                         <select id="baseline-dropdown-{project['id']}">
                             <option value="P0-(padrão)">P0-(padrão)</option>
                             {"".join([f'<option value="{name}" {"selected" if name == baseline_name else ""}>{name}</option>' for name in baseline_options])}
@@ -2261,11 +2290,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // IMPORTANTE: Remover qualquer event listener onchange que possa ter sido adicionado
                         const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                        const currentIndicator = document.getElementById('current-baseline-{project["id"]}');
+                        
                         if (dropdown) {{
                             // Clonar o elemento para remover TODOS os event listeners
                             const newDropdown = dropdown.cloneNode(true);
                             dropdown.parentNode.replaceChild(newDropdown, dropdown);
                             console.log('🔒 Event listeners removidos do dropdown de baseline');
+                            
+                            // Adicionar nosso próprio listener para mudar cor do indicador
+                            const currentBaselineValue = newDropdown.value;
+                            
+                            newDropdown.addEventListener('change', function() {{
+                                if (currentIndicator) {{
+                                    // Se selecionou uma baseline diferente da ativa, adiciona classe changed
+                                    if (this.value !== currentBaselineValue) {{
+                                        currentIndicator.classList.add('changed');
+                                        currentIndicator.textContent = `Nova seleção: ${{this.value}}`;
+                                    }} else {{
+                                        currentIndicator.classList.remove('changed');
+                                        currentIndicator.textContent = `Baseline Ativa: ${{this.value}}`;
+                                    }}
+                                }}
+                            }});
                         }}
                     }}
                     
@@ -2311,6 +2358,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const currentDiv = document.getElementById('current-baseline-{project["id"]}');
                         if (currentDiv) {{
                             currentDiv.textContent = `Baseline Ativa: ${{baselineName}}`;
+                            currentDiv.classList.remove('changed');  // Remove cor laranja, volta para azul
                         }}
                         
                         // Fechar o seletor de baseline (igual ao menu de filtros)
