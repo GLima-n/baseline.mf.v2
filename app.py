@@ -2279,6 +2279,59 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Não faz nada - botão já existe no HTML
                     }}
                     
+                    // *** NOVA FUNÇÃO: Atualizar campos de exibição da sidebar ***
+                    function updateTaskDisplayFields(task) {{
+                        // Atualizar datas formatadas
+                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                        task.termino_previsto = formatDateDisplay(task.end_previsto);
+                        
+                        // Recalcular duração em meses
+                        if (task.start_previsto && task.end_previsto) {{
+                            const startDate = parseDate(task.start_previsto);
+                            const endDate = parseDate(task.end_previsto);
+                            if (startDate && endDate) {{
+                                const diffMs = endDate - startDate;
+                                const diffDays = diffMs / (1000 * 60 * 60 * 24);
+                                const duracao = diffDays / 30.4375; // Dias por mês médio
+                                task.duracao_prev_meses = duracao > 0 ? duracao.toFixed(1).replace('.', ',') : '-';
+                            }} else {{
+                                task.duracao_prev_meses = '-';
+                            }}
+                        }} else {{
+                            task.duracao_prev_meses = '-';
+                        }}
+                        
+                        // Recalcular VT (Variação de Término)
+                        if (task.end_real_original_raw && task.end_previsto) {{
+                            const endReal = parseDate(task.end_real_original_raw);
+                            const endPrev = parseDate(task.end_previsto);
+                            if (endReal && endPrev) {{
+                                const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                            }} else {{
+                                task.vt_text = '-';
+                            }}
+                        }} else {{
+                            task.vt_text = '-';
+                        }}
+                        
+                        // Recalcular VD (Variação de Duração)
+                        if (task.duracao_real_meses !== '-' && task.duracao_prev_meses !== '-') {{
+                            const duracaoReal = parseFloat(task.duracao_real_meses.replace(',', '.'));
+                            const duracaoPrev = parseFloat(task.duracao_prev_meses.replace(',', '.'));
+                            if (!isNaN(duracaoReal) && !isNaN(duracaoPrev)) {{
+                                // Converter meses para dias úteis (aproximadamente)
+                                const diffMeses = duracaoReal - duracaoPrev;
+                                const diffDias = Math.round(diffMeses * 22); // ~22 dias úteis por mês
+                                task.vd_text = diffDias > 0 ? `+${{diffDias}}d` : diffDias < 0 ? `${{diffDias}}d` : '0d';
+                            }} else {{
+                                task.vd_text = '-';
+                            }}
+                        }} else {{
+                            task.vd_text = '-';
+                        }}
+                    }}
+                    
                     function updateBaselineDropdownForProject(projectName) {{
                         console.log('📋 updateBaselineDropdownForProject chamada para:', projectName);
                         
@@ -2382,6 +2435,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     task.end_previsto = null;
                                     clearedCount++;
                                 }}
+                                
+                                // *** NOVO: Recalcular campos de exibição da sidebar ***
+                                updateTaskDisplayFields(task);
                             }}
                         }});
                         
