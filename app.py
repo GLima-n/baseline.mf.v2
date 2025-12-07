@@ -2266,34 +2266,44 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     function updateBaselineDropdownForProject(projectName) {{
-                        // Não faz nada - dropdown já está populado no HTML
+                        console.log('📋 updateBaselineDropdownForProject chamada para:', projectName);
                         
-                        // IMPORTANTE: Remover qualquer event listener onchange que possa ter sido adicionado
                         const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
                         const currentIndicator = document.getElementById('current-baseline-{project["id"]}');
                         
-                        if (dropdown) {{
-                            // Clonar o elemento para remover TODOS os event listeners
-                            const newDropdown = dropdown.cloneNode(true);
-                            dropdown.parentNode.replaceChild(newDropdown, dropdown);
-                            console.log('🔒 Event listeners removidos do dropdown de baseline');
-                            
-                            // Adicionar nosso próprio listener para mudar cor do indicador
-                            const currentBaselineValue = newDropdown.value;
-                            
-                            newDropdown.addEventListener('change', function() {{
-                                if (currentIndicator) {{
-                                    // Se selecionou uma baseline diferente da ativa, adiciona classe changed
-                                    if (this.value !== currentBaselineValue) {{
-                                        currentIndicator.classList.add('changed');
-                                        currentIndicator.textContent = `Nova seleção: ${{this.value}}`;
-                                    }} else {{
-                                        currentIndicator.classList.remove('changed');
-                                        currentIndicator.textContent = `Baseline Ativa: ${{this.value}}`;
-                                    }}
-                                }}
-                            }});
+                        if (!dropdown || !currentIndicator) {{
+                            console.warn('⚠️ Dropdown ou indicador não encontrado');
+                            return;
                         }}
+                        
+                        // Armazenar o valor original ANTES de clonar
+                        const originalBaselineValue = dropdown.value;
+                        console.log('🔍 Baseline original:', originalBaselineValue);
+                        
+                        // Clonar o dropdown para remover event listeners externos
+                        const newDropdown = dropdown.cloneNode(true);
+                        dropdown.parentNode.replaceChild(newDropdown, dropdown);
+                        console.log('🔒 Event listeners externos removidos do dropdown');
+                        
+                        // Adicionar nosso próprio listener no dropdown NOVO
+                        newDropdown.addEventListener('change', function() {{
+                            const selectedValue = this.value;
+                            console.log('📊 Dropdown mudou de:', originalBaselineValue, 'para:', selectedValue);
+                            
+                            if (selectedValue !== originalBaselineValue) {{
+                                // Baseline diferente selecionada - muda para laranja
+                                currentIndicator.classList.add('changed');
+                                currentIndicator.textContent = `Nova seleção: ${{selectedValue}}`;
+                                console.log('🟠 Indicador mudado para LARANJA (baseline diferente)');
+                            }} else {{
+                                // Voltou para a baseline original - muda para azul
+                                currentIndicator.classList.remove('changed');
+                                currentIndicator.textContent = `Baseline Ativa: ${{selectedValue}}`;
+                                console.log('🔵 Indicador mudado para AZUL (baseline original)');
+                            }}
+                        }});
+                        
+                        console.log('✅ Event listener adicionado com sucesso');
                     }}
                     
                     // Flag de controle para evitar execução automática
