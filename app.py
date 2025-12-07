@@ -4915,8 +4915,14 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     window.location.href = url.toString();
                 }}
                 
-                // Inicializar o Gantt Consolidado
-                initGantt();
+                // Inicializar populateFilters e setupEventListeners
+                populateFilters();
+                setupEventListeners();
+                positionTodayLine();
+                
+                // Inicializar renderizações
+                renderSidebar();
+                renderChart();
             </script>
         </body>
         </html>
