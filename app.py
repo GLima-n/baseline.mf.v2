@@ -3696,32 +3696,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             console.log('Tasks que pertencem ao grupo filtrado:', tasksComGrupoFiltrado.length);
                             console.log('=== FIM DEBUG ===');
 
-                            if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
-                                const offsetMeses = -selPulmaoMeses;
-                                console.log("Aplicando pulmão APENAS no previsto para filtros");
-                                
-                                baseTasks.forEach(task => {{
-                                    const etapaNome = task.name;
-                                    
-                                    if (etapas_sem_alteracao.includes(etapaNome)) {{
-                                        // Não altera datas
-                                    }}
-                                    else if (etapas_pulmao.includes(etapaNome)) {{
-                                        // Apenas datas previstas
-                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                    }}
-                                    else {{
-                                        // Apenas datas previstas
-                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                                        task.end_previsto = addMonths(task.end_previsto, offsetMeses);
-                                        
-                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                        task.termino_previsto = formatDateDisplay(task.end_previsto);
-                                    }}
-                                }});
-                            }}
-
+                            // *** APLICAR FILTROS PRIMEIRO (antes de pulmão/baseline) ***
                             let filteredTasks = baseTasks;
 
                             // *** LÓGICA DE FILTRO CORRIGIDA ***
@@ -3765,6 +3740,60 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 // Não interromper o processo, deixar que o renderSidebar mostre a mensagem apropriada
                             }}
 
+                            // Atualizar dados
+                            projectData[0].tasks = filteredTasks;
+                            tipoVisualizacao = selVis;
+                            
+                            // *** NOVA ORDEM: 1) REAPLICAR BASELINE (se ativa) ***
+                            console.log('🔄 Verificando baseline ativa:', currentActiveBaseline);
+                            if (currentActiveBaseline && currentActiveBaseline !== 'P0-(padrão)') {{
+                                console.log('📊 Reaplicando baseline:', currentActiveBaseline);
+                                reapplyActiveBaseline(projectData[0].tasks);
+                            }} else {{
+                                console.log('📋 Usando dados P0 (padrão - sem baseline)');
+                            }}
+                            
+                            // *** NOVA ORDEM: 2) APLICAR PULMÃO SOBRE A BASELINE ***
+                            if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
+                                const offsetMeses = -selPulmaoMeses;
+                                console.log("🔧 Aplicando pulmão de", selPulmaoMeses, "meses SOBRE a baseline ativa");
+                                
+                                projectData[0].tasks.forEach(task => {{
+                                    const etapaNome = task.name;
+                                    
+                                    if (etapas_sem_alteracao.includes(etapaNome)) {{
+                                        // Não altera datas
+                                        console.log('  ⏸️ Etapa protegida (sem alteração):', etapaNome);
+                                    }}
+                                    else if (etapas_pulmao.includes(etapaNome)) {{
+                                        // Apenas datas previstas - só ajusta início
+                                        const oldStart = task.start_previsto;
+                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                        console.log('  📅 Pulmão ' + etapaNome + ':', oldStart, '→', task.start_previsto);
+                                        
+                                        // Recalcular campos de exibição
+                                        updateTaskDisplayFields(task);
+                                    }}
+                                    else {{
+                                        // Apenas datas previstas - ajusta início e término
+                                        const oldStart = task.start_previsto;
+                                        const oldEnd = task.end_previsto;
+                                        task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                        task.end_previsto = addMonths(task.end_previsto, offsetMeses);
+                                        
+                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                        task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                        console.log('  ⏩ ' + etapaNome + ':', oldStart, '→', task.start_previsto);
+                                        
+                                        // Recalcular campos de exibição
+                                        updateTaskDisplayFields(task);
+                                    }}
+                                }});
+                            }} else {{
+                                console.log('⏸️ Pulmão desativado');
+                            }}
+
                             // Recalcular range de datas apenas se houver tasks
                             if (filteredTasks.length > 0) {{
                                 const {{ min: newMinStr, max: newMaxStr }} = findNewDateRange(filteredTasks);
@@ -3791,13 +3820,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 activeDataMinStr = finalMinDate.toISOString().split('T')[0];
                                 activeDataMaxStr = finalMaxDate.toISOString().split('T')[0];
                             }}
-
-                            // Atualizar dados e redesenhar
-                            projectData[0].tasks = filteredTasks;
-                            tipoVisualizacao = selVis;
-                            
-                            // *** REAPLICAR BASELINE ATIVA APÓS FILTROS ***
-                            reapplyActiveBaseline(projectData[0].tasks);
 
                             renderSidebar();
                             renderHeader();
