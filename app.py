@@ -2058,14 +2058,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div id="toast-loading" class="toast-loading">🔄 Processando...</div>
                 <div class="gantt-container" id="gantt-container-{project['id']}">
                     <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
-                        <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
+                        <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros" 
+                                onclick="toggleMenu('filter-menu-{project["id"]}', 'baseline-selector-{project["id"]}')">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                                 </svg>
                             </span>
                         </button>
-                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baselines">
+                        <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Baselines"
+                                onclick="toggleMenu('baseline-selector-{project["id"]}', 'filter-menu-{project["id"]}')">
                             <span>
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M3 3h18v18H3z"></path>
@@ -3595,41 +3597,31 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
                     
-                    // Event listeners para os botões da toolbar
-                    const filterBtn = document.getElementById('filter-btn-{project["id"]}');
-                    const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
-                    const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                    const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                    
-                    // Toggle menu de filtros
-                    if (filterBtn) {{
-                        filterBtn.addEventListener('click', (e) => {{
-                            e.stopPropagation();
-                            filterMenu.classList.toggle('is-open');
-                            baselineSelector.classList.remove('is-open');  // Fecha baseline ao abrir filtros
-                        }});
-                    }}
-                    
-                    // Toggle seletor de baseline
-                    if (baselineBtn) {{
-                        baselineBtn.addEventListener('click', (e) => {{
-                            e.stopPropagation();
-                            baselineSelector.classList.toggle('is-open');
-                            filterMenu.classList.remove('is-open');  // Fecha filtros ao abrir baseline
-                        }});
-                    }}
+                    // Função global para toggle de menus
+                    window.toggleMenu = function(menuToOpenId, menuToCloseId) {{
+                        const menuToOpen = document.getElementById(menuToOpenId);
+                        const menuToClose = document.getElementById(menuToCloseId);
+                        
+                        if (menuToOpen) {{
+                            menuToOpen.classList.toggle('is-open');
+                        }}
+                        if (menuToClose) {{
+                            menuToClose.classList.remove('is-open');
+                        }}
+                    }};
                     
                     // Fechar menus ao clicar fora
-                    document.addEventListener('click', (e) => {{
-                        // Verificar se clicou no botão de filtros ou em seus filhos (SVG)
-                        const clickedFilterBtn = e.target.closest('#filter-btn-{project["id"]}');
-                        // Verificar se clicou no botão de baseline ou em seus filhos (SVG)
-                        const clickedBaselineBtn = e.target.closest('#baseline-btn-{project["id"]}');
+                    document.addEventListener('click', function(e) {{
+                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                        const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+                        const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
                         
-                        if (!filterMenu.contains(e.target) && !clickedFilterBtn) {{
+                        // Fechar se clicou fora de ambos os menus e botões
+                        if (filterMenu && !filterMenu.contains(e.target) && !filterBtn.contains(e.target)) {{
                             filterMenu.classList.remove('is-open');
                         }}
-                        if (!baselineSelector.contains(e.target) && !clickedBaselineBtn) {{
+                        if (baselineSelector && !baselineSelector.contains(e.target) && !baselineBtn.contains(e.target)) {{
                             baselineSelector.classList.remove('is-open');
                         }}
                     }});
