@@ -4557,15 +4557,14 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .baseline-resize-corner::before {{
                         content: '';
                         position: absolute;
-                        bottom: 0;
-                        left: 0;
+                        bottom: -2px;
+                        left: -2px;
                         width: 0;
                         height: 0;
                         border-style: solid;
-                        border-width: 0 0 16px 16px;
+                        border-width: 0 0 18px 18px;
                         border-color: transparent transparent #cbd5e0 transparent;
-                        border-bottom-left-radius: 8px;
-                        transform: rotate(45deg);
+                        transform: rotate(-45deg);
                         transform-origin: bottom left;
                     }}
                     
@@ -4580,7 +4579,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         left: 2px;
                         width: 10px;
                         height: 10px;
-                        transform: rotate(45deg);
+                        transform: rotate(-45deg);
                         transform-origin: center;
                         background: 
                             linear-gradient(90deg, transparent 48%, white 48%, white 52%, transparent 52%),
