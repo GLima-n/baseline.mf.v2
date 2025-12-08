@@ -4209,7 +4209,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         baseline_rows_html += f"""
         <div class="baseline-row" data-empreendimento="{emp}">
             <label title="{emp}">{emp}</label>
-            <select class="baseline-dropdown-emp" data-emp="{emp}" onchange='applyBaselineForEmp({emp_json}, this.value)'>
+            <select class="baseline-dropdown-emp" data-emp="{emp}" onchange='applyBaselineForEmp({emp_json}, this.value); var p0=document.getElementById("apply-p0-all-{project["id"]}"); var latest=document.getElementById("apply-latest-all-{project["id"]}"); if(p0)p0.checked=false; if(latest)latest.checked=false;'>
                 {options_html}
             </select>
         </div>
