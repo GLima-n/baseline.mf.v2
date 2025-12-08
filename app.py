@@ -3838,8 +3838,103 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
                     
+                    // ========== MENU DE CONTEXTO ==========
+                    function setupContextMenu() {{
+                        const contextMenu = document.getElementById('context-menu');
+                        const ganttArea = document.getElementById('gantt-chart-content-{project["id"]}');
+                        const ctxBaselineBtn = document.getElementById('ctx-baseline');
+                        const toastLoading = document.getElementById('toast-loading');
+                        
+                        if (!contextMenu || !ganttArea) {{
+                            console.warn('Menu de contexto ou área do Gantt não encontrados');
+                            return;
+                        }}
+                        
+                        // Função para mostrar menu
+                        function showContextMenu(x, y) {{
+                            contextMenu.style.left = x + 'px';
+                            contextMenu.style.top = y + 'px';
+                            contextMenu.style.display = 'block';
+                        }}
+                        
+                        // Função para esconder menu
+                        function hideContextMenu() {{
+                            contextMenu.style.display = 'none';
+                        }}
+                        
+                        // Função para mostrar toast
+                        function showToast(message) {{
+                            if (toastLoading) {{
+                                toastLoading.textContent = message;
+                                toastLoading.style.display = 'block';
+                                setTimeout(() => {{
+                                    toastLoading.style.display = 'none';
+                                }}, 3000);
+                            }}
+                        }}
+                        
+                        // Event: Botão direito na área do Gantt
+                        ganttArea.addEventListener('contextmenu', function(e) {{
+                            e.preventDefault();
+                            e.stopPropagation();
+                            showContextMenu(e.pageX, e.pageY);
+                        }});
+                        
+                        // Event: Clique em "Criar Linha de Base"
+                        if (ctxBaselineBtn) {{
+                            ctxBaselineBtn.addEventListener('click', function() {{
+                                hideContextMenu();
+                                showToast('📸 Solicitando criação de linha de base...');
+                                
+                                // Obter nome do empreendimento atual
+                                const currentProjectName = projectData[0]?.name || 'Desconhecido';
+                                
+                                // Enviar mensagem para o parent (Streamlit)
+                                window.parent.postMessage({{
+                                    type: 'CREATE_BASELINE',
+                                    empreendimento: currentProjectName,
+                                    timestamp: new Date().getTime()
+                                }}, '*');
+                                
+                                console.log('Mensagem enviada:', {{
+                                    type: 'CREATE_BASELINE',
+                                    empreendimento: currentProjectName
+                                }});
+                                
+                                // Feedback visual
+                                setTimeout(() => {{
+                                    showToast('✅ Solicitação enviada! Verifique a Tab 3 para acompanhar.');
+                                }}, 1500);
+                            }});
+                        }}
+                        
+                        // Event: Clique fora do menu
+                        document.addEventListener('click', function(e) {{
+                            if (contextMenu && !contextMenu.contains(e.target)) {{
+                                hideContextMenu();
+                            }}
+                        }});
+                        
+                        // Event: ESC fecha menu
+                        document.addEventListener('keydown', function(e) {{
+                            if (e.key === 'Escape') {{
+                                hideContextMenu();
+                            }}
+                        }});
+                        
+                        // Prevenir menu padrão do navegador
+                        document.addEventListener('contextmenu', function(e) {{
+                            if (e.target.closest('#gantt-chart-content-{project["id"]}')) {{
+                                e.preventDefault();
+                            }}
+                        }}, true);
+                        
+                        console.log('✅ Menu de contexto configurado com sucesso');
+                    }}
+                    
                     // Inicializar o Gantt
                     initGantt();
+                    setupContextMenu();
                 </script>
             </body>
             </html>
@@ -6618,6 +6713,38 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
+        # ========== LISTENER DE POSTMESSAGE PARA MENU DE CONTEXTO ==========
+        # Script HTML que escuta mensagens do iframe e atualiza session_state
+        st.components.v1.html("""
+        <script>
+            // Listener para mensagens postMessage do iframe do Gantt
+            window.addEventListener('message', function(event) {
+                // Verificar se a mensagem é de criação de baseline
+                if (event.data && event.data.type === 'CREATE_BASELINE') {
+                    console.log('📨 Mensagem recebida do Gantt:', event.data);
+                    
+                    const empreendimento = event.data.empreendimento;
+                    
+                    // Armazenar no localStorage para persistência entre reloads
+                    localStorage.setItem('pending_baseline_creation', JSON.stringify({
+                        empreendimento: empreendimento,
+                        timestamp: event.data.timestamp,
+                        created_at: new Date().toISOString()
+                    }));
+                    
+                    console.log('✅ Baseline pendente salva no localStorage:', empreendimento);
+                    
+                    // Exibir alerta visual
+                    alert('📸 Solicitação de Baseline Recebida!\\n\\n' +
+                          'Empreendimento: ' + empreendimento + '\\n\\n' +
+                          'Por favor, vá até a Tab 3 (Linhas de Base) para finalizar a criação.');
+                }
+            });
+            
+            console.log('✅ Listener de postMessage ativado');
+        </script>
+        """, height=0)
+        
         
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
@@ -7096,6 +7223,49 @@ with st.spinner("Carregando e processando dados..."):
             if not empreendimentos_baseline:
                 st.warning("Nenhum empreendimento disponível")
             else:
+                # ========== VERIFICAR BASELINE PENDENTE DO MENU DE CONTEXTO ==========
+                st.components.v1.html("""
+                <script>
+                    // Verificar se há baseline pendente
+                    const pendingBaseline = localStorage.getItem('pending_baseline_creation');
+                    
+                    if (pendingBaseline) {
+                        const data = JSON.parse(pendingBaseline);
+                        const empreendimento = data.empreendimento;
+                        
+                        // Mostrar alerta
+                        const alertDiv = document.createElement('div');
+                        alertDiv.style.cssText = `
+                            background-color: #fff3cd;
+                            border: 1px solid #ffeaa7;
+                            color: #856404;
+                            padding: 12px 20px;
+                            border-radius: 8px;
+                            margin: 10px 0;
+                            font-weight: bold;
+                            text-align: center;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                        `;
+                        alertDiv.innerHTML = `
+                            📸 <strong>Baseline Pendente de Criação</strong><br>
+                            Empreendimento: <span style="color: #d63384;">${empreendimento}</span><br>
+                            <small>Selecione o empreendimento acima e clique em "Criar Nova Linha de Base"</small>
+                        `;
+                        
+                        document.body.prepend(alertDiv);
+                        
+                        // Auto-esconder após 10 segundos
+                        setTimeout(() => {
+                            alertDiv.style.transition = 'opacity 0.5s';
+                            alertDiv.style.opacity = '0';
+                            setTimeout(() => alertDiv.remove(), 500);
+                        }, 10000);
+                        
+                        console.log('⚠️ Baseline pendente detectada:', empreendimento);
+                    }
+                </script>
+                """, height=0)
+                
                 selected_empreendimento_baseline = st.selectbox(
                     "Selecione o Empreendimento",
                     empreendimentos_baseline,
