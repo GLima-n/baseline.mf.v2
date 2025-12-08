@@ -3863,13 +3863,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                         
                         // Função para mostrar toast
-                        function showToast(message) {{
+                        function showToast(message, duration = 3000) {{
                             if (toastLoading) {{
                                 toastLoading.textContent = message;
                                 toastLoading.style.display = 'block';
+                                toastLoading.style.backgroundColor = '#2ecc71';
+                                toastLoading.style.padding = '15px 25px';
+                                toastLoading.style.fontSize = '14px';
+                                toastLoading.style.fontWeight = 'bold';
                                 setTimeout(() => {{
                                     toastLoading.style.display = 'none';
-                                }}, 3000);
+                                }}, duration);
                             }}
                         }}
                         
@@ -3884,35 +3888,31 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         if (ctxBaselineBtn) {{
                             ctxBaselineBtn.addEventListener('click', function() {{
                                 hideContextMenu();
-                                showToast('📸 Criando linha de base...');
                                 
                                 // Obter nome do empreendimento atual
                                 const currentProjectName = projectData[0]?.name || 'Desconhecido';
                                 
-                                console.log('Mensagem enviada:', {{
-                                    type: 'CREATE_BASELINE',
-                                    empreendimento: currentProjectName
-                                }});
+                                console.log('📸 Solicitando criação de baseline para:', currentProjectName);
                                 
-                                // Redirecionar página pai com query params
-                                try {{
-                                    const encodedEmp = encodeURIComponent(currentProjectName);
-                                    const timestamp = new Date().getTime();
-                                    const newUrl = window.location.origin + window.location.pathname + 
-                                                   `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
-                                    
-                                    console.log('Redirecionando para:', newUrl);
-                                    
-                                    // Tentar redirecionar a página pai (Streamlit)
-                                    if (window.parent && window.parent !== window) {{
-                                        window.parent.location.href = newUrl;
-                                    }} else {{
-                                        window.location.href = newUrl;
-                                    }}
-                                }} catch (error) {{
-                                    console.error('Erro ao redirecionar:', error);
-                                    showToast('❌ Erro ao criar baseline. Use a Tab 3.');
-                                }}
+                                // Armazenar no localStorage para persistência
+                                localStorage.setItem('pending_baseline_creation', JSON.stringify({{
+                                    empreendimento: currentProjectName,
+                                    timestamp: new Date().getTime(),
+                                    created_at: new Date().toISOString()
+                                }}));
+                                
+                                console.log('✅ Pedido salvo no localStorage');
+                                
+                                // Exibir toast de sucesso
+                                showToast('📸 Pedido salvo! Vá para Tab 3 (Linhas de Base) para finalizar.', 5000);
+                                
+                                // Exibir alerta modal também
+                                setTimeout(() => {{
+                                    alert('📸 Solicitação de Baseline Salva!\\n\\n' +
+                                          'Empreendimento: ' + currentProjectName + '\\n\\n' +                    '👉 Vá para a Tab 3 (Linhas de Base)\\n' +
+                                          'O empreendimento será pré-selecionado automaticamente.\\n\\n' +
+                                          'Clique em "Criar Nova Linha de Base" para finalizar.');
+                                }}, 500);
                             }});
                         }}
                         
@@ -3937,7 +3937,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }}, true);
                         
-                        console.log('✅ Menu de contexto configurado com sucesso');
+                        console.log('✅ Menu de contexto configurado com sucesso (usando localStorage)');
                     }}
                     
                     // Inicializar o Gantt
@@ -7219,38 +7219,98 @@ with st.spinner("Carregando e processando dados..."):
                     const pendingBaseline = localStorage.getItem('pending_baseline_creation');
                     
                     if (pendingBaseline) {
-                        const data = JSON.parse(pendingBaseline);
-                        const empreendimento = data.empreendimento;
-                        
-                        // Mostrar alerta
-                        const alertDiv = document.createElement('div');
-                        alertDiv.style.cssText = `
-                            background-color: #fff3cd;
-                            border: 1px solid #ffeaa7;
-                            color: #856404;
-                            padding: 12px 20px;
-                            border-radius: 8px;
-                            margin: 10px 0;
-                            font-weight: bold;
-                            text-align: center;
-                            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-                        `;
-                        alertDiv.innerHTML = `
-                            📸 <strong>Baseline Pendente de Criação</strong><br>
-                            Empreendimento: <span style="color: #d63384;">${empreendimento}</span><br>
-                            <small>Selecione o empreendimento acima e clique em "Criar Nova Linha de Base"</small>
-                        `;
-                        
-                        document.body.prepend(alertDiv);
-                        
-                        // Auto-esconder após 10 segundos
-                        setTimeout(() => {
-                            alertDiv.style.transition = 'opacity 0.5s';
-                            alertDiv.style.opacity = '0';
-                            setTimeout(() => alertDiv.remove(), 500);
-                        }, 10000);
-                        
-                        console.log('⚠️ Baseline pendente detectada:', empreendimento);
+                        try {
+                            const data = JSON.parse(pendingBaseline);
+                            const empreendimento = data.empreendimento;
+                            const timestamp = new Date(data.created_at).toLocaleString('pt-BR');
+                            
+                            // Mostrar banner destacado
+                            const alertDiv = document.createElement('div');
+                            alertDiv.id = 'pending-baseline-alert';
+                            alertDiv.style.cssText = `
+                                position: fixed;
+                                top: 80px;
+                                left: 50%;
+                                transform: translateX(-50%);
+                                z-index: 9999;
+                                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                color: white;
+                                padding: 20px 30px;
+                                border-radius: 12px;
+                                margin: 10px 0;
+                                font-weight: bold;
+                                text-align: center;
+                                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+                                min-width: 400px;
+                                animation: slideDown 0.5s ease-out;
+                            `;
+                            
+                            alertDiv.innerHTML = `
+                                <div style="font-size: 24px; margin-bottom: 10px;">📸</div>
+                                <div style="font-size: 18px; margin-bottom: 8px;">Baseline Pendente</div>
+                                <div style="font-size: 16px; color: #ffd700; margin-bottom: 8px;">
+                                    ${empreendimento}
+                                </div>
+                                <div style="font-size: 12px; opacity: 0.9; margin-bottom: 15px;">
+                                    Solicitado em: ${timestamp}
+                                </div>
+                                <div style="font-size: 13px; background: rgba(255,255,255,0.2); padding: 10px; border-radius: 6px; margin-bottom: 12px;">
+                                    ✅ Selecione o empreendimento abaixo<br>
+                                    ✅ Clique em "Criar Nova Linha de Base"
+                                </div>
+                                <button onclick="clearPendingBaseline()" style="
+                                    background: rgba(255,255,255,0.3);
+                                    border: 1px solid white;
+                                    color: white;
+                                    padding: 8px 16px;
+                                    border-radius: 6px;
+                                    cursor: pointer;
+                                    font-weight: bold;
+                                    font-size: 12px;
+                                ">Cancelar Pedido</button>
+                            `;
+                            
+                            // Adicionar estilo de animação
+                            const style = document.createElement('style');
+                            style.textContent = `
+                                @keyframes slideDown {
+                                    from {
+                                        opacity: 0;
+                                        transform: translateX(-50%) translateY(-20px);
+                                    }
+                                    to {
+                                        opacity: 1;
+                                        transform: translateX(-50%) translateY(0);
+                                    }
+                                }
+                            `;
+                            document.head.appendChild(style);
+                            
+                            document.body.appendChild(alertDiv);
+                            
+                            // Função global para limpar pedido
+                            window.clearPendingBaseline = function() {
+                                localStorage.removeItem('pending_baseline_creation');
+                                alertDiv.style.animation = 'slideDown 0.3s ease-in reverse';
+                                setTimeout(() => alertDiv.remove(), 300);
+                                console.log('✅ Pedido de baseline cancelado');
+                            };
+                            
+                            // Auto-esconder após 30 segundos
+                            setTimeout(() => {
+                                if (document.getElementById('pending-baseline-alert')) {
+                                    alertDiv.style.animation = 'slideDown 0.5s ease-in reverse';
+                                    setTimeout(() => alertDiv.remove(), 500);
+                                }
+                            }, 30000);
+                            
+                            console.log('⚠️ Baseline pendente detectada:', empreendimento);
+                            console.log('💡 Dica: O usuário deve selecionar o empreendimento e clicar em Criar');
+                            
+                        } catch (e) {
+                            console.error('Erro ao processar baseline pendente:', e);
+                            localStorage.removeItem('pending_baseline_creation');
+                        }
                     }
                 </script>
                 """, height=0)
