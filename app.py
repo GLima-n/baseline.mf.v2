@@ -4474,6 +4474,28 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div style="margin-bottom: 10px; font-weight: 600; color: #2d3748; font-size: 13px;">
                         Selecionar Baselines por Empreendimento
                     </div>
+                    
+                    <!-- Checkboxes de Aplicação Rápida -->
+                    <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
+                        <div style="font-weight: 600; color: #2d3748; font-size: 12px; margin-bottom: 8px;">
+                            Aplicação Rápida
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="apply-p0-all-{project['id']}" 
+                                       onchange="handleQuickApply('p0')" 
+                                       style="margin-right: 6px; cursor: pointer;">
+                                <span style="font-size: 11px; color: #4a5568;">Aplicar P0 para todos</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="checkbox" id="apply-latest-all-{project['id']}" 
+                                       onchange="handleQuickApply('latest')" 
+                                       style="margin-right: 6px; cursor: pointer;">
+                                <span style="font-size: 11px; color: #4a5568;">Aplicar última baseline para todos</span>
+                            </label>
+                        </div>
+                    </div>
+                    
                     <div class="baseline-selector-table" style="
                         max-height: 400px;
                         overflow-y: auto;
@@ -5357,14 +5379,115 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         task.inicio_previsto = "N/D";
                         task.termino_previsto = "N/D";
                         task.duracao_prev_meses = "-";
-                        task.vt_text = "-";
-                        
-                        console.log(`⚠️ Baseline ${{baselineName}} não tem dados para ${{empreendimento}}`);
+                    }}
+                }}
+                
+                // *** FUNÇÕES DE APLICAÇÃO RÁPIDA (NOVO) ***
+                
+                // Encontrar última baseline disponível para um empreendimento
+                function findLatestBaseline(baselines) {{
+                    if (!baselines) return "P0-(padrão)";
+                    
+                    const baselineNames = Object.keys(baselines);
+                    
+                    // Filtrar apenas baselines válidas (não P0)
+                    const validBaselines = baselineNames.filter(name => name !== "P0-(padrão)");
+                    
+                    if (validBaselines.length === 0) {{
+                        return "P0-(padrão)";
                     }}
                     
-                    // Re-renderizar
-                    renderSidebar();
-                    renderChart();
+                    // Ordenar por hierarquia numérica (P10 > P9 > ... > P1)
+                    validBaselines.sort((a, b) => {{
+                        // Extrair número de P1, P2, P10, etc.
+                        const numA = parseInt(a.match(/P(\d+)/)?.[1] || '0');
+                        const numB = parseInt(b.match(/P(\d+)/)?.[1] || '0');
+                        
+                        // Maior número = mais recente
+                        return numB - numA;
+                    }});
+                    
+                    console.log(`Última baseline encontrada: ${{validBaselines[0]}}`);
+                    return validBaselines[0];
+                }}
+                
+                // Aplicar P0 para todos os empreendimentos
+                function applyP0ToAll() {{
+                    console.log('🔄 Aplicando P0 para todos os empreendimentos');
+                    
+                    const tasks = projectData[0].tasks;
+                    if (!tasks) return;
+                    
+                    let count = 0;
+                    tasks.forEach(task => {{
+                        const emp = task.name;
+                        
+                        // Aplicar baseline P0
+                        applyBaselineForEmp(emp, "P0-(padrão)");
+                        
+                        // Atualizar dropdown visual
+                        const dropdown = document.querySelector(`select[data-emp="${{emp}}"]`);
+                        if (dropdown) {{
+                            dropdown.value = "P0-(padrão)";
+                        }}
+                        
+                        count++;
+                    }});
+                    
+                    console.log(`✅ P0 aplicado para ${{count}} empreendimentos`);
+                }}
+                
+                // Aplicar última baseline para todos os empreendimentos
+                function applyLatestToAll() {{
+                    console.log('🔄 Aplicando última baseline para todos os empreendimentos');
+                    
+                    const tasks = projectData[0].tasks;
+                    if (!tasks) return;
+                    
+                    let count = 0;
+                    tasks.forEach(task => {{
+                        const emp = task.name;
+                        
+                        // Encontrar última baseline deste empreendimento
+                        const latestBaseline = findLatestBaseline(task.baselines);
+                        
+                        if (latestBaseline) {{
+                            // Aplicar baseline
+                            applyBaselineForEmp(emp, latestBaseline);
+                            
+                            // Atualizar dropdown visual
+                            const dropdown = document.querySelector(`select[data-emp="${{emp}}"]`);
+                            if (dropdown) {{
+                                dropdown.value = latestBaseline;
+                            }}
+                            
+                            count++;
+                        }}
+                    }});
+                    
+                    console.log(`✅ Última baseline aplicada para ${{count}} empreendimentos`);
+                }}
+                
+                // Gerenciar checkboxes de aplicação rápida
+                function handleQuickApply(mode) {{
+                    const p0Checkbox = document.getElementById('apply-p0-all-{project["id"]}');
+                    const latestCheckbox = document.getElementById('apply-latest-all-{project["id"]}');
+                    
+                    if (mode === 'p0') {{
+                        // Desmarcar "latest"
+                        if (latestCheckbox) latestCheckbox.checked = false;
+                        
+                        if (p0Checkbox && p0Checkbox.checked) {{
+                            applyP0ToAll();
+                        }}
+                    }} else if (mode === 'latest') {{
+                        // Desmarcar "p0"
+                        if (p0Checkbox) p0Checkbox.checked = false;
+                        
+                        if (latestCheckbox && latestCheckbox.checked) {{
+                            applyLatestToAll();
+                        }}
+                    }}
                 }}
                 
                 // Event Listeners para baseline
