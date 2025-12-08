@@ -4471,13 +4471,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     padding: 15px;
                     border: 1px solid #e2e8f0;
                 ">
-                    <div style="margin-bottom: 10px; font-weight: 600; color: #2d3748; font-size: 13px;">
-                        Selecionar Baselines por Empreendimento
+                    <div style="margin-bottom: 12px; font-weight: 700; color: #1a202c; font-size: 14px; border-bottom: 2px solid #4299e1; padding-bottom: 8px;">
+                        Selecione Linhas de Base
                     </div>
                     
                     <!-- Checkboxes de Aplicação Rápida -->
-                    <div style="margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px solid #e2e8f0;">
-                        <div style="font-weight: 600; color: #2d3748; font-size: 12px; margin-bottom: 8px;">
+                    <div style="margin-bottom: 15px; padding: 10px; background: #f7fafc; border-radius: 6px; border: 1px solid #e2e8f0;">
+                        <div style="font-weight: 600; color: #2d3748; font-size: 12px; margin-bottom: 10px;">
                             Aplicação Rápida
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -4509,10 +4509,15 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .baseline-row {{
                         display: grid;
                         grid-template-columns: 1.2fr 1fr;
-                        gap: 8px;
-                        padding: 6px 0;
+                        gap: 10px;
+                        padding: 8px 6px;
                         border-bottom: 1px solid #e2e8f0;
                         align-items: center;
+                        transition: background-color 0.15s ease;
+                    }}
+                    
+                    .baseline-row:hover {{
+                        background-color: #f7fafc;
                     }}
                     
                     .baseline-row:last-child {{
@@ -4533,16 +4538,18 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     .baseline-row select.baseline-dropdown-emp {{
                         width: 100%;
-                        padding: 4px 6px;
+                        padding: 5px 8px;
                         border: 1px solid #cbd5e0;
-                        border-radius: 4px;
-                        font-size: 10px;
+                        border-radius: 5px;
+                        font-size: 11px;
                         background-color: white;
+                        transition: all 0.2s ease;
                         cursor: pointer;
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:hover {{
-                        border-color: #a0aec0;
+                        border-color: #4299e1;
+                        box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.1);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:focus {{
