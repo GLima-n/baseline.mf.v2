@@ -4554,13 +4554,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:hover {{
-                        border-color: #4299e1;
+                        border-color: #1a202c;
                         box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.1);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:focus {{
                         outline: none;
-                        border-color: #4299e1;
+                        border-color: #1a202;
                         box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
                     }}
                 </style>
