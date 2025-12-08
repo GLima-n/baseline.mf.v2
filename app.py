@@ -7213,8 +7213,12 @@ with st.spinner("Carregando e processando dados..."):
                 st.warning("Nenhum empreendimento disponível")
             else:
                 # ========== VERIFICAR BASELINE PENDENTE DO MENU DE CONTEXTO ==========
-                st.components.v1.html("""
+                # Usando markdown com HTML inline para garantir execução
+                st.markdown("""
                 <script>
+                (function() {
+                    console.log('🔍 Tab 3: Verificando baseline pendente...');
+                    
                     // Verificar se há baseline pendente
                     const pendingBaseline = localStorage.getItem('pending_baseline_creation');
                     
@@ -7223,6 +7227,8 @@ with st.spinner("Carregando e processando dados..."):
                             const data = JSON.parse(pendingBaseline);
                             const empreendimento = data.empreendimento;
                             const timestamp = new Date(data.created_at).toLocaleString('pt-BR');
+                            
+                            console.log('✅ Baseline pendente encontrada:', empreendimento);
                             
                             // Mostrar banner destacado
                             const alertDiv = document.createElement('div');
@@ -7291,29 +7297,34 @@ with st.spinner("Carregando e processando dados..."):
                             // Função global para limpar pedido
                             window.clearPendingBaseline = function() {
                                 localStorage.removeItem('pending_baseline_creation');
-                                alertDiv.style.animation = 'slideDown 0.3s ease-in reverse';
-                                setTimeout(() => alertDiv.remove(), 300);
+                                if (alertDiv && alertDiv.parentNode) {
+                                    alertDiv.style.animation = 'slideDown 0.3s ease-in reverse';
+                                    setTimeout(() => alertDiv.remove(), 300);
+                                }
                                 console.log('✅ Pedido de baseline cancelado');
                             };
                             
                             // Auto-esconder após 30 segundos
                             setTimeout(() => {
-                                if (document.getElementById('pending-baseline-alert')) {
-                                    alertDiv.style.animation = 'slideDown 0.5s ease-in reverse';
-                                    setTimeout(() => alertDiv.remove(), 500);
+                                const alert = document.getElementById('pending-baseline-alert');
+                                if (alert) {
+                                    alert.style.animation = 'slideDown 0.5s ease-in reverse';
+                                    setTimeout(() => alert.remove(), 500);
                                 }
                             }, 30000);
                             
-                            console.log('⚠️ Baseline pendente detectada:', empreendimento);
-                            console.log('💡 Dica: O usuário deve selecionar o empreendimento e clicar em Criar');
+                            console.log('⚠️ Banner exibido para:', empreendimento);
                             
                         } catch (e) {
-                            console.error('Erro ao processar baseline pendente:', e);
+                            console.error('❌ Erro ao processar baseline pendente:', e);
                             localStorage.removeItem('pending_baseline_creation');
                         }
+                    } else {
+                        console.log('ℹ️  Nenhuma baseline pendente');
                     }
+                })();
                 </script>
-                """, height=0)
+                """, unsafe_allow_html=True)
                 
                 selected_empreendimento_baseline = st.selectbox(
                     "Selecione o Empreendimento",
