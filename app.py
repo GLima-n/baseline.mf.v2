@@ -4563,13 +4563,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         height: 0;
                         border-style: solid;
                         border-width: 0 0 18px 18px;
-                        border-color: transparent transparent #cbd5e0 transparent;
+                        border-color: transparent;
                         transform: rotate(-45deg);
                         transform-origin: bottom left;
                     }}
                     
                     .baseline-resize-corner:hover::before {{
-                        border-color: transparent transparent #4299e1 transparent;
+                        border-color: transparent;
                     }}
                     
                     .baseline-resize-corner::after {{
@@ -4582,9 +4582,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         transform: rotate(-45deg);
                         transform-origin: center;
                         background: 
-                            linear-gradient(90deg, transparent 48%, white 48%, white 52%, transparent 52%),
-                            linear-gradient(90deg, transparent 56%, white 56%, white 60%, transparent 60%),
-                            linear-gradient(90deg, transparent 64%, white 64%, white 68%, transparent 68%);
+                            linear-gradient(90deg, transparent 48%, #9ca3af 48%, #9ca3af 52%, transparent 52%),
+                            linear-gradient(90deg, transparent 56%, #9ca3af 56%, #9ca3af 60%, transparent 60%),
+                            linear-gradient(90deg, transparent 64%, #9ca3af 64%, #9ca3af 68%, transparent 68%);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp {{
