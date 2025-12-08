@@ -11,15 +11,14 @@ import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
 from dateutil.relativedelta import relativedelta #Dados para JavaScript
+import json
 
 import streamlit.components.v1 as components  
-import json
 import random
 import time
 import urllib.parse
 import mysql.connector
 from mysql.connector import Error
-import json
 from datetime import datetime
 try:
     from dropdown_component import simple_multiselect_dropdown
