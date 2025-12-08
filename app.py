@@ -5421,21 +5421,55 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     let count = 0;
                     tasks.forEach(task => {{
                         const emp = task.name;
+                        const baselineName = "P0-(padrão)";
                         
-                        // Aplicar baseline P0
-                        applyBaselineForEmp(emp, "P0-(padrão)");
+                        // Atualizar estado
+                        baselinesPorEmpreendimento[emp] = baselineName;
+                        
+                        // Aplicar baseline P0 diretamente
+                        if (task.baselines && task.baselines[baselineName]) {{
+                            const baselineData = task.baselines[baselineName];
+                            
+                            if (baselineData.start !== null && baselineData.end !== null) {{
+                                task.start_previsto = baselineData.start;
+                                task.end_previsto = baselineData.end;
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                
+                                const startDate = parseDate(task.start_previsto);
+                                const endDate = parseDate(task.end_previsto);
+                                if (startDate && endDate) {{
+                                    const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                                    task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                                }}
+                                
+                                if (task.end_real_original_raw && task.end_previsto) {{
+                                    const endReal = parseDate(task.end_real_original_raw);
+                                    const endPrev = parseDate(task.end_previsto);
+                                    if (endReal && endPrev) {{
+                                        const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                        task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                                    }}
+                                }}
+                            }}
+                        }}
                         
                         // Atualizar dropdown visual
                         const dropdown = document.querySelector(`select[data-emp="${{emp}}"]`);
                         if (dropdown) {{
-                            dropdown.value = "P0-(padrão)";
+                            dropdown.value = baselineName;
                         }}
                         
                         count++;
                     }});
                     
+                    // Renderizar apenas uma vez no final
+                    renderSidebar();
+                    renderChart();
+                    
                     console.log(`✅ P0 aplicado para ${{count}} empreendimentos`);
                 }}
+
                 
                 // Aplicar última baseline para todos os empreendimentos
                 function applyLatestToAll() {{
@@ -5452,8 +5486,43 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const latestBaseline = findLatestBaseline(task.baselines);
                         
                         if (latestBaseline) {{
-                            // Aplicar baseline
-                            applyBaselineForEmp(emp, latestBaseline);
+                            // Atualizar estado
+                            baselinesPorEmpreendimento[emp] = latestBaseline;
+                            
+                            // Aplicar baseline diretamente
+                            if (task.baselines && task.baselines[latestBaseline]) {{
+                                const baselineData = task.baselines[latestBaseline];
+                                
+                                if (baselineData.start !== null && baselineData.end !== null) {{
+                                    task.start_previsto = baselineData.start;
+                                    task.end_previsto = baselineData.end;
+                                    task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                    task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                    
+                                    const startDate = parseDate(task.start_previsto);
+                                    const endDate = parseDate(task.end_previsto);
+                                    if (startDate && endDate) {{
+                                        const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                                        task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                                    }}
+                                    
+                                    if (task.end_real_original_raw && task.end_previsto) {{
+                                        const endReal = parseDate(task.end_real_original_raw);
+                                        const endPrev = parseDate(task.end_previsto);
+                                        if (endReal && endPrev) {{
+                                            const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                            task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                                        }}
+                                    }}
+                                }} else {{
+                                    task.start_previsto = null;
+                                    task.end_previsto = null;
+                                    task.inicio_previsto = "N/D";
+                                    task.termino_previsto = "N/D";
+                                    task.duracao_prev_meses = "-";
+                                    task.vt_text = "-";
+                                }}
+                            }}
                             
                             // Atualizar dropdown visual
                             const dropdown = document.querySelector(`select[data-emp="${{emp}}"]`);
@@ -5465,8 +5534,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }});
                     
+                    // Renderizar apenas uma vez no final
+                    renderSidebar();
+                    renderChart();
+                    
                     console.log(`✅ Última baseline aplicada para ${{count}} empreendimentos`);
                 }}
+
                 
                 // Gerenciar checkboxes de aplicação rápida
                 function handleQuickApply(mode) {{
