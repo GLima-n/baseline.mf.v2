@@ -5328,7 +5328,44 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         tipoVisualizacao = selVis;
                         pulmaoStatus = selPulmao;
 
-                        // *** 7. ATUALIZAR TÍTULO DO PROJETO ***
+                        // *** 7. REPLICAR BASELINES SELECIONADAS ***
+                        // Após filtrar, reaplicar as baselines que o usuário selecionou
+                        filteredTasks.forEach(task => {{
+                            const emp = task.name;
+                            const selectedBaseline = baselinesPorEmpreendimento[emp];
+                            
+                            if (selectedBaseline && selectedBaseline !== "P0-(padrão)") {{
+                                // Aplicar baseline sem re-renderizar (será feito no final)
+                                if (task.baselines && task.baselines[selectedBaseline]) {{
+                                    const baselineData = task.baselines[selectedBaseline];
+                                    
+                                    if (baselineData.start !== null && baselineData.end !== null) {{
+                                        task.start_previsto = baselineData.start;
+                                        task.end_previsto = baselineData.end;
+                                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                        task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                        
+                                        const startDate = parseDate(task.start_previsto);
+                                        const endDate = parseDate(task.end_previsto);
+                                        if (startDate && endDate) {{
+                                            const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                                            task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                                        }}
+                                        
+                                        if (task.end_real_original_raw && task.end_previsto) {{
+                                            const endReal = parseDate(task.end_real_original_raw);
+                                            const endPrev = parseDate(task.end_previsto);
+                                            if (endReal && endPrev) {{
+                                                const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                                task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                                            }}
+                                        }}
+                                    }}
+                                }}
+                            }}
+                        }});
+
+                        // *** 8. ATUALIZAR TÍTULO DO PROJETO ***
                         updateProjectTitle(currentStageName);
 
                         // Redesenhar
