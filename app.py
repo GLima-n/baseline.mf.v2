@@ -5437,7 +5437,16 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         task.inicio_previsto = "N/D";
                         task.termino_previsto = "N/D";
                         task.duracao_prev_meses = "-";
+                        task.vt_text = "-";
+                        
+                        console.log(`⚠️ Baseline ${{baselineName}} não tem dados para ${{empreendimento}}`);
                     }}
+                    
+                    // Re-renderizar o gráfico
+                    renderSidebar();
+                    renderChart();
+                    
+                    console.log(`🎨 Gráfico re-renderizado após aplicar baseline`);
                 }}
                 
                 // *** FUNÇÕES DE APLICAÇÃO RÁPIDA (NOVO) ***
