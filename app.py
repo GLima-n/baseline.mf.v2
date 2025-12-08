@@ -5277,6 +5277,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // Reload page with new parameters
                     window.location.href = url.toString();
+                }}
                 
                 // *** BASELINE INDIVIDUAL POR EMPREENDIMENTO (MODIFICADO) ***
                 // Mapa para rastrear baseline ativa de cada empreendimento
