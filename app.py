@@ -5340,8 +5340,27 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     const baselineData = task.baselines[selectedBaseline];
                                     
                                     if (baselineData.start !== null && baselineData.end !== null) {{
-                                        task.start_previsto = baselineData.start;
-                                        task.end_previsto = baselineData.end;
+                                        // Aplicar dados da baseline
+                                        let startPrevisto = baselineData.start;
+                                        let endPrevisto = baselineData.end;
+                                        
+                                        // *** APLICAR PULMÃO SE NECESSÁRIO ***
+                                        if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
+                                            const offsetMeses = -selPulmaoMeses;
+                                            const startDate = parseDate(startPrevisto);
+                                            const endDate = parseDate(endPrevisto);
+                                            
+                                            if (startDate && endDate) {{
+                                                startDate.setMonth(startDate.getMonth() + offsetMeses);
+                                                endDate.setMonth(endDate.getMonth() + offsetMeses);
+                                                
+                                                startPrevisto = startDate.toISOString().split('T')[0];
+                                                endPrevisto = endDate.toISOString().split('T')[0];
+                                            }}
+                                        }}
+                                        
+                                        task.start_previsto = startPrevisto;
+                                        task.end_previsto = endPrevisto;
                                         task.inicio_previsto = formatDateDisplay(task.start_previsto);
                                         task.termino_previsto = formatDateDisplay(task.end_previsto);
                                         
