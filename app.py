@@ -4477,7 +4477,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     padding: 15px;
                     border: 1px solid #e2e8f0;
                 ">
-                    <div style="margin-bottom: 12px; font-weight: 700; color: #1a202c; font-size: 14px; border-bottom: 2px solid #4299e1; padding-bottom: 8px;">
+                    <div style="margin-bottom: 12px; font-weight: 700; color: #1a202c; font-size: 14px; border-bottom: 2px solid #1a202c; padding-bottom: 8px;">
                         Selecione Linhas de Base
                     </div>
                     
@@ -4554,13 +4554,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:hover {{
-                        border-color: #1a202c;
+                        border-color: #4299e1;
                         box-shadow: 0 0 0 1px rgba(66, 153, 225, 0.1);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp:focus {{
                         outline: none;
-                        border-color: #1a202;
+                        border-color: #4299e1;
                         box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
                     }}
                 </style>
