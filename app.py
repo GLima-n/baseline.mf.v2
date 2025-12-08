@@ -345,39 +345,39 @@ def process_context_menu_actions(df=None):
         raw_emp = query_params.get('empreendimento', None)
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
+        print(f"🔔 BACKEND: Recebido comando de criação de baseline para '{empreendimento}'")
 
-        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
+        # 2. Garantia de Dados
         if df is None or df.empty:
-            print("⚠️ Sessão Iframe. Carregando dados...")
+            print("⚠️ Carregando dados...")
             try:
-                df = load_data() # Sua função de carregar Excel/SQL
+                df = load_data()
             except Exception as e:
-                print(f"❌ Erro load_data: {e}")
+                print(f"❌ Erro ao carregar dados: {e}")
+                st.error(f"❌ Erro ao carregar dados: {e}")
+                st.query_params.clear()
                 return
 
-        # 3. Executa Salvamento
-        if empreendimento and df is not None:
-            try:
-                # Cria a baseline (usa sua função take_gantt_baseline existente)
-                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ FINALIZADO: {version_name} criado.")
-                # Limpa URL
-                st.query_params.clear()
-            except Exception as e:
-                print(f"❌ Erro take_gantt_baseline: {e}")
-
-        # 4. Executa a criação
+        # 3. Executa criação da baseline
         if empreendimento and df is not None and not df.empty:
             try:
                 # Cria e Salva no MySQL
                 version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
+                print(f"✅ SUCESSO: Baseline '{version_name}' criada para '{empreendimento}'!")
+                
+                # Feedback visual para o usuário
+                st.success(f"✅ Linha de Base **{version_name}** criada com sucesso para **{empreendimento}**!")
                 
                 # Limpa params para não repetir na próxima carga
                 st.query_params.clear()
                 
+                # Força atualização da página
+                st.rerun()
+                
             except Exception as e:
+                print(f"❌ Erro ao criar baseline: {e}")
+                st.error(f"❌ Erro ao criar baseline: {e}")
+                st.query_params.clear()
                 print(f"❌ Erro ao salvar baseline: {e}")
         else:
             print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
@@ -3884,27 +3884,35 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         if (ctxBaselineBtn) {{
                             ctxBaselineBtn.addEventListener('click', function() {{
                                 hideContextMenu();
-                                showToast('📸 Solicitando criação de linha de base...');
+                                showToast('📸 Criando linha de base...');
                                 
                                 // Obter nome do empreendimento atual
                                 const currentProjectName = projectData[0]?.name || 'Desconhecido';
-                                
-                                // Enviar mensagem para o parent (Streamlit)
-                                window.parent.postMessage({{
-                                    type: 'CREATE_BASELINE',
-                                    empreendimento: currentProjectName,
-                                    timestamp: new Date().getTime()
-                                }}, '*');
                                 
                                 console.log('Mensagem enviada:', {{
                                     type: 'CREATE_BASELINE',
                                     empreendimento: currentProjectName
                                 }});
                                 
-                                // Feedback visual
-                                setTimeout(() => {{
-                                    showToast('✅ Solicitação enviada! Verifique a Tab 3 para acompanhar.');
-                                }}, 1500);
+                                // Redirecionar página pai com query params
+                                try {{
+                                    const encodedEmp = encodeURIComponent(currentProjectName);
+                                    const timestamp = new Date().getTime();
+                                    const newUrl = window.location.origin + window.location.pathname + 
+                                                   `?context_action=take_baseline&empreendimento=${{encodedEmp}}&t=${{timestamp}}`;
+                                    
+                                    console.log('Redirecionando para:', newUrl);
+                                    
+                                    // Tentar redirecionar a página pai (Streamlit)
+                                    if (window.parent && window.parent !== window) {{
+                                        window.parent.location.href = newUrl;
+                                    }} else {{
+                                        window.location.href = newUrl;
+                                    }}
+                                }} catch (error) {{
+                                    console.error('Erro ao redirecionar:', error);
+                                    showToast('❌ Erro ao criar baseline. Use a Tab 3.');
+                                }}
                             }});
                         }}
                         
@@ -6713,35 +6721,16 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
-        # ========== LISTENER DE POSTMESSAGE PARA MENU DE CONTEXTO ==========
+        # ========== PROCESSAR CRIAÇÃO DE BASELINE VIA MENU DE CONTEXTO ==========
+        # Verifica se há query params de criação de baseline e processa automaticamente
+        process_context_menu_actions(df_para_exibir)
+        
+        # ========== LISTENER DE POSTMESSAGE PARA MENU DE CONTEXTO (DEPREC IADO) ==========
         # Script HTML que escuta mensagens do iframe e atualiza session_state
+        # NOTA: Agora usando redirecionamento com query params, mais confiável
         st.components.v1.html("""
         <script>
-            // Listener para mensagens postMessage do iframe do Gantt
-            window.addEventListener('message', function(event) {
-                // Verificar se a mensagem é de criação de baseline
-                if (event.data && event.data.type === 'CREATE_BASELINE') {
-                    console.log('📨 Mensagem recebida do Gantt:', event.data);
-                    
-                    const empreendimento = event.data.empreendimento;
-                    
-                    // Armazenar no localStorage para persistência entre reloads
-                    localStorage.setItem('pending_baseline_creation', JSON.stringify({
-                        empreendimento: empreendimento,
-                        timestamp: event.data.timestamp,
-                        created_at: new Date().toISOString()
-                    }));
-                    
-                    console.log('✅ Baseline pendente salva no localStorage:', empreendimento);
-                    
-                    // Exibir alerta visual
-                    alert('📸 Solicitação de Baseline Recebida!\\n\\n' +
-                          'Empreendimento: ' + empreendimento + '\\n\\n' +
-                          'Por favor, vá até a Tab 3 (Linhas de Base) para finalizar a criação.');
-                }
-            });
-            
-            console.log('✅ Listener de postMessage ativado');
+            console.log('✅ Menu de contexto usa redirecionamento direto (não postMessage)');
         </script>
         """, height=0)
         
