@@ -4509,6 +4509,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     ">
                         {baseline_rows_html}
                     </div>
+                    <div class="baseline-resize-corner" title="Arrastar para redimensionar"></div>
                 </div>
 
                 <style>
@@ -4540,6 +4541,21 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         overflow: hidden;
                         text-overflow: ellipsis;
                         white-space: nowrap;
+                    }}
+                    
+                    .baseline-resize-corner {{
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        width: 20px;
+                        height: 20px;
+                        cursor: nwse-resize;
+                        background: linear-gradient(135deg, transparent 50%, #cbd5e0 50%);
+                        border-bottom-left-radius: 8px;
+                    }}
+                    
+                    .baseline-resize-corner:hover {{
+                        background: linear-gradient(135deg, transparent 50%, #4299e1 50%);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp {{
@@ -5577,6 +5593,48 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                 }}
                 
+                // Configurar redimensionamento arrastável
+                function setupBaselineResize() {{
+                    const corner = document.querySelector('.baseline-resize-corner');
+                    const selector = document.getElementById('baseline-selector-{project["id"]}');
+                    
+                    if (!corner || !selector) return;
+                    
+                    let isResizing = false;
+                    let startX = 0;
+                    let startWidth = 0;
+                    
+                    corner.addEventListener('mousedown', function(e) {{
+                        isResizing = true;
+                        startX = e.clientX;
+                        startWidth = selector.offsetWidth;
+                        
+                        // Prevenir seleção de texto
+                        e.preventDefault();
+                        e.stopPropagation();
+                        document.body.style.userSelect = 'none';
+                        document.body.style.cursor = 'nwse-resize';
+                    }});
+                    
+                    document.addEventListener('mousemove', function(e) {{
+                        if (!isResizing) return;
+                        
+                        // Calcular nova largura (arrastar para esquerda diminui, direita aumenta)
+                        const diff = startX - e.clientX; // Invertido porque é borda esquerda
+                        const newWidth = Math.max(250, Math.min(600, startWidth + diff));
+                        selector.style.width = `${{newWidth}}px`;
+                    }});
+                    
+                    document.addEventListener('mouseup', function() {{
+                        if (isResizing) {{
+                            isResizing = false;
+                            document.body.style.userSelect = '';
+                            document.body.style.cursor = '';
+                        }}
+                    }});
+                }}
+
+                
                 // Event Listeners para baseline
                 function setupBaselineListeners() {{
                     const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
@@ -5615,6 +5673,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 // Inicializar o Gantt Consolidado
                 initGantt();
                 setupBaselineListeners();  // *** NOVO: Ativar event listeners de baseline ***
+                setupBaselineResize();      // *** NOVO: Ativar redimensionamento arrastável ***
             </script>
         </body>
         </html>
