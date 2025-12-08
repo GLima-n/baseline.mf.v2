@@ -345,39 +345,39 @@ def process_context_menu_actions(df=None):
         raw_emp = query_params.get('empreendimento', None)
         empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        print(f"🔔 BACKEND: Recebido comando de criação de baseline para '{empreendimento}'")
+        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
 
-        # 2. Garantia de Dados
+        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
         if df is None or df.empty:
-            print("⚠️ Carregando dados...")
+            print("⚠️ Sessão Iframe. Carregando dados...")
             try:
-                df = load_data()
+                df = load_data() # Sua função de carregar Excel/SQL
             except Exception as e:
-                print(f"❌ Erro ao carregar dados: {e}")
-                st.error(f"❌ Erro ao carregar dados: {e}")
-                st.query_params.clear()
+                print(f"❌ Erro load_data: {e}")
                 return
 
-        # 3. Executa criação da baseline
+        # 3. Executa Salvamento
+        if empreendimento and df is not None:
+            try:
+                # Cria a baseline (usa sua função take_gantt_baseline existente)
+                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
+                print(f"✅ FINALIZADO: {version_name} criado.")
+                # Limpa URL
+                st.query_params.clear()
+            except Exception as e:
+                print(f"❌ Erro take_gantt_baseline: {e}")
+
+        # 4. Executa a criação
         if empreendimento and df is not None and not df.empty:
             try:
                 # Cria e Salva no MySQL
                 version_name = take_gantt_baseline(df, empreendimento, "Gantt")
-                print(f"✅ SUCESSO: Baseline '{version_name}' criada para '{empreendimento}'!")
-                
-                # Feedback visual para o usuário
-                st.success(f"✅ Linha de Base **{version_name}** criada com sucesso para **{empreendimento}**!")
+                print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
                 
                 # Limpa params para não repetir na próxima carga
                 st.query_params.clear()
                 
-                # Força atualização da página
-                st.rerun()
-                
             except Exception as e:
-                print(f"❌ Erro ao criar baseline: {e}")
-                st.error(f"❌ Erro ao criar baseline: {e}")
-                st.query_params.clear()
                 print(f"❌ Erro ao salvar baseline: {e}")
         else:
             print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
@@ -3838,111 +3838,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     console.log('Tasks base:', allTasks_baseData);
                     console.log('Dados de baseline completos:', allBaselinesData);
                     
-                    // ========== MENU DE CONTEXTO ==========
-                    function setupContextMenu() {{
-                        const contextMenu = document.getElementById('context-menu');
-                        const ganttArea = document.getElementById('gantt-chart-content-{project["id"]}');
-                        const ctxBaselineBtn = document.getElementById('ctx-baseline');
-                        const toastLoading = document.getElementById('toast-loading');
-                        
-                        if (!contextMenu || !ganttArea) {{
-                            console.warn('Menu de contexto ou área do Gantt não encontrados');
-                            return;
-                        }}
-                        
-                        // Função para mostrar menu
-                        function showContextMenu(x, y) {{
-                            contextMenu.style.left = x + 'px';
-                            contextMenu.style.top = y + 'px';
-                            contextMenu.style.display = 'block';
-                        }}
-                        
-                        // Função para esconder menu
-                        function hideContextMenu() {{
-                            contextMenu.style.display = 'none';
-                        }}
-                        
-                        // Função para mostrar toast
-                        function showToast(message, duration = 3000) {{
-                            if (toastLoading) {{
-                                toastLoading.textContent = message;
-                                toastLoading.style.display = 'block';
-                                toastLoading.style.backgroundColor = '#2ecc71';
-                                toastLoading.style.padding = '15px 25px';
-                                toastLoading.style.fontSize = '14px';
-                                toastLoading.style.fontWeight = 'bold';
-                                setTimeout(() => {{
-                                    toastLoading.style.display = 'none';
-                                }}, duration);
-                            }}
-                        }}
-                        
-                        // Event: Botão direito na área do Gantt
-                        ganttArea.addEventListener('contextmenu', function(e) {{
-                            e.preventDefault();
-                            e.stopPropagation();
-                            showContextMenu(e.pageX, e.pageY);
-                        }});
-                        
-                        // Event: Clique em "Criar Linha de Base"
-                        if (ctxBaselineBtn) {{
-                            ctxBaselineBtn.addEventListener('click', function() {{
-                                hideContextMenu();
-                                
-                                // Obter nome do empreendimento atual
-                                const currentProjectName = projectData[0]?.name || 'Desconhecido';
-                                
-                                console.log('📸 Solicitando criação de baseline para:', currentProjectName);
-                                
-                                // Armazenar no localStorage para persistência
-                                localStorage.setItem('pending_baseline_creation', JSON.stringify({{
-                                    empreendimento: currentProjectName,
-                                    timestamp: new Date().getTime(),
-                                    created_at: new Date().toISOString()
-                                }}));
-                                
-                                console.log('✅ Pedido salvo no localStorage');
-                                
-                                // Exibir toast de sucesso
-                                showToast('📸 Pedido salvo! Vá para Tab 3 (Linhas de Base) para finalizar.', 5000);
-                                
-                                // Exibir alerta modal também
-                                setTimeout(() => {{
-                                    alert('📸 Solicitação de Baseline Salva!\\n\\n' +
-                                          'Empreendimento: ' + currentProjectName + '\\n\\n' +                    '👉 Vá para a Tab 3 (Linhas de Base)\\n' +
-                                          'O empreendimento será pré-selecionado automaticamente.\\n\\n' +
-                                          'Clique em "Criar Nova Linha de Base" para finalizar.');
-                                }}, 500);
-                            }});
-                        }}
-                        
-                        // Event: Clique fora do menu
-                        document.addEventListener('click', function(e) {{
-                            if (contextMenu && !contextMenu.contains(e.target)) {{
-                                hideContextMenu();
-                            }}
-                        }});
-                        
-                        // Event: ESC fecha menu
-                        document.addEventListener('keydown', function(e) {{
-                            if (e.key === 'Escape') {{
-                                hideContextMenu();
-                            }}
-                        }});
-                        
-                        // Prevenir menu padrão do navegador
-                        document.addEventListener('contextmenu', function(e) {{
-                            if (e.target.closest('#gantt-chart-content-{project["id"]}')) {{
-                                e.preventDefault();
-                            }}
-                        }}, true);
-                        
-                        console.log('✅ Menu de contexto configurado com sucesso (usando localStorage)');
-                    }}
-                    
                     // Inicializar o Gantt
                     initGantt();
-                    setupContextMenu();
                 </script>
             </body>
             </html>
@@ -6721,19 +6618,6 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
-        # ========== PROCESSAR CRIAÇÃO DE BASELINE VIA MENU DE CONTEXTO ==========
-        # Verifica se há query params de criação de baseline e processa automaticamente
-        process_context_menu_actions(df_para_exibir)
-        
-        # ========== LISTENER DE POSTMESSAGE PARA MENU DE CONTEXTO (DEPREC IADO) ==========
-        # Script HTML que escuta mensagens do iframe e atualiza session_state
-        # NOTA: Agora usando redirecionamento com query params, mais confiável
-        st.components.v1.html("""
-        <script>
-            console.log('✅ Menu de contexto usa redirecionamento direto (não postMessage)');
-        </script>
-        """, height=0)
-        
         
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
@@ -7212,133 +7096,6 @@ with st.spinner("Carregando e processando dados..."):
             if not empreendimentos_baseline:
                 st.warning("Nenhum empreendimento disponível")
             else:
-                # ========== DETECTOR DE BASELINE PENDENTE (SEM IFRAME) ==========
-                # Usa st.markdown direto na página, sem componente isolado
-                st.markdown("""
-                <div id="baseline-checker"></div>
-                <script>
-                (function() {
-                    console.log('🔍 Tab 3: Verificando baseline pendente (sem iframe)...');
-                    
-                    // Verificar se há baseline pendente
-                    const pendingBaseline = localStorage.getItem('pending_baseline_creation');
-                    
-                    if (pendingBaseline) {
-                        try {
-                            const data = JSON.parse(pendingBaseline);
-                            const empreendimento = data.empreendimento;
-                            const timestamp = new Date(data.created_at).toLocaleString('pt-BR');
-                            
-                            console.log('✅ Baseline pendente encontrada:', empreendimento);
-                            
-                            // Criar banner fixo (não precisa redirecionar!)
-                            const banner = document.createElement('div');
-                            banner.id = 'pending-baseline-banner';
-                            banner.innerHTML = `
-                                <div style="
-                                    position: fixed;
-                                    top: 70px;
-                                    left: 50%;
-                                    transform: translateX(-50%);
-                                    z-index: 999999;
-                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                                    color: white;
-                                    padding: 25px 35px;
-                                    border-radius: 15px;
-                                    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.5);
-                                    min-width: 450px;
-                                    max-width: 600px;
-                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                                    animation: slideDown 0.5s ease-out;
-                                ">
-                                    <div style="font-size: 32px; text-align: center; margin-bottom: 12px;">📸</div>
-                                    <div style="font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 10px;">
-                                        Baseline Pendente
-                                    </div>
-                                    <div style="font-size: 18px; color: #ffd700; text-align: center; margin-bottom: 12px; font-weight: 600;">
-                                        ${empreendimento}
-                                    </div>
-                                    <div style="font-size: 13px; opacity: 0.95; text-align: center; margin-bottom: 20px;">
-                                        Solicitado em: ${timestamp}
-                                    </div>
-                                    <div style="
-                                        background: rgba(255,255,255,0.15);
-                                        padding: 15px;
-                                        border-radius: 10px;
-                                        margin-bottom: 15px;
-                                        font-size: 14px;
-                                        line-height: 1.6;
-                                    ">
-                                        ✅ <strong>Passo 1:</strong> Selecione o empreendimento abaixo<br>
-                                        ✅ <strong>Passo 2:</strong> Clique em "Criar Baseline"
-                                    </div>
-                                    <div style="text-align: center;">
-                                        <button onclick="clearPendingBaseline()" style="
-                                            background: rgba(255,255,255,0.25);
-                                            border: 2px solid white;
-                                            color: white;
-                                            padding: 10px 20px;
-                                            border-radius: 8px;
-                                            cursor: pointer;
-                                            font-weight: bold;
-                                            font-size: 13px;
-                                            transition: all 0.2s;
-                                        " onmouseover="this.style.background='rgba(255,255,255,0.35)'" 
-                                           onmouseout="this.style.background='rgba(255,255,255,0.25)'">
-                                            ✖️ Cancelar Pedido
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                            
-                            // Adicionar animação
-                            const style = document.createElement('style');
-                            style.textContent = `
-                                @keyframes slideDown {
-                                    from {
-                                        opacity: 0;
-                                        transform: translateX(-50%) translateY(-30px);
-                                    }
-                                    to {
-                                        opacity: 1;
-                                        transform: translateX(-50%) translateY(0);
-                                    }
-                                }
-                            `;
-                            document.head.appendChild(style);
-                            
-                            // Adicionar ao body
-                            document.body.appendChild(banner);
-                            
-                            // Função para limpar
-                            window.clearPendingBaseline = function() {
-                                localStorage.removeItem('pending_baseline_creation');
-                                banner.style.animation = 'slideDown 0.3s ease-in reverse';
-                                setTimeout(() => banner.remove(), 300);
-                                console.log('✅ Pedido cancelado pelo usuário');
-                            };
-                            
-                            // Auto-remover após 60 segundos
-                            setTimeout(() => {
-                                if (document.getElementById('pending-baseline-banner')) {
-                                    banner.style.animation = 'slideDown 0.5s ease-in reverse';
-                                    setTimeout(() => banner.remove(), 500);
-                                }
-                            }, 60000);
-                            
-                            console.log('🎉 Banner exibido com sucesso!');
-                            
-                        } catch (e) {
-                            console.error('❌ Erro:', e);
-                            localStorage.removeItem('pending_baseline_creation');
-                        }
-                    } else {
-                        console.log('ℹ️  Nenhuma baseline pendente');
-                    }
-                })();
-                </script>
-                """, unsafe_allow_html=True)
-                
                 selected_empreendimento_baseline = st.selectbox(
                     "Selecione o Empreendimento",
                     empreendimentos_baseline,
