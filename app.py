@@ -4240,8 +4240,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 .toggle-sidebar-btn {{ background: rgba(255,255,255,0.2); border: none; color: white; width: 24px; height: 24px; border-radius: 5px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background-color 0.2s, transform 0.3s ease-in-out; }}
                 .toggle-sidebar-btn:hover {{ background: rgba(255,255,255,0.4); }}
                 .sidebar-grid-header-wrapper {{ display: grid; grid-template-columns: 0px 1fr; color: #d1d5db; font-size: 9px; font-weight: 600; text-transform: uppercase; height: 30px; align-items: center; }}
-                .sidebar-grid-header {{ display: grid; grid-template-columns: 0.6fr 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; padding: 0 10px; align-items: center; }}
-                .sidebar-row {{ display: grid; grid-template-columns: 0.6fr 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; }}
+                .sidebar-grid-header {{ display: grid; grid-template-columns: 2.5fr 0.6fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; padding: 0 10px; align-items: center; }}
+                .sidebar-row {{ display: grid; grid-template-columns: 2.5fr 0.6fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; }}
                 .sidebar-cell {{ display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4a5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; border: none; }}
                 .header-cell {{ text-align: center; }}
                 .header-cell.task-name-cell {{ text-align: left; }}
@@ -4259,7 +4259,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 .sidebar-cell.status-red   {{ color: #C0392B; font-weight: 700; }}
                 .sidebar-cell.status-yellow{{ color: #B9770E; font-weight: 700; }}
                 .sidebar-cell.status-default{{ color: #566573; font-weight: 700; }}
-                .sidebar-row .sidebar-cell:nth-child(1),
+                .sidebar-row .sidebar-cell:nth-child(2),
                 .sidebar-row .sidebar-cell:nth-child(3),
                 .sidebar-row .sidebar-cell:nth-child(4),
                 .sidebar-row .sidebar-cell:nth-child(5),
@@ -4677,8 +4677,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <div class="sidebar-grid-header-wrapper">
                                 <div style="width: 0px;"></div>
                                 <div class="sidebar-grid-header">
-                                    <div class="header-cell">UGB</div>
                                     <div class="header-cell task-name-cell">EMPREENDIMENTO</div>
+                                    <div class="header-cell">UGB</div>
                                     <div class="header-cell">INÍCIO-P</div>
                                     <div class="header-cell">TÉRMINO-P</div>
                                     <div class="header-cell">DUR-P</div>
@@ -4900,8 +4900,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         task.numero_etapa = globalRowIndex;
 
                         html += '<div class="sidebar-row ' + rowClass + '">' +
-                            '<div class="sidebar-cell">' + (task.ugb || 'N/D') + '</div>' +
                             '<div class="sidebar-cell task-name-cell" title="' + task.numero_etapa + '. ' + task.name + '">' + task.numero_etapa + '. ' + task.name + '</div>' +
+                            '<div class="sidebar-cell">' + (task.ugb || 'N/D') + '</div>' +
                             '<div class="sidebar-cell">' + task.inicio_previsto + '</div>' +
                             '<div class="sidebar-cell">' + task.termino_previsto + '</div>' +
                             '<div class="sidebar-cell">' + task.duracao_prev_meses + '</div>' +
