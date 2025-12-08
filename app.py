@@ -4565,6 +4565,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         border-width: 0 0 16px 16px;
                         border-color: transparent transparent #cbd5e0 transparent;
                         border-bottom-left-radius: 8px;
+                        transform: rotate(-45deg);
+                        transform-origin: bottom left;
                     }}
                     
                     .baseline-resize-corner:hover::before {{
