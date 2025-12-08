@@ -4006,7 +4006,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         Inicio_Real=('Inicio_Real', 'min'),
         Termino_Real=('Termino_Real', 'max'),
         **{'% concluído': ('% concluído', 'max')},
-        SETOR=('SETOR', 'first')
+        SETOR=('SETOR', 'first'),
+        UGB=('UGB', 'first')
     ).reset_index()
     
     all_data_by_stage_js = {}
@@ -4049,6 +4050,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
             task = {
                 "id": f"t{j}_{i}", # ID único
                 "name": row["Empreendimento"], # O 'name' ainda é o Empreendimento
+                "ugb": row.get("UGB", "N/D"),
                 "numero_etapa": j + 1,
                 "start_previsto": start_date.strftime("%Y-%m-%d"),
                 "end_previsto": end_date.strftime("%Y-%m-%d"),
