@@ -5321,7 +5321,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     const baselineData = task.baselines[baselineName];
                     
-                    if (baselineData.start !== null \u0026\u0026 baselineData.end !== null) {{
+                    if (baselineData.start !== null && baselineData.end !== null) {{
                         // Atualizar datas previstas
                         task.start_previsto = baselineData.start;
                         task.end_previsto = baselineData.end;
@@ -5333,16 +5333,16 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Recalcular duração
                         const startDate = parseDate(task.start_previsto);
                         const endDate = parseDate(task.end_previsto);
-                        if (startDate \u0026\u0026 endDate) {{
+                        if (startDate && endDate) {{
                             const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
                             task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
                         }}
                         
                         // Recalcular VT (Variação de Término)
-                        if (task.end_real_original_raw \u0026\u0026 task.end_previsto) {{
+                        if (task.end_real_original_raw && task.end_previsto) {{
                             const endReal = parseDate(task.end_real_original_raw);
                             const endPrev = parseDate(task.end_previsto);
-                            if (endReal \u0026\u0026 endPrev) {{
+                            if (endReal && endPrev) {{
                                 const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
                                 task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
                             }}
