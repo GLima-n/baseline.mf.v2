@@ -4174,30 +4174,47 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         
     altura_gantt = max(400, (len(empreendimentos_no_df) * 30) + 150)
 
-    # *** NOVO: Preparar baseline options para o consolidado ***
-    baseline_options_consolidado = []
-    baselines_por_empreendimento_consolidado = {}
+    # *** MODIFICADO: Preparar baselines individuais por empreendimento ***
+    baselines_por_empreendimento_html = {}
     
     try:
         all_baselines_dict = load_baselines()
         for emp in empreendimentos_no_df:
             emp_baseline_options = get_baseline_options(emp)
-            if emp_baseline_options:
-                baselines_por_empreendimento_consolidado[emp] = emp_baseline_options
-                # Unir todas as opções (sem duplicatas)
-                for opt in emp_baseline_options:
-                    if opt not in baseline_options_consolidado:
-                        baseline_options_consolidado.append(opt)
+            if not emp_baseline_options or len(emp_baseline_options) == 0:
+                emp_baseline_options = ["P0-(padrão)"]
+            else:
+                # Garantir que P0 está na lista
+                if "P0-(padrão)" not in emp_baseline_options:
+                    emp_baseline_options.insert(0, "P0-(padrão)")
+            
+            baselines_por_empreendimento_html[emp] = emp_baseline_options
     except Exception as e:
         print(f"Erro ao carregar baseline options no consolidado: {e}")
+        # Fallback: P0 para todos
+        for emp in empreendimentos_no_df:
+            baselines_por_empreendimento_html[emp] = ["P0-(padrão)"]
     
-    # Sempre incluir P0 no início
-    if "P0-(padrão)" not in baseline_options_consolidado:
-        baseline_options_consolidado.insert(0, "P0-(padrão)")
-    else:
-        # Garantir que P0 está no início
-        baseline_options_consolidado.remove("P0-(padrão)")
-        baseline_options_consolidado.insert(0, "P0-(padrão)")
+    # Gerar HTML dos dropdowns por empreendimento
+    baseline_rows_html = ""
+    for emp in empreendimentos_no_df:
+        emp_options = baselines_por_empreendimento_html.get(emp, ["P0-(padrão)"])
+        emp_safe = emp.replace("'", "\\'").replace('"', '&quot;')  # Escapar aspas
+        
+        options_html = "".join([
+            f'<option value="{opt}">{opt}</option>' 
+            for opt in emp_options
+        ])
+        
+        baseline_rows_html += f"""
+        <div class="baseline-row" data-empreendimento="{emp_safe}">
+            <label title="{emp_safe}">{emp}</label>
+            <select class="baseline-dropdown-emp" data-emp="{emp_safe}" onchange="applyBaselineForEmp('{emp_safe}', this.value)">
+                {options_html}
+            </select>
+        </div>
+        """
+
 
     # --- 4. Geração do HTML/JS Corrigido ---
     gantt_html = f"""
@@ -4454,41 +4471,64 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     padding: 15px;
                     border: 1px solid #e2e8f0;
                 ">
-                    <div style="margin-bottom: 10px; font-weight: 600; color: #2d3748;">
-                        Baseline Ativa: <span id="current-baseline-consolidado-{project['id']}">P0-(padrão)</span>
+                    <div style="margin-bottom: 10px; font-weight: 600; color: #2d3748; font-size: 13px;">
+                        Selecionar Baselines por Empreendimento
                     </div>
-                    <label for="baseline-dropdown-consolidado-{project['id']}" style="
-                        display: block;
+                    <div class="baseline-selector-table" style="
+                        max-height: 400px;
+                        overflow-y: auto;
+                        margin-top: 10px;
+                    ">
+                        {baseline_rows_html}
+                    </div>
+                </div>
+
+                <style>
+                    .baseline-row {{
+                        display: grid;
+                        grid-template-columns: 1.2fr 1fr;
+                        gap: 8px;
+                        padding: 6px 0;
+                        border-bottom: 1px solid #e2e8f0;
+                        align-items: center;
+                    }}
+                    
+                    .baseline-row:last-child {{
+                        border-bottom: none;
+                    }}
+                    
+                    .baseline-row label {{
                         font-size: 11px;
-                        font-weight: 600;
-                        color: #4a5568;
-                        margin-bottom: 4px;
-                        text-transform: uppercase;
-                    ">Selecionar Linha de Base</label>
-                    <select id="baseline-dropdown-consolidado-{project['id']}" style="
+                        font-weight: 500;
+                        color: #2d3748;
+                        display: flex;
+                        align-items: center;
+                        padding-left: 5px;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        white-space: nowrap;
+                    }}
+                    
+                    .baseline-row select.baseline-dropdown-emp {{
                         width: 100%;
-                        padding: 6px 8px;
+                        padding: 4px 6px;
                         border: 1px solid #cbd5e0;
                         border-radius: 4px;
-                        font-size: 13px;
-                        margin-bottom: 10px;
-                    ">
-                        {"".join([f'<option value="{name}">{name}</option>' for name in baseline_options_consolidado])}
-                    </select>
-                    <button onclick="switchBaselineConsolidado(document.getElementById('baseline-dropdown-consolidado-{project['id']}').value)" style="
-                        width: 100%;
-                        padding: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        color: white;
-                        background-color: #2d3748;
-                        border: none;
-                        border-radius: 4px;
+                        font-size: 10px;
+                        background-color: white;
                         cursor: pointer;
-                    ">
-                        Aplicar Linha de Base
-                    </button>
-                </div>
+                    }}
+                    
+                    .baseline-row select.baseline-dropdown-emp:hover {{
+                        border-color: #a0aec0;
+                    }}
+                    
+                    .baseline-row select.baseline-dropdown-emp:focus {{
+                        outline: none;
+                        border-color: #4299e1;
+                        box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.1);
+                    }}
+                </style>
 
                 <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                     
@@ -4722,6 +4762,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     // NOTA: applyInitialPulmaoState foi movida para DENTRO de initGantt
                     applyInitialPulmaoState(); 
+                    
+                    // Inicializar estado de baselines por empreendimento
+                    initializeBaselineState();
                     
                     renderSidebar();
                     renderHeader();
@@ -5234,13 +5277,25 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // Reload page with new parameters
                     window.location.href = url.toString();
+                
+                // *** BASELINE INDIVIDUAL POR EMPREENDIMENTO (MODIFICADO) ***
+                // Mapa para rastrear baseline ativa de cada empreendimento
+                let baselinesPorEmpreendimento = {{}};
+                
+                // Inicializar estado com P0 para todos
+                function initializeBaselineState() {{
+                    const tasks = projectData[0].tasks;
+                    if (tasks) {{
+                        tasks.forEach(task => {{
+                            baselinesPorEmpreendimento[task.name] = "P0-(padrão)";
+                        }});
+                    }}
+                    console.log('Estado de baselines inicializado:', baselinesPorEmpreendimento);
                 }}
                 
-                // *** BASELINE SWITCHING PARA CONSOLIDADO (NOVO) ***
-                let currentActiveBaselineConsolidado = 'P0-(padrão)';
-                
-                function switchBaselineConsolidado(baselineName) {{
-                    console.log(`🔄 Trocando baseline consolidado para: ${{baselineName}}`);
+                // Aplicar baseline para um empreendimento específico
+                function applyBaselineForEmp(empreendimento, baselineName) {{
+                    console.log(`🔄 Aplicando baseline "${{baselineName}}" para: ${{empreendimento}}`);
                     
                     const tasks = projectData[0].tasks;
                     if (!tasks || tasks.length === 0) {{
@@ -5248,79 +5303,67 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         return;
                     }}
                     
-                    let updated = 0;
-                    let cleared = 0;
+                    // Atualizar estado
+                    baselinesPorEmpreendimento[empreendimento] = baselineName;
                     
-                    tasks.forEach(task => {{
-                        if (!task.baselines || !task.baselines[baselineName]) {{
-                            console.warn(`Task ${{task.name}} não tem baseline ${{baselineName}}`);
-                            return;
-                        }}
-                        
-                        const baselineData = task.baselines[baselineName];
-                        
-                        if (baselineData.start !== null && baselineData.end !== null) {{
-                            // Atualizar datas previstas
-                            task.start_previsto = baselineData.start;
-                            task.end_previsto = baselineData.end;
-                            
-                            // Recalcular campos de exibição
-                            task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                            task.termino_previsto = formatDateDisplay(task.end_previsto);
-                            
-                            // Recalcular duração
-                            const startDate = parseDate(task.start_previsto);
-                            const endDate = parseDate(task.end_previsto);
-                            if (startDate && endDate) {{
-                                const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
-                                task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
-                            }}
-                            
-                            // Recalcular VT (Variação de Término)
-                            if (task.end_real_original_raw && task.end_previsto) {{
-                                const endReal = parseDate(task.end_real_original_raw);
-                                const endPrev = parseDate(task.end_previsto);
-                                if (endReal && endPrev) {{
-                                    const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
-                                    task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
-                                }}
-                            }}
-                            
-                            updated++;
-                        }} else {{
-                            // Baseline não tem dados para esta etapa
-                            task.start_previsto = null;
-                            task.end_previsto = null;
-                            task.inicio_previsto = "N/D";
-                            task.termino_previsto = "N/D";
-                            task.duracao_prev_meses = "-";
-                            task.vt_text = "-";
-                            cleared++;
-                        }}
-                    }});
+                    // Encontrar a task deste empreendimento
+                    const task = tasks.find(t => t.name === empreendimento);
                     
-                    // Atualizar indicador
-                    const indicator = document.getElementById('current-baseline-consolidado-{project["id"]}');
-                    if (indicator) {{
-                        indicator.textContent = baselineName;
+                    if (!task) {{
+                        console.warn(`Task não encontrada para empreendimento: ${{empreendimento}}`);
+                        return;
                     }}
                     
-                    // Atualizar título do projeto
-                    const titleElement = document.querySelector('.project-title-row span');
-                    if (titleElement) {{
-                        const baseName = titleElement.textContent.split(' - 📊')[0];
-                        titleElement.textContent = baselineName === 'P0-(padrão)'  
-                            ? baseName 
-                            : `${{baseName}} - 📊 ${{baselineName}}`;
+                    if (!task.baselines || !task.baselines[baselineName]) {{
+                        console.warn(`Task ${{task.name}} não tem baseline ${{baselineName}}`);
+                        return;
+                    }}
+                    
+                    const baselineData = task.baselines[baselineName];
+                    
+                    if (baselineData.start !== null \u0026\u0026 baselineData.end !== null) {{
+                        // Atualizar datas previstas
+                        task.start_previsto = baselineData.start;
+                        task.end_previsto = baselineData.end;
+                        
+                        // Recalcular campos de exibição
+                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                        task.termino_previsto = formatDateDisplay(task.end_previsto);
+                        
+                        // Recalcular duração
+                        const startDate = parseDate(task.start_previsto);
+                        const endDate = parseDate(task.end_previsto);
+                        if (startDate \u0026\u0026 endDate) {{
+                            const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                            task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                        }}
+                        
+                        // Recalcular VT (Variação de Término)
+                        if (task.end_real_original_raw \u0026\u0026 task.end_previsto) {{
+                            const endReal = parseDate(task.end_real_original_raw);
+                            const endPrev = parseDate(task.end_previsto);
+                            if (endReal \u0026\u0026 endPrev) {{
+                                const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                            }}
+                        }}
+                        
+                        console.log(`✅ Baseline aplicada para ${{empreendimento}}: ${{baselineName}}`);
+                    }} else {{
+                        // Baseline não tem dados para esta etapa
+                        task.start_previsto = null;
+                        task.end_previsto = null;
+                        task.inicio_previsto = "N/D";
+                        task.termino_previsto = "N/D";
+                        task.duracao_prev_meses = "-";
+                        task.vt_text = "-";
+                        
+                        console.log(`⚠️ Baseline ${{baselineName}} não tem dados para ${{empreendimento}}`);
                     }}
                     
                     // Re-renderizar
                     renderSidebar();
                     renderChart();
-                    
-                    currentActiveBaselineConsolidado = baselineName;
-                    
-                    console.log(`✅ Baseline aplicada: ${{updated}} atualizadas, ${{cleared}} limpas`);
                 }}
                 
                 // Event Listeners para baseline
