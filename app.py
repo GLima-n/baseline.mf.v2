@@ -4199,7 +4199,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
     for emp in empreendimentos_no_df:
         emp_options = baselines_por_empreendimento_html.get(emp, ["P0-(padrão)"])
         # Usar JSON para escape seguro
-        emp_json = json.dumps(emp)  # Escape seguro para JavaScript
+        emp_json = json.dumps(emp)  # Gera "Nome do Emp" com aspas duplas
         
         options_html = "".join([
             f'<option value="{opt}">{opt}</option>' 
@@ -4209,7 +4209,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         baseline_rows_html += f"""
         <div class="baseline-row" data-empreendimento="{emp}">
             <label title="{emp}">{emp}</label>
-            <select class="baseline-dropdown-emp" data-emp="{emp}" onchange="applyBaselineForEmp({emp_json}, this.value)">
+            <select class="baseline-dropdown-emp" data-emp="{emp}" onchange='applyBaselineForEmp({emp_json}, this.value)'>
                 {options_html}
             </select>
         </div>
