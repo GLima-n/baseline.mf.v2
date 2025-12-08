@@ -4470,6 +4470,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     top: 10px;
                     right: 50px;
                     width: 280px;
+                    min-height: 200px;
                     background: white;
                     border-radius: 8px;
                     box-shadow: 0 5px 15px rgba(0,0,0,0.3);
@@ -4547,15 +4548,40 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         position: absolute;
                         bottom: 0;
                         left: 0;
-                        width: 20px;
-                        height: 20px;
+                        width: 16px;
+                        height: 16px;
                         cursor: nwse-resize;
-                        background: linear-gradient(135deg, transparent 50%, #cbd5e0 50%);
+                        z-index: 100;
+                    }}
+                    
+                    .baseline-resize-corner::before {{
+                        content: '';
+                        position: absolute;
+                        bottom: 0;
+                        left: 0;
+                        width: 0;
+                        height: 0;
+                        border-style: solid;
+                        border-width: 0 0 16px 16px;
+                        border-color: transparent transparent #cbd5e0 transparent;
                         border-bottom-left-radius: 8px;
                     }}
                     
-                    .baseline-resize-corner:hover {{
-                        background: linear-gradient(135deg, transparent 50%, #4299e1 50%);
+                    .baseline-resize-corner:hover::before {{
+                        border-color: transparent transparent #4299e1 transparent;
+                    }}
+                    
+                    .baseline-resize-corner::after {{
+                        content: '';
+                        position: absolute;
+                        bottom: 2px;
+                        left: 2px;
+                        width: 10px;
+                        height: 10px;
+                        background: 
+                            linear-gradient(135deg, transparent 48%, white 48%, white 52%, transparent 52%),
+                            linear-gradient(135deg, transparent 56%, white 56%, white 60%, transparent 60%),
+                            linear-gradient(135deg, transparent 64%, white 64%, white 68%, transparent 68%);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp {{
@@ -5597,17 +5623,22 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 function setupBaselineResize() {{
                     const corner = document.querySelector('.baseline-resize-corner');
                     const selector = document.getElementById('baseline-selector-{project["id"]}');
+                    const table = selector ? selector.querySelector('.baseline-selector-table') : null;
                     
-                    if (!corner || !selector) return;
+                    if (!corner || !selector || !table) return;
                     
                     let isResizing = false;
                     let startX = 0;
+                    let startY = 0;
                     let startWidth = 0;
+                    let startHeight = 0;
                     
                     corner.addEventListener('mousedown', function(e) {{
                         isResizing = true;
                         startX = e.clientX;
+                        startY = e.clientY;
                         startWidth = selector.offsetWidth;
+                        startHeight = table.offsetHeight;
                         
                         // Prevenir seleção de texto
                         e.preventDefault();
@@ -5620,9 +5651,14 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         if (!isResizing) return;
                         
                         // Calcular nova largura (arrastar para esquerda diminui, direita aumenta)
-                        const diff = startX - e.clientX; // Invertido porque é borda esquerda
-                        const newWidth = Math.max(250, Math.min(600, startWidth + diff));
+                        const diffX = startX - e.clientX; // Invertido porque é borda esquerda
+                        const newWidth = Math.max(250, Math.min(600, startWidth + diffX));
                         selector.style.width = `${{newWidth}}px`;
+                        
+                        // Calcular nova altura (arrastar para baixo aumenta, cima diminui)
+                        const diffY = e.clientY - startY;
+                        const newHeight = Math.max(150, Math.min(600, startHeight + diffY));
+                        table.style.maxHeight = `${{newHeight}}px`;
                     }});
                     
                     document.addEventListener('mouseup', function() {{
@@ -5633,6 +5669,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }});
                 }}
+
 
                 
                 // Event Listeners para baseline
