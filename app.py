@@ -7212,96 +7212,132 @@ with st.spinner("Carregando e processando dados..."):
             if not empreendimentos_baseline:
                 st.warning("Nenhum empreendimento disponível")
             else:
-                # ========== VERIFICAR BASELINE PENDENTE E REDIRECIONAR ==========
-                # Componente que lê localStorage e redireciona com query params
-                st.components.v1.html("""
+                # ========== DETECTOR DE BASELINE PENDENTE (SEM IFRAME) ==========
+                # Usa st.markdown direto na página, sem componente isolado
+                st.markdown("""
+                <div id="baseline-checker"></div>
                 <script>
                 (function() {
-                    console.log('🔍 Tab 3: Verificando baseline pendente...');
+                    console.log('🔍 Tab 3: Verificando baseline pendente (sem iframe)...');
                     
                     // Verificar se há baseline pendente
                     const pendingBaseline = localStorage.getItem('pending_baseline_creation');
                     
-                    // Verificar se já processamos (para evitar loop)
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const alreadyNotified = urlParams.get('baseline_notification');
-                    
-                    if (pendingBaseline && !alreadyNotified) {
+                    if (pendingBaseline) {
                         try {
                             const data = JSON.parse(pendingBaseline);
                             const empreendimento = data.empreendimento;
+                            const timestamp = new Date(data.created_at).toLocaleString('pt-BR');
                             
                             console.log('✅ Baseline pendente encontrada:', empreendimento);
-                            console.log('🔄 Redirecionando para notificar Python...');
                             
-                            // Redirecionar página PAI (não o iframe) com query param
-                            const encodedEmp = encodeURIComponent(empreendimento);
-                            const currentUrl = window.location.href.split('?')[0];
-                            const newUrl = currentUrl + '?baseline_notification=true&pending_emp=' + encodedEmp;
+                            // Criar banner fixo (não precisa redirecionar!)
+                            const banner = document.createElement('div');
+                            banner.id = 'pending-baseline-banner';
+                            banner.innerHTML = `
+                                <div style="
+                                    position: fixed;
+                                    top: 70px;
+                                    left: 50%;
+                                    transform: translateX(-50%);
+                                    z-index: 999999;
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    color: white;
+                                    padding: 25px 35px;
+                                    border-radius: 15px;
+                                    box-shadow: 0 10px 40px rgba(102, 126, 234, 0.5);
+                                    min-width: 450px;
+                                    max-width: 600px;
+                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                    animation: slideDown 0.5s ease-out;
+                                ">
+                                    <div style="font-size: 32px; text-align: center; margin-bottom: 12px;">📸</div>
+                                    <div style="font-size: 20px; font-weight: bold; text-align: center; margin-bottom: 10px;">
+                                        Baseline Pendente
+                                    </div>
+                                    <div style="font-size: 18px; color: #ffd700; text-align: center; margin-bottom: 12px; font-weight: 600;">
+                                        ${empreendimento}
+                                    </div>
+                                    <div style="font-size: 13px; opacity: 0.95; text-align: center; margin-bottom: 20px;">
+                                        Solicitado em: ${timestamp}
+                                    </div>
+                                    <div style="
+                                        background: rgba(255,255,255,0.15);
+                                        padding: 15px;
+                                        border-radius: 10px;
+                                        margin-bottom: 15px;
+                                        font-size: 14px;
+                                        line-height: 1.6;
+                                    ">
+                                        ✅ <strong>Passo 1:</strong> Selecione o empreendimento abaixo<br>
+                                        ✅ <strong>Passo 2:</strong> Clique em "Criar Baseline"
+                                    </div>
+                                    <div style="text-align: center;">
+                                        <button onclick="clearPendingBaseline()" style="
+                                            background: rgba(255,255,255,0.25);
+                                            border: 2px solid white;
+                                            color: white;
+                                            padding: 10px 20px;
+                                            border-radius: 8px;
+                                            cursor: pointer;
+                                            font-weight: bold;
+                                            font-size: 13px;
+                                            transition: all 0.2s;
+                                        " onmouseover="this.style.background='rgba(255,255,255,0.35)'" 
+                                           onmouseout="this.style.background='rgba(255,255,255,0.25)'">
+                                            ✖️ Cancelar Pedido
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
                             
-                            // Tentar diferentes métodos de redirecionamento
-                            try {
-                                // Método 1: Tentar parent
-                                if (window.parent && window.parent !== window) {
-                                    window.parent.location.href = newUrl;
-                                } else {
-                                    // Método 2: Própria janela
-                                    window.location.href = newUrl;
+                            // Adicionar animação
+                            const style = document.createElement('style');
+                            style.textContent = `
+                                @keyframes slideDown {
+                                    from {
+                                        opacity: 0;
+                                        transform: translateX(-50%) translateY(-30px);
+                                    }
+                                    to {
+                                        opacity: 1;
+                                        transform: translateX(-50%) translateY(0);
+                                    }
                                 }
-                            } catch (e) {
-                                // Método 3: window.top
-                                try {
-                                    window.top.location.href = newUrl;
-                                } catch (e2) {
-                                    console.error('❌ Não foi possível redirecionar:', e2);
-                                    // Fallback: apenas loga
-                                    console.log('💡 Por favor, selecione:', empreendimento);
+                            `;
+                            document.head.appendChild(style);
+                            
+                            // Adicionar ao body
+                            document.body.appendChild(banner);
+                            
+                            // Função para limpar
+                            window.clearPendingBaseline = function() {
+                                localStorage.removeItem('pending_baseline_creation');
+                                banner.style.animation = 'slideDown 0.3s ease-in reverse';
+                                setTimeout(() => banner.remove(), 300);
+                                console.log('✅ Pedido cancelado pelo usuário');
+                            };
+                            
+                            // Auto-remover após 60 segundos
+                            setTimeout(() => {
+                                if (document.getElementById('pending-baseline-banner')) {
+                                    banner.style.animation = 'slideDown 0.5s ease-in reverse';
+                                    setTimeout(() => banner.remove(), 500);
                                 }
-                            }
+                            }, 60000);
+                            
+                            console.log('🎉 Banner exibido com sucesso!');
                             
                         } catch (e) {
-                            console.error('❌ Erro ao processar baseline pendente:', e);
+                            console.error('❌ Erro:', e);
                             localStorage.removeItem('pending_baseline_creation');
                         }
-                    } else if (alreadyNotified) {
-                        console.log('ℹ️  Notificação já processada');
                     } else {
                         console.log('ℹ️  Nenhuma baseline pendente');
                     }
                 })();
                 </script>
-                """, height=50)
-                
-                # ========== PROCESSAR NOTIFICAÇÃO DE BASELINE PENDENTE ==========
-                query_params = st.query_params
-                pending_emp = query_params.get('pending_emp')
-                
-                if pending_emp and query_params.get('baseline_notification') == 'true':
-                    empreendimento_pendente = urllib.parse.unquote(pending_emp)
-                    
-                    # Exibir alerta de sucesso
-                    st.info(f"""
-                    ### 📸 Baseline Pendente Detectada!
-                    
-                    **Empreendimento:** {empreendimento_pendente}
-                    
-                    👇 Selecione o empreendimento abaixo e clique em "Criar Baseline"
-                    """)
-                    
-                    # Adicionar botão para limpar notificação
-                    col1, col2 = st.columns([3, 1])
-                    with col2:
-                        if st.button("✖️ Limpar Notificação", key="clear_notification"):
-                            # Limpar query params
-                            st.query_params.clear()
-                            # JavaScript para limpar localStorage
-                            st.components.v1.html("""
-                            <script>
-                                localStorage.removeItem('pending_baseline_creation');
-                                console.log('✅ Notificação limpa');
-                            </script>
-                            """, height=0)
-                            st.rerun()
+                """, unsafe_allow_html=True)
                 
                 selected_empreendimento_baseline = st.selectbox(
                     "Selecione o Empreendimento",
