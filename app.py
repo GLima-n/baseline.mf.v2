@@ -4578,10 +4578,12 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         left: 2px;
                         width: 10px;
                         height: 10px;
+                        transform: rotate(-45deg);
+                        transform-origin: center;
                         background: 
-                            linear-gradient(135deg, transparent 48%, white 48%, white 52%, transparent 52%),
-                            linear-gradient(135deg, transparent 56%, white 56%, white 60%, transparent 60%),
-                            linear-gradient(135deg, transparent 64%, white 64%, white 68%, transparent 68%);
+                            linear-gradient(90deg, transparent 48%, white 48%, white 52%, transparent 52%),
+                            linear-gradient(90deg, transparent 56%, white 56%, white 60%, transparent 60%),
+                            linear-gradient(90deg, transparent 64%, white 64%, white 68%, transparent 68%);
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp {{
