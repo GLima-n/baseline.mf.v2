@@ -6590,8 +6590,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
             .tooltip {{ position: absolute; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
             .tooltip.show {{ opacity: 1; }}
-            .today-line {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
-            .month-divider {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fcf6f6; z-index: 4; pointer-events: none; }}
+            .today-line {{ position: absolute; top: 0; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
+            .month-divider {{ position: absolute; top: 0; bottom: 0; width: 1px; background-color: #fcf6f6; z-index: 4; pointer-events: none; }}
             .month-divider.first {{ background-color: #eeeeee; width: 1px; }}
             .gantt-toolbar {{
                 position: absolute; top: 10px; right: 10px;
