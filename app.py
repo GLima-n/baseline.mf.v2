@@ -7951,31 +7951,24 @@ with st.spinner("Carregando e processando dados..."):
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                # Botão Por Projeto (ativo quando ambos são False)
-                is_project = not st.session_state.consolidated_view and not st.session_state.sector_view
                 st.button(
-                    "📁 Por Projeto", 
+                    "Por Projeto", 
                     on_click=set_project_view, 
-                    use_container_width=True,
-                    type="primary" if is_project else "secondary"
+                    use_container_width=True
                 )
             
             with col2:
-                # Botão Consolidado (ativo quando consolidated_view é True)
                 st.button(
-                    "📊 Consolidado", 
+                    "Por Etapa", 
                     on_click=set_consolidated_view, 
-                    use_container_width=True,
-                    type="primary" if st.session_state.consolidated_view else "secondary"
+                    use_container_width=True
                 )
             
             with col3:
-                # Botão Por Setor (ativo quando sector_view é True)
                 st.button(
-                    "🏢 Por Setor", 
+                    "Por Setor", 
                     on_click=set_sector_view, 
-                    use_container_width=True,
-                    type="primary" if st.session_state.sector_view else "secondary"
+                    use_container_width=True
                 )
             
             # Mensagens centralizadas
