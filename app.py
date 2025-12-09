@@ -2962,9 +2962,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 <div class="radial-background-circle"></div>
                                 
                                 <!-- Centro com play button -->
-                                <div class="radial-center" title="Menu Radial">
-                                    <div class="radial-center-play"></div>
-                                </div>
+                                <div class="radial-center" title="Menu Radial"></div>
                                 
                                 <!-- Topo: Move Tool (Criar Baseline) -->
                                 <div class="radial-item" id="btn-create-baseline" style="top: 34px; left: 114px;">
