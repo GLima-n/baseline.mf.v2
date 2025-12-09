@@ -7036,15 +7036,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 const monthHeader = document.createElement('div');
                 monthHeader.className = 'month-header';
                 
-                const meses = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-                
                 for (let m = 0; m < totalMeses; m++) {{
                     const date = new Date(dataInicio);
                     date.setMonth(dataInicio.getMonth() + m);
                     
                     const monthCell = document.createElement('div');
                     monthCell.className = 'month-cell';
-                    monthCell.textContent = meses[date.getMonth()];
+                    // Usar número do mês com 2 dígitos (01, 02, 03...) igual aos outros gráficos
+                    const monthNumber = String(date.getMonth() + 1).padStart(2, '0');
+                    monthCell.textContent = monthNumber;
                     monthHeader.appendChild(monthCell);
                 }}
                 
