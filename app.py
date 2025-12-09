@@ -6798,18 +6798,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     <div style="display: flex; flex-direction: column; gap: 6px;">
                         <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="checkbox" id="apply-p0-all-{project['id']}" 
+                                   onchange="handleQuickApply('p0')"
                                    style="margin-right: 6px; cursor: pointer;">
                             <span style="font-size: 11px; color: #4a5568;">Aplicar P0 para todos</span>
                         </label>
                         <label style="display: flex; align-items: center; cursor: pointer;">
                             <input type="checkbox" id="apply-latest-all-{project['id']}" 
+                                   onchange="handleQuickApply('latest')"
                                    style="margin-right: 6px; cursor: pointer;">
                             <span style="font-size: 11px; color: #4a5568;">Aplicar última baseline para todos</span>
                         </label>
-                        <button onclick="applyQuickBaselines()" 
-                                style="margin-top: 8px; padding: 6px 12px; background: #2d3748; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: 600;">
-                            Aplicar Selecionados
-                        </button>
                     </div>
                 </div>
                 
@@ -6902,23 +6900,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 renderGantt();
             }}
             
-            // Função para aplicação rápida (NOVA - só aplica quando usuário clica no botão)
-            function applyQuickBaselines() {{
-                const checkP0 = document.getElementById('apply-p0-all-{project["id"]}');
-                const checkLatest = document.getElementById('apply-latest-all-{project["id"]}');
-                
-                // Verificar se pelo menos um está marcado
-                if (!checkP0.checked && !checkLatest.checked) {{
-                    alert('Por favor, selecione pelo menos uma opção de baseline para aplicar.');
-                    return;
-                }}
-                
-                // Se ambos estiverem marcados, avisar que só um pode ser aplicado
-                if (checkP0.checked && checkLatest.checked) {{
-                    alert('Por favor, selecione apenas uma opção: P0 OU Última baseline.');
-                    return;
-                }}
-                
+            // Função para aplicação rápida (aplica imediatamente ao marcar checkbox)
+            function handleQuickApply(mode) {{
                 const emps = [...new Set(currentTasks.map(t => t.empreendimento))];
                 
                 emps.forEach(emp => {{
@@ -6927,7 +6910,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     
                     let targetBaseline = "P0-(padrão)";
                     
-                    if (checkLatest.checked) {{
+                    if (mode === 'latest') {{
                         const baselines = empTasks[0].baselines || {{}};
                         const baselineNames = Object.keys(baselines).filter(b => b !== "P0-(padrão)");
                         if (baselineNames.length > 0) {{
@@ -6941,9 +6924,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     if (dropdown) dropdown.value = targetBaseline;
                 }});
                 
-                // Desmarcar checkboxes após aplicar
-                checkP0.checked = false;
-                checkLatest.checked = false;
+                // Desmarcar o outro checkbox
+                if (mode === 'p0') {{
+                    const checkLatest = document.getElementById('apply-latest-all-{project["id"]}');
+                    if (checkLatest) checkLatest.checked = false;
+                }} else {{
+                    const checkP0 = document.getElementById('apply-p0-all-{project["id"]}');
+                    if (checkP0) checkP0.checked = false;
+                }}
             }}
             
             // Funções auxiliares
