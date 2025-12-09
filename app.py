@@ -2980,7 +2980,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <rect x="14" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 58px; right: 15px;">
+                                <div class="radial-tooltip" style="top: 70px; left: 210px;">
                                     Frame
                                     <span class="tooltip-badge inactive-badge">F</span>
                                 </div>
@@ -2991,7 +2991,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 50%; right: 8px; transform: translateY(-50%);">
+                                <div class="radial-tooltip" style="top: 128px; left: 224px;">
                                     Pen Tool
                                     <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
@@ -3002,7 +3002,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M5 4v3h5.5v12h3V7H19V4z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="bottom: 40px; right: 40px;">
+                                <div class="radial-tooltip" style="top: 176px; left: 185px;">
                                     Text
                                     <span class="tooltip-badge inactive-badge">T</span>
                                 </div>
@@ -3016,7 +3016,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M18 18l-3-3m3 3l3-3m-3 3v-6" stroke="currentColor" fill="none" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="bottom: 40px; left: 40px;">
+                                <div class="radial-tooltip" style="top: 176px; right: 158px;">
                                     Actions
                                 </div>
                                 
@@ -3027,7 +3027,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 50%; left: 8px; transform: translateY(-50%);">
+                                <div class="radial-tooltip" style="top: 128px; right: 188px;">
                                     Objects
                                     <span class="tooltip-badge inactive-badge">O</span>
                                 </div>
@@ -3038,7 +3038,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 58px; left: 15px;">
+                                <div class="radial-tooltip" style="top: 70px; right: 172px;">
                                     Comment
                                     <span class="tooltip-badge inactive-badge">C</span>
                                 </div>
