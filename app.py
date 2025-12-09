@@ -6543,13 +6543,56 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .month-cell {{ width: 30px; height: 30px; border-right: 1px solid rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 500; }}
             .chart-body {{ position: relative; }}
             .gantt-row {{ position: relative; height: 30px; border-bottom: 1px solid #eff2f5; background-color: white; }}
-            .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-            .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
-            .gantt-bar.previsto {{ z-index: 7; }}
-            .gantt-bar.real {{ z-index: 8; }}
-            .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
+            
+            /* Estilo aprimorado das barras - Similar aos outros gráficos */
+            .gantt-bar {{ 
+                position: absolute; 
+                height: 16px; 
+                top: 7px; 
+                border-radius: 4px; 
+                cursor: pointer; 
+                transition: all 0.2s ease; 
+                display: flex; 
+                align-items: center; 
+                padding: 0 6px; 
+                box-shadow: 0 2px 4px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3);
+                border: 1px solid rgba(0,0,0,0.15);
+            }}
+            
+            .gantt-bar:hover {{ 
+                transform: translateY(-2px) scale(1.02); 
+                box-shadow: 0 4px 12px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.4); 
+                z-index: 10 !important;
+                border-color: rgba(0,0,0,0.25);
+            }}
+            
+            /* Barra Prevista - Mais clara com borda da cor real */
+            .gantt-bar.previsto {{ 
+                z-index: 7;
+                opacity: 0.85;
+                background: linear-gradient(to bottom, rgba(255,255,255,0.2), rgba(0,0,0,0.05));
+            }}
+            
+            /* Barra Real - Mais escura e sólida */
+            .gantt-bar.real {{ 
+                z-index: 8;
+                opacity: 0.95;
+                background: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(0,0,0,0.1));
+                box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.2);
+            }}
+            
+            .bar-label {{ 
+                font-size: 9px; 
+                font-weight: 700; 
+                white-space: nowrap; 
+                overflow: hidden; 
+                text-overflow: ellipsis; 
+                text-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 0 3px rgba(255,255,255,0.5);
+                letter-spacing: 0.3px;
+            }}
+            
             .gantt-bar.real .bar-label {{ color: white; }}
-            .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
+            .gantt-bar.previsto .bar-label {{ color: #4a5568; font-weight: 600; }}
             .tooltip {{ position: fixed; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
             .tooltip.show {{ opacity: 1; }}
             .today-line {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
@@ -7039,8 +7082,17 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             barPrevisto.className = 'gantt-bar previsto';
                             barPrevisto.style.left = `${{left}}px`;
                             barPrevisto.style.width = `${{width}}px`;
-                            barPrevisto.style.backgroundColor = cores.previsto;
-                            barPrevisto.style.border = `1px solid ${{cores.real}}`;
+                            
+                            // Gradiente rico para barra prevista
+                            barPrevisto.style.background = `
+                                linear-gradient(to bottom, 
+                                    rgba(255,255,255,0.3), 
+                                    rgba(0,0,0,0.05)
+                                ),
+                                ${{cores.previsto}}
+                            `;
+                            barPrevisto.style.borderColor = cores.real;
+                            barPrevisto.style.borderWidth = '1.5px';
                             
                             const label = document.createElement('div');
                             label.className = 'bar-label';
@@ -7073,7 +7125,17 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             barReal.className = 'gantt-bar real';
                             barReal.style.left = `${{left}}px`;
                             barReal.style.width = `${{width}}px`;
-                            barReal.style.backgroundColor = cores.real;
+                            
+                            // Gradiente rico para barra real
+                            barReal.style.background = `
+                                linear-gradient(to bottom, 
+                                    rgba(255,255,255,0.2), 
+                                    rgba(0,0,0,0.15)
+                                ),
+                                ${{cores.real}}
+                            `;
+                            barReal.style.borderColor = `rgba(0,0,0,0.3)`;
+                            barReal.style.borderWidth = '1.5px';
                             
                             const label = document.createElement('div');
                             label.className = 'bar-label';
