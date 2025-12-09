@@ -6683,6 +6683,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 z-index: 999;
                 padding: 15px;
                 border: 1px solid #e2e8f0;
+                overflow: hidden;
             }}
             .baseline-selector.is-open {{
                 display: block;
