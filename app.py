@@ -2853,20 +2853,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 toast.innerHTML = `⏳ Criando baseline para <b>${{currentProjectName}}</b>...`;
                             }}
 
-                            // D. SOLUÇÃO SIMPLES: Recarregar página com query params
+                            // D. SOLUÇÃO FINAL: Usar link invisível com target="_top" (funciona em sandbox!)
                             try {{
                                 // Encode o nome do projeto
                                 const encodedProject = encodeURIComponent(currentProjectName);
                                 
                                 // Construir URL com query parameters
-                                const currentUrl = window.parent.location.href;
+                                const currentUrl = window.top.location.href;
                                 const baseUrl = currentUrl.split('?')[0];
                                 const newUrl = `${{baseUrl}}?create_baseline=${{encodedProject}}&t=${{new Date().getTime()}}`;
                                 
-                                console.log('🔄 Navegando para:', newUrl);
+                                console.log('🔄 Criando link para navegação:', newUrl);
                                 
-                                // Navegar para a nova URL (recarrega a página e processa a baseline)
-                                window.parent.location.href = newUrl;
+                                // Criar link invisível com target="_top" (FUNCIONA em iframe sandboxed!)
+                                const link = document.createElement('a');
+                                link.href = newUrl;
+                                link.target = '_top';  // Navega a janela top-level
+                                link.style.display = 'none';
+                                document.body.appendChild(link);
+                                
+                                // Clicar no link (navegação permitida mesmo em sandbox)
+                                link.click();
+                                
+                                console.log('✅ Navegação iniciada via link');
                                 
                             }} catch (error) {{
                                 console.error('❌ Erro ao navegar:', error);
