@@ -11,12 +11,10 @@ def show_welcome_screen():
     # Processar login do formulário
     if 'popup_email' in st.query_params:
         email = st.query_params['popup_email']
-        name = st.query_params.get('popup_name', '')
         
         if email and '@' in email:
-            # Salvar email e nome no session_state
+            # Salvar email no session_state
             st.session_state.user_email = email
-            st.session_state.user_name = name
             
             # Limpar params e recarregar
             st.query_params.clear()
@@ -117,10 +115,11 @@ def show_welcome_screen():
             width: 100vw;
             height: 100vh;
             display: flex;
-            justify-content: center;
+            justify-content: flex-end;
             align-items: center;
             z-index: 1000000;
             padding: 20px;
+            padding-right: 80px;
         }}
         
         .popup-card {{
@@ -222,6 +221,10 @@ def show_welcome_screen():
         }}
         
         @media (max-width: 480px) {{
+            .popup-container {{
+                justify-content: center;
+                padding: 20px;
+            }}
             .popup-card {{
                 margin: 15px;
             }}
@@ -251,13 +254,10 @@ def show_welcome_screen():
                     {'<img src="' + logo_base64 + '" alt="Logo Viana e Moura" />' if logo_base64 else ''}
                 </div>
                 <h2>Bem-vindo ao Painel</h2>
-                <p>Por favor, preencha seus dados para acessar</p>
+                <p>Por favor, informe seu email para acessar</p>
             </div>
             <div class="popup-body">
                 <form method="get">
-                    <div class="input-group">
-                        <input type="text" name="popup_name" placeholder="Nome completo" class="popup-input" required />
-                    </div>
                     <div class="input-group">
                         <input type="email" name="popup_email" placeholder="Email corporativo" class="popup-input" required />
                     </div>
