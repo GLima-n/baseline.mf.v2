@@ -6275,6 +6275,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         df_gantt["% concluído"] = 0
     df_gantt["% concluído"] = df_gantt["% concluído"].fillna(0).apply(converter_porcentagem)
     
+    # --- FILTRO: Remover etapas pai ANTES da agregação ---
+    # Etapas pai são aquelas que têm subetapas definidas em SUBETAPAS
+    etapas_pai = list(SUBETAPAS.keys())  # ["ENG. LIMP.", "ENG. TER.", "ENG. INFRA", "ENG. PAV"]
+    df_gantt = df_gantt[~df_gantt['Etapa'].isin(etapas_pai)]
+    
     # Agrupar por SETOR, Empreendimento e Etapa
     df_gantt_agg = df_gantt.groupby(['SETOR', 'Empreendimento', 'Etapa']).agg(
         Inicio_Prevista=('Inicio_Prevista', 'min'),
@@ -6285,11 +6290,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         UGB=('UGB', 'first'),
         GRUPO=('GRUPO', 'first')
     ).reset_index()
-    
-    # --- FILTRO: Remover etapas pai (mostrar apenas subetapas e etapas normais) ---
-    # Etapas pai são aquelas que têm subetapas definidas em SUBETAPAS
-    etapas_pai = list(SUBETAPAS.keys())  # ["ENG. LIMP.", "ENG. TER.", "ENG. INFRA", "ENG. PAV"]
-    df_gantt_agg = df_gantt_agg[~df_gantt_agg['Etapa'].isin(etapas_pai)]
     
     # --- 2. Preparar Dados para TODOS os Setores ---
     all_data_by_sector_js = {}
