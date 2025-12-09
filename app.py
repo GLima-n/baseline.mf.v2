@@ -2833,7 +2833,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     transform: translate(-50%, -50%);
                                     width: 160px;
                                     height: 160px;
-                                    border: 2px solid #e0e0e0;
+                                    border: 8px solid #f0f0f0;
                                     border-radius: 50%;
                                     background: transparent;
                                     z-index: 1;
