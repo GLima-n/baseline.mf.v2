@@ -7236,7 +7236,21 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 const y = e.pageY - chartContent.offsetTop;
                 const walkY = (y - startY) * 2; // Multiplicador para velocidade vertical
                 chartContent.scrollTop = scrollTop - walkY;
+                
+                // --- SINCRONIZAÇÃO: Sidebar acompanha scroll vertical do gráfico ---
+                const sidebarContent = document.getElementById('gantt-sidebar-content-{project["id"]}');
+                if (sidebarContent) {{
+                    sidebarContent.scrollTop = chartContent.scrollTop;
+                }}
             }});
+            
+            // --- SINCRONIZAÇÃO ADICIONAL: Scroll direto na sidebar também sincroniza ---
+            const sidebarContent = document.getElementById('gantt-sidebar-content-{project["id"]}');
+            if (sidebarContent) {{
+                sidebarContent.addEventListener('scroll', () => {{
+                    chartContent.scrollTop = sidebarContent.scrollTop;
+                }});
+            }}
             
             // Renderizar inicial
             renderGantt();
