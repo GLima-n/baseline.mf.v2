@@ -42,14 +42,17 @@ def show_welcome_screen():
         for logo_path in logo_paths:
             if os.path.exists(logo_path):
                 try:
+                    print(f"✅ Logo encontrada: {logo_path}")
                     with open(logo_path, 'rb') as f:
                         logo_data = base64.b64encode(f.read()).decode('utf-8')
                         if logo_path.endswith('.svg'):
                             return f"data:image/svg+xml;base64,{logo_data}"
                         else:
                             return f"data:image/png;base64,{logo_data}"
-                except:
+                except Exception as e:
+                    print(f"❌ Erro ao carregar {logo_path}: {e}")
                     continue
+        print("⚠️ Nenhuma logo encontrada")
         return ""
     
     svg_base64 = load_svg_as_base64()
@@ -145,12 +148,18 @@ def show_welcome_screen():
             justify-content: center;
             align-items: center;
             filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
         }}
         
         .logo-container img {{
-            max-width: 250px;
+            max-width: 320px;
+            width: 320px;
             height: auto;
             transition: transform 0.3s ease;
+            transform: scale(1);
         }}
         
         .popup-header h2 {{
