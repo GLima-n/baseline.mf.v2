@@ -6534,27 +6534,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         "ENTREGA": "🎉"
     }
     
-    # --- Preparar dados para filtros ---
-    filter_options = {}
-    
-    # Grupos únicos
-    grupos_unicos = sorted(df_gantt_agg['GRUPO'].dropna().unique().tolist())
-    if "Todos" not in grupos_unicos:
-        grupos_unicos.insert(0, "Todos")
-    filter_options['grupos'] = grupos_unicos
-    
-    # Etapas únicas
-    etapas_unicas = sorted(df_gantt_agg['Etapa'].dropna().unique().tolist())
-    if "Todas" not in etapas_unicas:
-        etapas_unicas.insert(0, "Todas")
-    filter_options['etapas'] = etapas_unicas
-    
-    # Empreendimentos únicos
-    empreendimentos_unicos = sorted(df_gantt_agg['Empreendimento'].dropna().unique().tolist())
-    if "Todos" not in empreendimentos_unicos:
-        empreendimentos_unicos.insert(0, "Todos")
-    filter_options['empreendimentos'] = empreendimentos_unicos
-    
     # --- 5. Gerar HTML/CSS/JavaScript ---
     # (Baseado no consolidado mas adaptado para setores)
     gantt_html = f"""
@@ -6563,8 +6542,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
-        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
         
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -6822,14 +6799,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         <option value="Todos">Todos</option>
                         {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
                     </select>
-                </div>
-                <div class="filter-group">
-                    <label for="filter-grupo-{project['id']}">Grupo</label>
-                    <div id="filter-grupo-{project['id']}"></div>
-                </div>
-                <div class="filter-group">
-                    <label for="filter-etapa-{project['id']}">Etapa</label>
-                    <div id="filter-etapa-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -7480,142 +7449,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 document.addEventListener('mouseup', () => {{
                     isResizing = false;
                 }});
-            }}
-            
-            // --- INICIALIZAÇÃO DOS FILTROS E EVENT LISTENERS ---
-            try {{
-                // Dados dos filtros
-                const filterOptions = {json.dumps(filter_options)};
-                
-                // Configuração padrão do VirtualSelect
-                const vsConfig = {{
-                    multiple: true,
-                    search: true,
-                    optionsCount: 6,
-                    showResetButton: true,
-                    resetButtonText: 'Limpar',
-                    selectAllText: 'Selecionar Todos',
-                    allOptionsSelectedText: 'Todos',
-                    optionsSelectedText: 'selecionados',
-                    searchPlaceholderText: 'Buscar...',
-                    optionHeight: '30px',
-                    popupDropboxBreakpoint: '3000px',
-                    noOptionsText: 'Nenhuma opção encontrada',
-                    noSearchResultsText: 'Nenhum resultado encontrado'
-                }};
-                
-                // Inicializar VirtualSelect para Grupos
-                let vsGrupo = null;
-                if (filterOptions.grupos && filterOptions.grupos.length > 0) {{
-                    const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
-                    vsGrupo = VirtualSelect.init({{
-                        ...vsConfig,
-                        ele: '#filter-grupo-{project["id"]}',
-                        options: grupoOptions,
-                        placeholder: "Selecionar Grupo(s)",
-                        selectedValue: ["Todos"]
-                    }});
-                }}
-                
-                // Inicializar VirtualSelect para Etapas
-                let vsEtapa = null;
-                if (filterOptions.etapas && filterOptions.etapas.length > 0) {{
-                    const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
-                    vsEtapa = VirtualSelect.init({{
-                        ...vsConfig,
-                        ele: '#filter-etapa-{project["id"]}',
-                        options: etapaOptions,
-                        placeholder: "Selecionar Etapa(s)",
-                        selectedValue: ["Todas"]
-                    }});
-                }}
-                
-                // --- EVENT LISTENERS DOS BOTÕES ---
-                // Botão de filtros
-                const filterBtn = document.getElementById('filter-btn-{project["id"]}');
-                if (filterBtn) {{
-                    filterBtn.addEventListener('click', () => {{
-                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                        if (filterMenu) filterMenu.classList.toggle('is-open');
-                        if (baselineSelector) baselineSelector.classList.remove('is-open');
-                    }});
-                }}
-                
-                // Botão de baseline
-                const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
-                if (baselineBtn) {{
-                    baselineBtn.addEventListener('click', () => {{
-                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                        if (baselineSelector) baselineSelector.classList.toggle('is-open');
-                        if (filterMenu) filterMenu.classList.remove('is-open');
-                    }});
-                }}
-                
-                // Botão de tela cheia
-                const fullscreenBtn = document.getElementById('fullscreen-btn-{project["id"]}');
-                if (fullscreenBtn) {{
-                    // Fullscreen não funciona em iframe do Streamlit
-                    // Removendo funcionalidade para evitar erro de permissão
-                    fullscreenBtn.style.display = 'none';
-                    /*
-                    fullscreenBtn.addEventListener('click', () => {{
-                        const container = document.getElementById('gantt-container-{project["id"]}');
-                        if (!document.fullscreenElement) {{
-                            container.requestFullscreen();
-                        }} else {{
-                            document.exitFullscreen();
-                        }}
-                    }});
-                    */
-                }}
-                
-                // Botão de aplicar filtros
-                const applyBtn = document.getElementById('filter-apply-btn-{project["id"]}');
-                if (applyBtn) {{
-                    applyBtn.addEventListener('click', () => {{
-                        const setorSelect = document.getElementById('filter-setor-{project["id"]}');
-                        const projectSelect = document.getElementById('filter-project-{project["id"]}');
-                        const concluidasCheck = document.getElementById('filter-concluidas-{project["id"]}');
-                        const visRadio = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked');
-                        
-                        const setorSelecionado = setorSelect ? setorSelect.value : 'Todos';
-                        const projectSelecionado = projectSelect ? projectSelect.value : 'Todos';
-                        const gruposSelecionados = vsGrupo ? (vsGrupo.value || ["Todos"]) : ["Todos"];
-                        const etapasSelecionadas = vsEtapa ? (vsEtapa.value || ["Todas"]) : ["Todas"];
-                        const mostrarApenasConcluidas = concluidasCheck ? concluidasCheck.checked : false;
-                        const tipoVisualizacao = visRadio ? visRadio.value : 'Ambos';
-                        
-                        // Filtrar tasks
-                        currentTasks = allTasks.filter(task => {{
-                            // Filtro de setor
-                            if (setorSelecionado !== 'Todos' && task.setor !== setorSelecionado) return false;
-                            
-                            // Filtro de empreendimento
-                            if (projectSelecionado !== 'Todos' && task.empreendimento !== projectSelecionado) return false;
-                            
-                            // Filtro de grupo
-                            if (!gruposSelecionados.includes("Todos") && !gruposSelecionados.includes(task.grupo)) return false;
-                            
-                            // Filtro de etapa
-                            if (!etapasSelecionadas.includes("Todas") && !etapasSelecionadas.includes(task.etapa)) return false;
-                            
-                            // Filtro de concluídas
-                            if (mostrarApenasConcluidas && task.progress >= 100) return false;
-                            
-                            return true;
-                        }});
-                        
-                        renderGantt();
-                        
-                        // Fechar menu
-                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                        if (filterMenu) filterMenu.classList.remove('is-open');
-                    }});
-                }}
-            }} catch (error) {{
-                console.error('Erro ao inicializar filtros:', error);
             }}
             
             // Renderizar inicial
