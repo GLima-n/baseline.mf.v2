@@ -6461,10 +6461,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     
     # --- 3. Preparar Dados Iniciais ---
     empreendimentos_no_df = sorted(list(df_gantt_agg["Empreendimento"].unique()))
+    grupos_disponiveis = sorted(list(df_gantt_agg["GRUPO"].unique()))
     
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
-        "setores_disponiveis": sorted(all_sector_names)
+        "setores_disponiveis": sorted(all_sector_names),
+        "grupos": grupos_disponiveis
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6669,6 +6671,36 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 border: none; border-radius: 4px; cursor: pointer;
                 margin-top: 5px;
             }}
+            .multiselect-container {{
+                max-height: 150px;
+                overflow-y: auto;
+                border: 1px solid #cbd5e0;
+                border-radius: 4px;
+                padding: 5px;
+                background-color: white;
+            }}
+            .multiselect-item {{
+                display: flex;
+                align-items: center;
+                padding: 4px 6px;
+                cursor: pointer;
+                border-radius: 3px;
+            }}
+            .multiselect-item:hover {{
+                background-color: #f7fafc;
+            }}
+            .multiselect-item input[type="checkbox"] {{
+                margin-right: 8px;
+                cursor: pointer;
+            }}
+            .multiselect-item label {{
+                font-size: 12px;
+                font-weight: 500;
+                color: #2d3748;
+                cursor: pointer;
+                margin: 0;
+                text-transform: none;
+            }}
             .baseline-selector {{
                 display: none;
                 position: absolute;
@@ -6799,6 +6831,17 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         <option value="Todos">Todos</option>
                         {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
                     </select>
+                </div>
+                <div class="filter-group">
+                    <label>Grupos</label>
+                    <div class="multiselect-container" id="filter-grupos-container-{project['id']}">
+                        {"".join([f'''
+                        <div class="multiselect-item">
+                            <input type="checkbox" id="grupo-{i}-{project['id']}" value="{grupo}" checked>
+                            <label for="grupo-{i}-{project['id']}">{grupo}</label>
+                        </div>
+                        ''' for i, grupo in enumerate(filter_options['grupos'])])}
+                    </div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -7013,12 +7056,43 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 sidebarContent.innerHTML = '';
                 chartContainer.innerHTML = '';
                 
+                // --- APLICAR FILTROS ---
+                // 1. Filtro de Empreendimento
+                const filtroEmp = document.getElementById('filter-project-{project["id"]}')?.value || 'Todos';
+                
+                // 2. Filtro de Grupos (multiselect)
+                const grupoCheckboxes = document.querySelectorAll('#filter-grupos-container-{project["id"]} input[type="checkbox"]:checked');
+                const gruposSelecionados = Array.from(grupoCheckboxes).map(cb => cb.value);
+                
+                // 3. Filtro de Não Concluídas
+                const mostrarApenasNaoConcluidas = document.getElementById('filter-concluidas-{project["id"]}')?.checked || false;
+                
+                // Aplicar filtros
+                let filteredTasks = currentTasks.filter(task => {{
+                    // Filtro de empreendimento
+                    if (filtroEmp !== 'Todos' && task.empreendimento !== filtroEmp) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de grupos
+                    if (gruposSelecionados.length > 0 && !gruposSelecionados.includes(task.grupo)) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de não concluídas
+                    if (mostrarApenasNaoConcluidas && task.progress >= 100) {{
+                        return false;
+                    }}
+                    
+                    return true;
+                }});
+                
                 // --- ORDENAÇÃO DINÂMICA: Por data de início (prevista ou real) ---
                 // Verificar qual visualização está ativa
                 const visualizacaoReal = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value === 'Real';
                 
                 // Ordenar tasks do mais antigo para o mais novo
-                currentTasks.sort((a, b) => {{
+                filteredTasks.sort((a, b) => {{
                     let dateA, dateB;
                     
                     if (visualizacaoReal) {{
@@ -7035,7 +7109,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
                 
                 // --- 1. Renderizar Sidebar ---
-                currentTasks.forEach((task, idx) => {{
+                filteredTasks.forEach((task, idx) => {{
                     const row = document.createElement('div');
                     row.className = 'sidebar-row';
                     row.innerHTML = `
