@@ -6714,6 +6714,45 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 border-radius: 4px;
                 font-size: 11px;
             }}
+            .baseline-resize-corner {{
+                position: absolute;
+                bottom: 0;
+                left: 0;
+                width: 16px;
+                height: 16px;
+                cursor: nwse-resize;
+                z-index: 100;
+            }}
+            .baseline-resize-corner::before {{
+                content: '';
+                position: absolute;
+                bottom: -2px;
+                left: -2px;
+                width: 0;
+                height: 0;
+                border-style: solid;
+                border-width: 0 0 18px 18px;
+                border-color: transparent;
+                transform: rotate(-45deg);
+                transform-origin: bottom left;
+            }}
+            .baseline-resize-corner:hover::before {{
+                border-color: transparent;
+            }}
+            .baseline-resize-corner::after {{
+                content: '';
+                position: absolute;
+                bottom: 2px;
+                left: 2px;
+                width: 10px;
+                height: 10px;
+                transform: rotate(-45deg);
+                transform-origin: center;
+                background: 
+                    linear-gradient(90deg, transparent 48%, #9ca3af 48%, #9ca3af 52%, transparent 52%),
+                    linear-gradient(90deg, transparent 56%, #9ca3af 56%, #9ca3af 60%, transparent 60%),
+                    linear-gradient(90deg, transparent 64%, #9ca3af 64%, #9ca3af 68%, transparent 68%);
+            }}
         </style>
     </head>
     <body>
@@ -6814,6 +6853,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 <div class="baseline-selector-table" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
                     {baseline_rows_html}
                 </div>
+                <div class="baseline-resize-corner" title="Arrastar para redimensionar"></div>
             </div>
             
             <div class="gantt-main">
@@ -7352,6 +7392,45 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             if (sidebarContent) {{
                 sidebarContent.addEventListener('scroll', () => {{
                     chartContent.scrollTop = sidebarContent.scrollTop;
+                }});
+            }}
+            
+            // --- REDIMENSIONAMENTO DO SELETOR DE BASELINE ---
+            const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+            const resizeCorner = baselineSelector.querySelector('.baseline-resize-corner');
+            
+            if (resizeCorner) {{
+                let isResizing = false;
+                let startX, startY, startWidth, startHeight;
+                
+                resizeCorner.addEventListener('mousedown', (e) => {{
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = parseInt(document.defaultView.getComputedStyle(baselineSelector).width, 10);
+                    startHeight = parseInt(document.defaultView.getComputedStyle(baselineSelector).height, 10);
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                }});
+                
+                document.addEventListener('mousemove', (e) => {{
+                    if (!isResizing) return;
+                    
+                    const width = startWidth + (e.clientX - startX);
+                    const height = startHeight + (e.clientY - startY);
+                    
+                    // Limites mínimos e máximos
+                    if (width >= 250 && width <= 600) {{
+                        baselineSelector.style.width = width + 'px';
+                    }}
+                    if (height >= 200 && height <= 800) {{
+                        baselineSelector.style.minHeight = height + 'px';
+                    }}
+                }});
+                
+                document.addEventListener('mouseup', () => {{
+                    isResizing = false;
                 }});
             }}
             
