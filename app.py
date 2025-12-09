@@ -2802,38 +2802,27 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     height: 80px;
                                     border: 6px solid #007AFF;
                                     border-radius: 50%;
-                                    background: transparent;
+                                    background: #007AFF;
                                     cursor: pointer;
                                     transition: all 0.2s ease;
                                     z-index: 10;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
                                 }}
                                 
                                 .radial-center:hover {{
-                                    border-width: 8px;
                                     transform: translate(-50%, -50%) scale(1.08);
-                                    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+                                    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
                                 }}
                                 
-                                .radial-svg {{
-                                    position: absolute;
-                                    top: 0;
-                                    left: 0;
-                                    width: 100%;
-                                    height: 100%;
-                                    pointer-events: none;
-                                    z-index: 1;
-                                }}
-                                
-                                .radial-connector {{
-                                    position: absolute;
-                                    top: 50%;
-                                    left: 50%;
-                                    width: 1px;
-                                    height: 90px;
-                                    background: rgba(0, 0, 0, 0.06);
-                                    transform-origin: top center;
-                                    pointer-events: none;
-                                    z-index: 2;
+                                .radial-center-play {{
+                                    width: 0;
+                                    height: 0;
+                                    border-left: 18px solid white;
+                                    border-top: 12px solid transparent;
+                                    border-bottom: 12px solid transparent;
+                                    margin-left: 6px;
                                 }}
                                 
                                 .radial-item {{
@@ -2849,22 +2838,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-item svg {{
-                                    width: 28px;
-                                    height: 28px;
+                                    width: 24px;
+                                    height: 24px;
                                     transition: all 0.2s ease;
                                 }}
                                 
-                                .radial-item.active svg {{
-                                    fill: #007AFF;
-                                }}
-                                
-                                .radial-item:not(.active) svg {{
+                                .radial-item svg {{
                                     fill: #333333;
                                 }}
                                 
-                                .radial-item:hover:not(.active) svg {{
-                                    fill: #666666;
-                                    transform: scale(1.1);
+                                .radial-item:hover svg {{
+                                    fill: #000000;
+                                    transform: scale(1.15);
                                 }}
                                 
                                 .radial-tooltip {{
@@ -2889,9 +2874,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-tooltip:not(.active) {{
-                                    background: white;
+                                    background: #f5f5f5;
                                     color: #333;
-                                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
                                 }}
                                 
                                 .tooltip-badge {{
@@ -2910,14 +2895,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .tooltip-badge.inactive-badge {{
-                                    background: #f0f0f0;
+                                    background: #e0e0e0;
                                     color: #666;
                                 }}
                                 
                                 .radial-more {{
                                     position: absolute;
                                     padding: 10px 18px;
-                                    background: #e8e8e8;
+                                    background: #f5f5f5;
                                     color: #666;
                                     border-radius: 20px;
                                     font-size: 13px;
@@ -2925,10 +2910,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     cursor: pointer;
                                     transition: all 0.2s ease;
                                     z-index: 5;
+                                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
                                 }}
                                 
                                 .radial-more:hover {{
-                                    background: #d8d8d8;
+                                    background: #e8e8e8;
                                     transform: scale(1.05);
                                 }}
                                 
@@ -2943,35 +2929,23 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </style>
                             
                             <div class="radial-menu-wrapper">
-                                <svg class="radial-svg" viewBox="0 0 500 500">
-                                    <path d="M 250 250 L 250 90 A 160 160 0 0 1 332.8 128.4 Z" 
-                                          fill="rgba(0, 122, 255, 0.08)" 
-                                          stroke="#007AFF" 
-                                          stroke-width="2.5"
-                                          opacity="1"/>
-                                </svg>
+                                <!-- Centro com play button -->
+                                <div class="radial-center" title="Menu Radial">
+                                    <div class="radial-center-play"></div>
+                                </div>
                                 
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(0deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(45deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(90deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(135deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(180deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(225deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(270deg);"></div>
-                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(315deg);"></div>
-                                
-                                <div class="radial-center" title="Menu Radial"></div>
-                                
-                                <div class="radial-item active" id="btn-create-baseline" style="top: 60px; left: 234px;">
+                                <!-- 12h: Move Tool (ATIVO - Criar Baseline) -->
+                                <div class="radial-item" id="btn-create-baseline" style="top: 60px; left: 234px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
                                 <div class="radial-tooltip active" style="top: 20px; left: 50%; transform: translateX(-50%);">
-                                    Criar Baseline
+                                    Move Tool
                                     <span class="tooltip-badge active-badge">M</span>
                                 </div>
                                 
+                                <!-- 1h30: Frame -->
                                 <div class="radial-item" style="top: 133px; left: 352px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -2985,6 +2959,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     <span class="tooltip-badge inactive-badge">F</span>
                                 </div>
                                 
+                                <!-- 3h: Pen Tool -->
                                 <div class="radial-item" style="top: 234px; left: 410px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
@@ -2995,6 +2970,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
                                 
+                                <!-- 4h30: Text -->
                                 <div class="radial-item" style="top: 335px; left: 352px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M5 4v3h5.5v12h3V7H19V4z"/>
@@ -3005,10 +2981,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     <span class="tooltip-badge inactive-badge">T</span>
                                 </div>
                                 
+                                <!-- 6h: More -->
                                 <div class="radial-more" style="top: 420px; left: 50%; transform: translateX(-50%);">
                                     More ...
                                 </div>
                                 
+                                <!-- 7h30: Actions -->
                                 <div class="radial-item" style="top: 335px; left: 116px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" rx="1"/>
@@ -3021,6 +2999,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     Actions
                                 </div>
                                 
+                                <!-- 9h: Objects -->
                                 <div class="radial-item" style="top: 234px; left: 58px;">
                                     <svg viewBox="0 0 24 24">
                                         <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3032,6 +3011,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     <span class="tooltip-badge inactive-badge">O</span>
                                 </div>
                                 
+                                <!-- 10h30: Comment -->
                                 <div class="radial-item" style="top: 133px; left: 116px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
