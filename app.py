@@ -2781,10 +2781,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         menu.innerHTML = `
                             <style>
+                                @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+                                
                                 .radial-menu-container {{
                                     position: relative;
-                                    width: 320px;
-                                    height: 320px;
+                                    width: 400px;
+                                    height: 400px;
                                 }}
                                 
                                 .radial-center {{
@@ -2792,12 +2794,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     top: 50%;
                                     left: 50%;
                                     transform: translate(-50%, -50%);
-                                    width: 80px;
-                                    height: 80px;
-                                    background: #3b82f6;
-                                    border: 4px solid white;
+                                    width: 72px;
+                                    height: 72px;
+                                    background: #4F7CFF;
                                     border-radius: 50%;
-                                    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 8px rgba(255, 255, 255, 0.9);
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
@@ -2807,34 +2808,40 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-center:hover {{
-                                    transform: translate(-50%, -50%) scale(1.08);
-                                    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+                                    transform: translate(-50%, -50%) scale(1.05);
+                                    box-shadow: 0 4px 12px rgba(79, 124, 255, 0.3), 0 0 0 8px rgba(255, 255, 255, 0.9);
                                 }}
                                 
-                                .radial-center-icon {{
-                                    font-size: 32px;
-                                    filter: brightness(0) invert(1);
+                                .radial-center-play {{
+                                    width: 0;
+                                    height: 0;
+                                    border-left: 16px solid white;
+                                    border-top: 10px solid transparent;
+                                    border-bottom: 10px solid transparent;
+                                    margin-left: 4px;
                                 }}
                                 
                                 .radial-item {{
                                     position: absolute;
                                     top: 50%;
                                     left: 50%;
-                                    min-width: 120px;
-                                    height: 44px;
-                                    margin: -22px 0 0 -60px;
-                                    background: white;
-                                    border-radius: 22px;
-                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                                    min-width: 140px;
+                                    height: 40px;
+                                    margin: -20px 0 0 -70px;
+                                    background: rgba(255, 255, 255, 0.95);
+                                    backdrop-filter: blur(10px);
+                                    border-radius: 20px;
+                                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
                                     display: flex;
                                     align-items: center;
-                                    padding: 0 16px 0 12px;
-                                    gap: 10px;
+                                    padding: 0 14px 0 10px;
+                                    gap: 8px;
                                     cursor: pointer;
-                                    transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+                                    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
                                     opacity: 0;
-                                    transform: translate(0, 0) scale(0.5);
-                                    border: 1.5px solid #e5e7eb;
+                                    transform: translate(0, 0) scale(0.7);
+                                    border: 1px solid rgba(0, 0, 0, 0.06);
+                                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
                                 }}
                                 
                                 .radial-item.visible {{
@@ -2843,16 +2850,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-item:hover {{
-                                    background: #f8fafc;
+                                    background: rgba(255, 255, 255, 1);
                                     transform: translate(var(--x), var(--y)) scale(1.05);
-                                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                                    border-color: #3b82f6;
+                                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
+                                    border-color: rgba(79, 124, 255, 0.3);
                                 }}
                                 
                                 .item-icon {{
-                                    font-size: 20px;
-                                    width: 28px;
-                                    height: 28px;
+                                    font-size: 18px;
+                                    width: 24px;
+                                    height: 24px;
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
@@ -2862,17 +2869,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 .item-label {{
                                     font-size: 13px;
                                     font-weight: 500;
-                                    color: #374151;
+                                    color: #1a1a1a;
                                     white-space: nowrap;
-                                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                                    letter-spacing: -0.01em;
                                 }}
                                 
                                 .item-shortcut {{
                                     font-size: 11px;
-                                    color: #9ca3af;
+                                    font-weight: 500;
+                                    color: #999;
                                     margin-left: auto;
-                                    padding-left: 12px;
-                                    font-family: 'Courier New', monospace;
+                                    padding-left: 10px;
+                                    font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
                                 }}
                                 
                                 .radial-backdrop {{
@@ -2881,8 +2889,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     left: 0;
                                     width: 100%;
                                     height: 100%;
-                                    background: rgba(0, 0, 0, 0.02);
-                                    backdrop-filter: blur(1px);
+                                    background: rgba(255, 255, 255, 0.01);
+                                    backdrop-filter: blur(2px);
                                     z-index: -1;
                                 }}
                             </style>
@@ -2890,47 +2898,42 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <div class="radial-backdrop"></div>
                             <div class="radial-menu-container">
                                 <div class="radial-center" title="Menu">
-                                    <svg class="radial-center-icon" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                                        <circle cx="12" cy="12" r="1"></circle>
-                                        <circle cx="19" cy="12" r="1"></circle>
-                                        <circle cx="5" cy="12" r="1"></circle>
-                                        <circle cx="12" cy="5" r="1"></circle>
-                                        <circle cx="12" cy="19" r="1"></circle>
-                                    </svg>
+                                    <div class="radial-center-play"></div>
                                 </div>
                                 
-                                <div class="radial-item" id="item-create-baseline" style="--x: 0px; --y: -120px;">
+                                <div class="radial-item" id="item-create-baseline" style="--x: 0px; --y: -140px;">
                                     <div class="item-icon">📸</div>
-                                    <div class="item-label">Criar Baseline</div>
+                                    <div class="item-label">Move Tool</div>
                                     <div class="item-shortcut">M</div>
                                 </div>
                                 
-                                <div class="radial-item" id="item-export" style="--x: 104px; --y: -60px;">
-                                    <div class="item-icon">📥</div>
-                                    <div class="item-label">Exportar</div>
+                                <div class="radial-item" id="item-frame" style="--x: 121px; --y: -70px;">
+                                    <div class="item-icon">🖼</div>
+                                    <div class="item-label">Frame</div>
+                                    <div class="item-shortcut">F</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-pen" style="--x: 121px; --y: 70px;">
+                                    <div class="item-icon">✏</div>
+                                    <div class="item-label">Pen Tool</div>
                                     <div class="item-shortcut">P</div>
                                 </div>
                                 
-                                <div class="radial-item" id="item-view" style="--x: 104px; --y: 60px;">
-                                    <div class="item-icon">👁</div>
-                                    <div class="item-label">Visualizar</div>
+                                <div class="radial-item" id="item-text" style="--x: 0px; --y: 140px;">
+                                    <div class="item-icon">T</div>
+                                    <div class="item-label">Text</div>
                                     <div class="item-shortcut">T</div>
                                 </div>
                                 
-                                <div class="radial-item" id="item-settings" style="--x: 0px; --y: 120px;">
-                                    <div class="item-icon">⚙</div>
-                                    <div class="item-label">Configurações</div>
+                                <div class="radial-item" id="item-actions" style="--x: -121px; --y: 70px;">
+                                    <div class="item-icon">⚡</div>
+                                    <div class="item-label">Actions</div>
                                 </div>
                                 
-                                <div class="radial-item" id="item-compare" style="--x: -104px; --y: 60px;">
-                                    <div class="item-icon">📊</div>
-                                    <div class="item-label">Comparar</div>
-                                </div>
-                                
-                                <div class="radial-item" id="item-more" style="--x: -104px; --y: -60px;">
+                                <div class="radial-item" id="item-more" style="--x: -121px; --y: -70px;">
                                     <div class="item-icon">⋯</div>
-                                    <div class="item-label">Mais opções</div>
-                                    <div class="item-shortcut">W</div>
+                                    <div class="item-label">More</div>
+                                    <div class="item-shortcut">⋯</div>
                                 </div>
                             </div>
                         `;
@@ -2945,15 +2948,15 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Funções do Menu Radial
                         function showRadialMenu(x, y) {{
                             menu.style.display = 'block';
-                            menu.style.left = (x - 160) + 'px';
-                            menu.style.top = (y - 160) + 'px';
+                            menu.style.left = (x - 200) + 'px';
+                            menu.style.top = (y - 200) + 'px';
                             
                             setTimeout(() => {{
                                 const items = menu.querySelectorAll('.radial-item');
                                 items.forEach((item, index) => {{
                                     setTimeout(() => {{
                                         item.classList.add('visible');
-                                    }}, index * 50);
+                                    }}, index * 40);
                                 }});
                             }}, 10);
                         }}
@@ -3036,7 +3039,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }});
                         
                         // Outras ações (em breve)
-                        ['export', 'view', 'settings', 'compare', 'more'].forEach(action => {{
+                        ['frame', 'pen', 'text', 'actions', 'more'].forEach(action => {{
                             const item = menu.querySelector(`#item-${{action}}`);
                             if (item) {{
                                 item.addEventListener('click', function(e) {{
