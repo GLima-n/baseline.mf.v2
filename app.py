@@ -3016,7 +3016,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M18 18l-3-3m3 3l3-3m-3 3v-6" stroke="currentColor" fill="none" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 176px; left: 8px;">
+                                <div class="radial-tooltip" style="top: 176px; right: 185px;">
                                     Actions
                                 </div>
                                 
@@ -3027,7 +3027,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 128px; left: 4px;">
+                                <div class="radial-tooltip" style="top: 128px; right: 224px;">
                                     Objects
                                     <span class="tooltip-badge inactive-badge">O</span>
                                 </div>
@@ -3038,7 +3038,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 70px; left: 10px;">
+                                <div class="radial-tooltip" style="top: 70px; right: 210px;">
                                     Comment
                                     <span class="tooltip-badge inactive-badge">C</span>
                                 </div>
