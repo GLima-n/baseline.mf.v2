@@ -23,8 +23,6 @@ from datetime import datetime
 try:
     from dropdown_component import simple_multiselect_dropdown
     from popup import show_welcome_screen
-    from auto_reboot import check_and_reboot, show_uptime_badge
-except:
     from calculate_business_days import calculate_business_days
 except ImportError:
     st.warning("Componentes 'dropdown_component', 'popup' ou 'calculate_business_days' não encontrados. Alguns recursos podem não funcionar como esperado.")
@@ -73,12 +71,6 @@ if 'current_baseline_data' not in st.session_state:
     st.session_state.current_baseline_data = None
 if 'current_empreendimento' not in st.session_state:
     st.session_state.current_empreendimento = None
-
-# Verificar se precisa reiniciar o servidor (a cada 3 horas)
-try:
-    check_and_reboot()
-except:
-    pass  # Se auto_reboot não estiver disponível, continua normalmente
 
 # Mostrar popup de boas-vindas com campo de email
 show_welcome_screen()
