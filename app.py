@@ -2948,15 +2948,15 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     <div class="radial-center-play"></div>
                                 </div>
                                 
-                                <!-- 12h: Move Tool -->
+                                <!-- Topo: Move Tool (Criar Baseline) -->
                                 <div class="radial-item" id="btn-create-baseline" style="top: 38px; left: 118px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
                                 
-                                <!-- 1h30: Frame -->
-                                <div class="radial-item" style="top: 74px; left: 182px;">
+                                <!-- 51°: Frame -->
+                                <div class="radial-item" style="top: 68px; left: 180px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                         <rect x="14" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -2964,35 +2964,35 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <rect x="14" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 64px; right: 8px;">
+                                <div class="radial-tooltip" style="top: 58px; right: 15px;">
                                     Frame
                                     <span class="tooltip-badge inactive-badge">F</span>
                                 </div>
                                 
-                                <!-- 3h: Pen Tool -->
-                                <div class="radial-item" style="top: 118px; left: 212px;">
+                                <!-- 103°: Pen Tool -->
+                                <div class="radial-item" style="top: 136px; left: 196px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 50%; right: 4px; transform: translateY(-50%);">
+                                <div class="radial-tooltip" style="top: 50%; right: 8px; transform: translateY(-50%);">
                                     Pen Tool
                                     <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
                                 
-                                <!-- 4h30: Text -->
-                                <div class="radial-item" style="top: 162px; left: 182px;">
+                                <!-- 154°: Text -->
+                                <div class="radial-item" style="top: 190px; left: 153px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M5 4v3h5.5v12h3V7H19V4z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="bottom: 64px; right: 8px;">
+                                <div class="radial-tooltip" style="bottom: 40px; right: 40px;">
                                     Text
                                     <span class="tooltip-badge inactive-badge">T</span>
                                 </div>
                                 
-                                <!-- 7h30: Actions -->
-                                <div class="radial-item" style="top: 162px; left: 54px;">
+                                <!-- 206°: Actions -->
+                                <div class="radial-item" style="top: 190px; left: 83px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" rx="1"/>
                                         <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -3000,29 +3000,29 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M18 18l-3-3m3 3l3-3m-3 3v-6" stroke="currentColor" fill="none" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="bottom: 64px; left: 8px;">
+                                <div class="radial-tooltip" style="bottom: 40px; left: 40px;">
                                     Actions
                                 </div>
                                 
-                                <!-- 9h: Objects -->
-                                <div class="radial-item" style="top: 118px; left: 24px;">
+                                <!-- 257°: Objects -->
+                                <div class="radial-item" style="top: 136px; left: 40px;">
                                     <svg viewBox="0 0 24 24">
                                         <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                         <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 50%; left: 4px; transform: translateY(-50%);">
+                                <div class="radial-tooltip" style="top: 50%; left: 8px; transform: translateY(-50%);">
                                     Objects
                                     <span class="tooltip-badge inactive-badge">O</span>
                                 </div>
                                 
-                                <!-- 10h30: Comment -->
-                                <div class="radial-item" style="top: 74px; left: 54px;">
+                                <!-- 309°: Comment -->
+                                <div class="radial-item" style="top: 68px; left: 56px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 64px; left: 8px;">
+                                <div class="radial-tooltip" style="top: 58px; left: 15px;">
                                     Comment
                                     <span class="tooltip-badge inactive-badge">C</span>
                                 </div>
