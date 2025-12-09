@@ -7063,11 +7063,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // Obter cores do setor
                     const cores = coresPorSetor[task.setor] || coresPorSetor["Não especificado"];
                     
+                    // Verificar qual visualização está selecionada
+                    const tipoVisualizacao = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
+                    
                     let barPrevisto = null;
                     let barReal = null;
                     
-                    // Barra Prevista
-                    if (task.start_previsto && task.end_previsto) {{
+                    // Barra Prevista (só criar se visualização for "Previsto" ou "Ambos")
+                    if ((tipoVisualizacao === 'Previsto' || tipoVisualizacao === 'Ambos') && task.start_previsto && task.end_previsto) {{
                         const startDate = new Date(task.start_previsto);
                         const endDate = new Date(task.end_previsto);
                         
@@ -7099,8 +7102,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         }}
                     }}
                     
-                    // Barra Real
-                    if (task.start_real && task.end_real) {{
+                    // Barra Real (só criar se visualização for "Real" ou "Ambos")
+                    if ((tipoVisualizacao === 'Real' || tipoVisualizacao === 'Ambos') && task.start_real && task.end_real) {{
                         const startDate = new Date(task.start_real);
                         const endDate = new Date(task.end_real);
                         
