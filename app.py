@@ -3230,6 +3230,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // --- 6. BLOQUINHO DE NOTAS ---
                         let notepadActive = false;
                         const penIcon = menu.querySelector('[style*="top: 128px; left: 184px"]'); // Ícone Caneta
+                        const notepadTextarea = notepad.querySelector('.notepad-content');
+                        const NOTEPAD_STORAGE_KEY = 'gantt_notepad_content';
+                        
+                        // Carregar texto salvo do localStorage ao iniciar
+                        const savedContent = localStorage.getItem(NOTEPAD_STORAGE_KEY);
+                        if (savedContent && notepadTextarea) {{
+                            notepadTextarea.value = savedContent;
+                        }}
+                        
+                        // Salvar texto no localStorage sempre que digitar
+                        if (notepadTextarea) {{
+                            notepadTextarea.addEventListener('input', () => {{
+                                localStorage.setItem(NOTEPAD_STORAGE_KEY, notepadTextarea.value);
+                            }});
+                        }}
                         
                         // Toggle notepad ao clicar no ícone Caneta
                         if (penIcon) {{
@@ -3261,6 +3276,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     penIcon.style.borderColor = '';
                                     penIcon.style.background = '';
                                 }}
+                                // NÃO limpar localStorage aqui - apenas fechar visualmente
                             }});
                         }}
                         
