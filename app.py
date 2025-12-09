@@ -3001,7 +3001,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 10px; left: 50%; transform: translateX(-50%);">
+                                <div class="radial-tooltip yellow-tooltip" style="top: 10px; left: 50%; transform: translateX(-50%);">
                                     Em produção
                                     <span class="tooltip-badge inactive-badge">X</span>
                                 </div>
