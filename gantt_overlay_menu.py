@@ -324,24 +324,12 @@ def create_gantt_overlay_with_context_menu(iframe_height, selected_empreendiment
                 showLoading();
                 hideContextMenu();
                 
-                // Enviar mensagem para o Streamlit via postMessage
-                // O Streamlit irá capturar essa mensagem
-                window.parent.postMessage({{
-                    type: 'CREATE_BASELINE',
-                    empreendimento: selectedEmpreendimento,
-                    timestamp: new Date().getTime()
-                }}, '*');
+                // Redirecionar para Streamlit com query params
+                const timestamp = new Date().getTime();
+                const url = `?context_action=take_baseline&empreendimento=${{encodeURIComponent(selectedEmpreendimento)}}&t=${{timestamp}}`;
                 
-                // Simular resposta (em produção, aguardaria resposta do Streamlit)
-                setTimeout(() => {{
-                    hideLoading();
-                    showToast('✅ Baseline criada com sucesso!', 'success');
-                    
-                    // Recarregar a página após criação
-                    setTimeout(() => {{
-                        window.parent.location.reload();
-                    }}, 1500);
-                }}, 2000);
+                // Usar window.top para sair do iframe do componente
+                window.top.location.href = url;
             }}
             
             // Event listener para clique direito no overlay
@@ -401,17 +389,6 @@ def create_gantt_overlay_with_context_menu(iframe_height, selected_empreendiment
             document.addEventListener('contextmenu', (e) => {{
                 e.preventDefault();
             }}, true);
-            
-            // Receber mensagens do Streamlit (resposta à criação de baseline)
-            window.addEventListener('message', (event) => {{
-                if (event.data.type === 'BASELINE_CREATED') {{
-                    hideLoading();
-                    showToast('✅ Baseline ' + event.data.version + ' criada!', 'success');
-                }} else if (event.data.type === 'BASELINE_ERROR') {{
-                    hideLoading();
-                    showToast('❌ Erro: ' + event.data.message, 'error');
-                }}
-            }});
         </script>
     </body>
     </html>
