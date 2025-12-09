@@ -124,7 +124,7 @@ def show_welcome_screen():
     restricted_emails_js = str(restricted_emails).replace("'", '"')
     
     # Verificar se há erro de login
-    login_error =st.session_state.get('login_error', '')
+    login_error = st.session_state.get('login_error', '')
     if login_error:
         # Limpar erro após mostrar
         st.session_state.login_error = ''
