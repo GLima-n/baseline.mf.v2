@@ -2835,21 +2835,26 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     cursor: pointer;
                                     transition: all 0.2s ease;
                                     z-index: 5;
+                                    background: white;
+                                    border-radius: 6px;
+                                    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+                                }}
+                                
+                                .radial-item:hover {{
+                                    background: #f5f5f5;
+                                    transform: scale(1.1);
+                                    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
                                 }}
                                 
                                 .radial-item svg {{
-                                    width: 18px;
-                                    height: 18px;
+                                    width: 16px;
+                                    height: 16px;
                                     transition: all 0.2s ease;
-                                }}
-                                
-                                .radial-item svg {{
                                     fill: #333333;
                                 }}
                                 
                                 .radial-item:hover svg {{
                                     fill: #000000;
-                                    transform: scale(1.15);
                                 }}
                                 
                                 .radial-tooltip {{
@@ -2863,14 +2868,23 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     align-items: center;
                                     gap: 5px;
                                     pointer-events: none;
-                                    transition: all 0.2s ease;
+                                    transition: opacity 0.2s ease, transform 0.2s ease;
                                     z-index: 15;
+                                    opacity: 0;
+                                    transform: scale(0.9);
+                                }}
+                                
+                                .radial-item:hover + .radial-tooltip {{
+                                    opacity: 1;
+                                    transform: scale(1);
                                 }}
                                 
                                 .radial-tooltip.active {{
                                     background: #007AFF;
                                     color: white;
                                     box-shadow: 0 2px 12px rgba(0, 122, 255, 0.3);
+                                    opacity: 1 !important;
+                                    transform: scale(1) !important;
                                 }}
                                 
                                 .radial-tooltip:not(.active) {{
