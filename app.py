@@ -6680,7 +6680,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 background: white;
                 border-radius: 8px;
                 box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-                z-index: 99;
+                z-index: 999;
                 padding: 15px;
                 border: 1px solid #e2e8f0;
             }}
