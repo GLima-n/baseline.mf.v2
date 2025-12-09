@@ -6525,13 +6525,13 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     
     # Ícones por setor
     setor_icons = {
-        "PROSPECÇÃO": "🔍",
-        "LEGALIZAÇÃO": "📋",
-        "PULMÃO": "⏱️",
-        "ENGENHARIA": "📐",
-        "SUPRIMENTOS": "📦",
-        "OBRAS": "🏗️",
-        "ENTREGA": "🎉"
+        "PROSPECÇÃO": "",
+        "LEGALIZAÇÃO": "",
+        "PULMÃO": "",
+        "ENGENHARIA": "",
+        "SUPRIMENTOS": "",
+        "OBRAS": "",
+        "ENTREGA": ""
     }
     
     # --- 5. Gerar HTML/CSS/JavaScript ---
@@ -7916,43 +7916,67 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.consolidated_view = False
                 st.session_state.selected_etapa_nome = "Todos" # Valor inicial
 
-            # Função de callback para alternar o estado
-            def toggle_consolidated_view():
-                st.session_state.consolidated_view = not st.session_state.consolidated_view
-                if st.session_state.consolidated_view:
-                    # Se for para consolidar, pega a primeira etapa disponível (ou uma lógica mais robusta se necessário)
-                    etapa_para_consolidar = next((e for e in etapas_para_exibir if e != "Todos"), "Todos")
-                    st.session_state.selected_etapa_nome = etapa_para_consolidar
-                else:
-                    st.session_state.selected_etapa_nome = "Todos"
-
-            # Botão de ativação da visão etapa - já centralizado pelo CSS acima
-            button_label = "Aplicar Visão Etapa" if not st.session_state.consolidated_view else "Voltar para Visão EMP"
-            st.button(button_label, on_click=toggle_consolidated_view, use_container_width=True)
-            
-            # --- NOVO: Seletor de Setor ---
             # Inicializa o estado da visualização por setor se não existir
             if 'sector_view' not in st.session_state:
                 st.session_state.sector_view = False
                 st.session_state.selected_setor_nome = "Todos"
             
-            # Função de callback para alternar visualização por setor
-            def toggle_sector_view():
-                st.session_state.sector_view = not st.session_state.sector_view
-                if st.session_state.sector_view:
-                    # Se ativar visão por setor, desativa visão consolidada
-                    st.session_state.consolidated_view = False
-                    st.session_state.selected_etapa_nome = "Todos"
-                    # Pega o primeiro setor disponível
-                    setores_disponiveis = sorted(list(SETOR.keys()))
-                    setor_para_exibir = setores_disponiveis[0] if setores_disponiveis else "Todos"
-                    st.session_state.selected_setor_nome = setor_para_exibir
-                else:
-                    st.session_state.selected_setor_nome = "Todos"
+            # Funções de callback para cada modo de visualização
+            def set_project_view():
+                st.session_state.consolidated_view = False
+                st.session_state.sector_view = False
+                st.session_state.selected_etapa_nome = "Todos"
+                st.session_state.selected_setor_nome = "Todos"
             
-            # Botão de ativação da visão por setor
-            sector_button_label = "Aplicar Visão Setor" if not st.session_state.sector_view else "Voltar para Visão EMP"
-            st.button(sector_button_label, on_click=toggle_sector_view, use_container_width=True)
+            def set_consolidated_view():
+                st.session_state.consolidated_view = True
+                st.session_state.sector_view = False
+                # Pega a primeira etapa disponível
+                etapa_para_consolidar = next((e for e in etapas_para_exibir if e != "Todos"), "Todos")
+                st.session_state.selected_etapa_nome = etapa_para_consolidar
+                st.session_state.selected_setor_nome = "Todos"
+            
+            def set_sector_view():
+                st.session_state.consolidated_view = False
+                st.session_state.sector_view = True
+                st.session_state.selected_etapa_nome = "Todos"
+                # Pega o primeiro setor disponível
+                setores_disponiveis = sorted(list(SETOR.keys()))
+                setor_para_exibir = setores_disponiveis[0] if setores_disponiveis else "Todos"
+                st.session_state.selected_setor_nome = setor_para_exibir
+
+            # --- TRÊS BOTÕES SEPARADOS PARA NAVEGAÇÃO ---
+            st.markdown("#### 📊 Gráficos Gantt")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Botão Por Projeto (ativo quando ambos são False)
+                is_project = not st.session_state.consolidated_view and not st.session_state.sector_view
+                st.button(
+                    "📁 Por Projeto", 
+                    on_click=set_project_view, 
+                    use_container_width=True,
+                    type="primary" if is_project else "secondary"
+                )
+            
+            with col2:
+                # Botão Consolidado (ativo quando consolidated_view é True)
+                st.button(
+                    "📊 Consolidado", 
+                    on_click=set_consolidated_view, 
+                    use_container_width=True,
+                    type="primary" if st.session_state.consolidated_view else "secondary"
+                )
+            
+            with col3:
+                # Botão Por Setor (ativo quando sector_view é True)
+                st.button(
+                    "🏢 Por Setor", 
+                    on_click=set_sector_view, 
+                    use_container_width=True,
+                    type="primary" if st.session_state.sector_view else "secondary"
+                )
             
             # Mensagens centralizadas
             st.markdown("""
