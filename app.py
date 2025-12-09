@@ -2744,7 +2744,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             realBars.forEach(bar => {{
                                 if (isExpanded) {{
                                     bar.classList.add('parent-task-real', 'expanded');
-                                    // Define a cor da borda com a mesma cor original
                                     const originalColor = bar.style.backgroundColor;
                                     bar.style.borderColor = originalColor;
                                 }} else {{
@@ -2755,14 +2754,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
-                    // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
-                    // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
+                    // --- MENU RADIAL CIRCULAR (ESTILO MODERNO) ---
                     (function() {{
-                        // 1. Configuração
                         const containerId = 'gantt-container-' + '{project["id"]}';
                         const container = document.getElementById(containerId);
                         
-                        // Garante iframe
                         let iframe = document.getElementById('hidden-iframe');
                         if (!iframe) {{
                             iframe = document.createElement('iframe');
@@ -2773,55 +2769,212 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         if (!container) return;
 
-                        // Limpeza visual
-                        const oldMenu = container.querySelector('#context-menu');
+                        const oldMenu = container.querySelector('#radial-menu');
                         if (oldMenu) oldMenu.remove();
                         const oldToast = container.querySelector('.js-toast-loading');
                         if (oldToast) oldToast.remove();
 
-                        // 2. Criar Menu
+                        // Criar Menu Radial
                         const menu = document.createElement('div');
-                        menu.id = 'context-menu';
-                        menu.style.cssText = "position:fixed; z-index:2147483647; background:white; border:1px solid #ccc; border-radius:5px; display:none; min-width:160px; box-shadow:0 4px 15px rgba(0,0,0,0.2); font-family:sans-serif;";
+                        menu.id = 'radial-menu';
+                        menu.style.cssText = "position:fixed; z-index:2147483647; display:none; font-family:'Segoe UI', sans-serif;";
+                        
                         menu.innerHTML = `
-                            <div class="context-menu-item" id="btn-create-baseline" style="padding:12px 16px; cursor:pointer; font-size:13px; color:#333; display:flex; align-items:center; gap:8px;">
-                                <span>📸</span> <b>Criar Linha de Base</b>
+                            <style>
+                                .radial-menu-container {{
+                                    position: relative;
+                                    width: 280px;
+                                    height: 280px;
+                                }}
+                                
+                                .radial-center {{
+                                    position: absolute;
+                                    top: 50%;
+                                    left: 50%;
+                                    transform: translate(-50%, -50%);
+                                    width: 60px;
+                                    height: 60px;
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    border-radius: 50%;
+                                    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    font-size: 24px;
+                                    color: white;
+                                    cursor: pointer;
+                                    transition: all 0.3s ease;
+                                    z-index: 10;
+                                }}
+                                
+                                .radial-center:hover {{
+                                    transform: translate(-50%, -50%) scale(1.1);
+                                    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.6);
+                                }}
+                                
+                                .radial-item {{
+                                    position: absolute;
+                                    top: 50%;
+                                    left: 50%;
+                                    width: 70px;
+                                    height: 70px;
+                                    margin: -35px 0 0 -35px;
+                                    background: white;
+                                    border-radius: 50%;
+                                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+                                    display: flex;
+                                    flex-direction: column;
+                                    align-items: center;
+                                    justify-content: center;
+                                    cursor: pointer;
+                                    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+                                    opacity: 0;
+                                    transform: translate(0, 0) scale(0.3);
+                                    border: 2px solid #f0f0f0;
+                                }}
+                                
+                                .radial-item.visible {{
+                                    opacity: 1;
+                                    transform: translate(var(--x), var(--y)) scale(1);
+                                }}
+                                
+                                .radial-item:hover {{
+                                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                                    color: white;
+                                    transform: translate(var(--x), var(--y)) scale(1.15);
+                                    box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+                                    border-color: #667eea;
+                                }}
+                                
+                                .radial-item:hover .item-icon {{
+                                    filter: brightness(0) invert(1);
+                                }}
+                                
+                                .radial-item:hover .item-label {{
+                                    color: white;
+                                }}
+                                
+                                .item-icon {{
+                                    font-size: 24px;
+                                    margin-bottom: 2px;
+                                    transition: all 0.3s ease;
+                                }}
+                                
+                                .item-label {{
+                                    font-size: 9px;
+                                    font-weight: 600;
+                                    text-align: center;
+                                    color: #555;
+                                    white-space: nowrap;
+                                    transition: all 0.3s ease;
+                                }}
+                                
+                                .radial-backdrop {{
+                                    position: fixed;
+                                    top: 0;
+                                    left: 0;
+                                    width: 100%;
+                                    height: 100%;
+                                    background: rgba(0, 0, 0, 0.05);
+                                    z-index: -1;
+                                }}
+                            </style>
+                            
+                            <div class="radial-backdrop"></div>
+                            <div class="radial-menu-container">
+                                <div class="radial-center" title="Menu">📊</div>
+                                
+                                <div class="radial-item" id="item-create-baseline" data-angle="0" style="--x: 0px; --y: -100px;">
+                                    <div class="item-icon">📸</div>
+                                    <div class="item-label">Criar Base</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-export" data-angle="60" style="--x: 87px; --y: -50px;">
+                                    <div class="item-icon">📥</div>
+                                    <div class="item-label">Exportar</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-view" data-angle="120" style="--x: 87px; --y: 50px;">
+                                    <div class="item-icon">👁️</div>
+                                    <div class="item-label">Visualizar</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-settings" data-angle="180" style="--x: 0px; --y: 100px;">
+                                    <div class="item-icon">⚙️</div>
+                                    <div class="item-label">Config</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-compare" data-angle="240" style="--x: -87px; --y: 50px;">
+                                    <div class="item-icon">📊</div>
+                                    <div class="item-label">Comparar</div>
+                                </div>
+                                
+                                <div class="radial-item" id="item-info" data-angle="300" style="--x: -87px; --y: -50px;">
+                                    <div class="item-icon">ℹ️</div>
+                                    <div class="item-label">Info</div>
+                                </div>
                             </div>
                         `;
                         container.appendChild(menu);
 
-                        // 3. Criar Toast
+                        // Criar Toast
                         const toast = document.createElement('div');
                         toast.className = 'js-toast-loading';
                         toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
                         container.appendChild(toast);
 
-                        // 4. Listeners
+                        // Funções do Menu Radial
+                        function showRadialMenu(x, y) {{
+                            menu.style.display = 'block';
+                            menu.style.left = (x - 140) + 'px';
+                            menu.style.top = (y - 140) + 'px';
+                            
+                            setTimeout(() => {{
+                                const items = menu.querySelectorAll('.radial-item');
+                                items.forEach((item, index) => {{
+                                    setTimeout(() => {{
+                                        item.classList.add('visible');
+                                    }}, index * 50);
+                                }});
+                            }}, 10);
+                        }}
+                        
+                        function hideRadialMenu() {{
+                            const items = menu.querySelectorAll('.radial-item');
+                            items.forEach(item => {{
+                                item.classList.remove('visible');
+                            }});
+                            setTimeout(() => {{
+                                menu.style.display = 'none';
+                            }}, 200);
+                        }}
+
+                        // Event Listeners
                         container.addEventListener('contextmenu', function(e) {{
                             if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                                 e.preventDefault();
-                                menu.style.display = 'block';
-                                menu.style.left = e.clientX + 'px';
-                                menu.style.top = e.clientY + 'px';
-                            }} else {{
-                                menu.style.display = 'none';
+                                showRadialMenu(e.clientX, e.clientY);
                             }}
                         }});
 
                         document.addEventListener('click', function(e) {{
-                            if (menu.style.display === 'block' && !menu.contains(e.target)) {{
-                                menu.style.display = 'none';
+                            if (menu.style.display === 'block' && !e.target.closest('#radial-menu')) {{
+                                hideRadialMenu();
                             }}
                         }}, true);
-
-                        // --- 5. AÇÃO DO BOTÃO ---
-                        const btnCreate = menu.querySelector('#btn-create-baseline');
                         
+                        const centerBtn = menu.querySelector('.radial-center');
+                        centerBtn.addEventListener('click', function(e) {{
+                            e.stopPropagation();
+                            hideRadialMenu();
+                        }});
+
+                        // AÇÕES DOS ITENS
+                        const btnCreate = menu.querySelector('#item-create-baseline');
                         btnCreate.addEventListener('click', function(e) {{
                             e.stopPropagation();
                             e.preventDefault();
 
-                            // A. Nome do Projeto
                             let currentProjectName = "Desconhecido";
                             if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                                 currentProjectName = projectData[0].name;
@@ -2830,47 +2983,52 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 if (titleEl) currentProjectName = titleEl.textContent;
                             }}
 
-                            // B. Feedback Visual (Laranja = Processando)
-                            menu.style.display = 'none';
+                            hideRadialMenu();
                             toast.style.display = 'block';
-                            toast.style.backgroundColor = "#e67e22"; // Laranja
+                            toast.style.backgroundColor = "#e67e22";
                             toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
-                            // C. Montar URL CORRETA
                             const encodedProject = encodeURIComponent(currentProjectName);
                             const timestamp = new Date().getTime();
                             
-                            // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
-                            // Isso corrige o bug do "about:srcdoc"
                             let baseUrl = document.referrer;
                             if (!baseUrl || baseUrl === "") {{
-                                // Fallback raro
                                 baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
                             }}
-                            // Remove barra final
                             if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-                            // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
                             const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
 
                             console.log("🚀 URL Iframe:", finalUrl);
                             
-                            // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
                             if (iframe) iframe.src = finalUrl;
 
-                            // E. Feedback Final
-                            // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
                             setTimeout(() => {{
-                                toast.style.backgroundColor = "#27ae60"; // Verde
+                                toast.style.backgroundColor = "#27ae60";
                                 toast.innerHTML = `
                                     <div style="display:flex; flex-direction:column; gap:5px;">
                                         <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
-                                        <span style="font-size:12px;">Dados processados em segundo plano.</span>
+                                        <span style="font-size:12px; ">Dados processados em segundo plano.</span>
                                         <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
                                     </div>
                                 `;
                                 setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
                             }}, 4000);
+                        }});
+                        
+                        // Outras ações (em breve)
+                        ['export', 'view', 'settings', 'compare', 'info'].forEach(action => {{
+                            const item = menu.querySelector(`#item-${{action}}`);
+                            if (item) {{
+                                item.addEventListener('click', function(e) {{
+                                    e.stopPropagation();
+                                    hideRadialMenu();
+                                    toast.style.display = 'block';
+                                    toast.style.backgroundColor = "#3498db";
+                                    toast.innerHTML = `ℹ️ Função "${{action}}" em desenvolvimento...`;
+                                    setTimeout(() => {{ toast.style.display = 'none'; }}, 3000);
+                                }});
+                            }}
                         }});
 
                     }})();
