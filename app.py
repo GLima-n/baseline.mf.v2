@@ -2800,7 +2800,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     transform: translate(-50%, -50%);
                                     width: 44px;
                                     height: 44px;
-                                    border: 4px solid #007AFF;
+                                    border: 3px solid #007AFF;
                                     border-radius: 50%;
                                     background: transparent;
                                     cursor: pointer;
@@ -2813,7 +2813,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 
                                 .radial-center:hover {{
                                     transform: translate(-50%, -50%) scale(1.1);
-                                    border-width: 5px;
+                                    border-width: 4px;
                                 }}
                                 
                                 .radial-center-play {{
