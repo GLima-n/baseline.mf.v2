@@ -68,7 +68,7 @@ def show_welcome_screen():
         for logo_path in logo_paths:
             if os.path.exists(logo_path):
                 try:
-                    print(f"✅ Logo encontrada: {logo_path}")
+                    print(f"[OK] Logo encontrada: {logo_path}")
                     with open(logo_path, 'rb') as f:
                         logo_data = base64.b64encode(f.read()).decode('utf-8')
                         if logo_path.endswith('.svg'):
@@ -76,9 +76,9 @@ def show_welcome_screen():
                         else:
                             return f"data:image/png;base64,{logo_data}"
                 except Exception as e:
-                    print(f"❌ Erro ao carregar {logo_path}: {e}")
+                    print(f"[ERRO] Ao carregar {logo_path}: {e}")
                     continue
-        print("⚠️ Nenhuma logo encontrada")
+        print("[AVISO] Nenhuma logo encontrada")
         return ""
     
     svg_base64 = load_svg_as_base64()
