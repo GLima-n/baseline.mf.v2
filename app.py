@@ -2954,10 +2954,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip active" style="top: 8px; left: 50%; transform: translateX(-50%);">
-                                    Move Tool
-                                    <span class="tooltip-badge active-badge">M</span>
-                                </div>
                                 
                                 <!-- 1h30: Frame -->
                                 <div class="radial-item" style="top: 74px; left: 182px;">
@@ -2993,11 +2989,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 <div class="radial-tooltip" style="bottom: 64px; right: 8px;">
                                     Text
                                     <span class="tooltip-badge inactive-badge">T</span>
-                                </div>
-                                
-                                <!-- 6h: More -->
-                                <div class="radial-more" style="top: 218px; left: 50%; transform: translateX(-50%);">
-                                    More ...
                                 </div>
                                 
                                 <!-- 7h30: Actions -->
