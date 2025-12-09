@@ -6551,7 +6551,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
             .gantt-bar.real .bar-label {{ color: white; }}
             .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
-            .tooltip {{ position: fixed; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
+            .tooltip {{ position: absolute; background-color: #2d3748; color: white; padding: 6px 10px; border-radius: 4px; font-size: 11px; z-index: 1000; box-shadow: 0 2px 8px rgba(0,0,0,0.3); pointer-events: none; opacity: 0; transition: opacity 0.2s ease; max-width: 220px; }}
             .tooltip.show {{ opacity: 1; }}
             .today-line {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fdf1f1; z-index: 5; box-shadow: 0 0 1px rgba(229, 62, 62, 0.6); }}
             .month-divider {{ position: absolute; top: 60px; bottom: 0; width: 1px; background-color: #fcf6f6; z-index: 4; pointer-events: none; }}
@@ -6808,9 +6808,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     <div class="chart-container" id="chart-container-{project["id"]}"></div>
                 </div>
             </div>
+            
+            <!-- Tooltip dentro do container para funcionar em fullscreen -->
+            <div class="tooltip" id="tooltip"></div>
         </div>
-        
-        <div class="tooltip" id="tooltip"></div>
         
         <script>
             // Dados de todos os setores
@@ -7186,9 +7187,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 tooltip.innerHTML = content;
                 tooltip.classList.add('show');
                 
-                // Posicionar tooltip
-                const x = event.clientX + 10;
-                const y = event.clientY + 10;
+                // Posicionar tooltip (relativo ao container para funcionar em fullscreen)
+                const container = document.getElementById('gantt-container-{project["id"]}');
+                const rect = container.getBoundingClientRect();
+                const x = event.clientX - rect.left + 10;
+                const y = event.clientY - rect.top + 10;
                 tooltip.style.left = `${{x}}px`;
                 tooltip.style.top = `${{y}}px`;
             }}
