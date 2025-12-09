@@ -2998,7 +2998,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     </svg>
                                 </div>
                                 <div class="radial-tooltip" style="top: 114px; left: 224px;">
-                                    Caneta
+                                    Notas
                                     <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
                                 
@@ -3012,7 +3012,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     </svg>
                                 </div>
                                 <div class="radial-tooltip" style="top: 114px; right: 224px;">
-                                    Ações
+                                    Modo Foco
                                 </div>
                             </div>
                         `;
