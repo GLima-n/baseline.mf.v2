@@ -6717,7 +6717,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .baseline-resize-corner {{
                 position: absolute;
                 bottom: 0;
-                left: 0;
+                right: 0;
                 width: 16px;
                 height: 16px;
                 cursor: nwse-resize;
@@ -6727,14 +6727,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 content: '';
                 position: absolute;
                 bottom: -2px;
-                left: -2px;
+                right: -2px;
                 width: 0;
                 height: 0;
                 border-style: solid;
                 border-width: 0 0 18px 18px;
                 border-color: transparent;
-                transform: rotate(-45deg);
-                transform-origin: bottom left;
+                transform: rotate(45deg);
+                transform-origin: bottom right;
             }}
             .baseline-resize-corner:hover::before {{
                 border-color: transparent;
@@ -6743,7 +6743,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 content: '';
                 position: absolute;
                 bottom: 2px;
-                left: 2px;
+                right: 2px;
                 width: 10px;
                 height: 10px;
                 transform: rotate(-45deg);
@@ -7401,7 +7401,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             if (resizeCorner) {{
                 let isResizing = false;
-                let startX, startY, startWidth, startHeight;
+                let startX, startY, startWidth, startHeight, startRight;
                 
                 resizeCorner.addEventListener('mousedown', (e) => {{
                     isResizing = true;
@@ -7409,6 +7409,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     startY = e.clientY;
                     startWidth = parseInt(document.defaultView.getComputedStyle(baselineSelector).width, 10);
                     startHeight = parseInt(document.defaultView.getComputedStyle(baselineSelector).height, 10);
+                    startRight = parseInt(document.defaultView.getComputedStyle(baselineSelector).right, 10);
                     
                     e.preventDefault();
                     e.stopPropagation();
@@ -7417,17 +7418,22 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 document.addEventListener('mousemove', (e) => {{
                     if (!isResizing) return;
                     
-                    // Calcular nova largura e altura
+                    // Calcular movimento
                     const deltaX = e.clientX - startX;
                     const deltaY = e.clientY - startY;
                     
+                    // Nova largura: aumenta quando arrasta para DIREITA (deltaX positivo)
                     const newWidth = startWidth + deltaX;
                     const newHeight = startHeight + deltaY;
                     
-                    // Aplicar com limites
+                    // Aplicar largura com limites
                     if (newWidth >= 250 && newWidth <= 700) {{
                         baselineSelector.style.width = newWidth + 'px';
+                        // Ajustar right para compensar o aumento de largura
+                        baselineSelector.style.right = (startRight - deltaX) + 'px';
                     }}
+                    
+                    // Aplicar altura com limites
                     if (newHeight >= 200 && newHeight <= 800) {{
                         baselineSelector.style.height = newHeight + 'px';
                         
