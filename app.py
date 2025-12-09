@@ -2905,13 +2905,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-item:hover + .radial-tooltip {{
-                                    background: #007AFF;
-                                    color: white;
+                                    background: #FFC107;
+                                    color: #333;
                                 }}
                                 
                                 .radial-item:hover + .radial-tooltip .tooltip-badge {{
-                                    background: white;
-                                    color: #007AFF;
+                                    background: #333;
+                                    color: #FFC107;
                                 }}
                                 
                                 .radial-tooltip.active {{
@@ -2990,6 +2990,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
+                                <div class="radial-tooltip" style="top: 10px; left: 50%; transform: translateX(-50%);">
+                                    Em produção
+                                    <span class="tooltip-badge inactive-badge">X</span>
+                                </div>
                                 
                                 <!-- Direita: Pen Tool (Caneta) -->
                                 <div class="radial-item" style="top: 114px; left: 184px;">
@@ -2999,7 +3003,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 <div class="radial-tooltip" style="top: 114px; left: 224px;">
                                     Notas
-                                    <span class="tooltip-badge inactive-badge">P</span>
+                                    <span class="tooltip-badge inactive-badge">N</span>
                                 </div>
                                 
                                 <!-- Esquerda: Actions (Ações) -->
@@ -3013,6 +3017,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 <div class="radial-tooltip" style="top: 114px; right: 224px;">
                                     Modo Foco
+                                    <span class="tooltip-badge inactive-badge">F</span>
                                 </div>
                             </div>
                         `;
