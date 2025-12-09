@@ -148,7 +148,7 @@ def show_welcome_screen():
         }}
         
         .logo-container img {{
-            max-width: 200px;
+            max-width: 250px;
             height: auto;
             transition: transform 0.3s ease;
         }}
