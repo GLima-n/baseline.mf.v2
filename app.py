@@ -6544,6 +6544,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .chart-body {{ position: relative; }}
             .gantt-row {{ position: relative; height: 30px; border-bottom: 1px solid #eff2f5; background-color: white; }}
             .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+            .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
             .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
             .gantt-bar.previsto {{ z-index: 7; }}
             .gantt-bar.real {{ z-index: 8; }}
@@ -7023,6 +7024,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // Obter cores do setor
                     const cores = coresPorSetor[task.setor] || coresPorSetor["Não especificado"];
                     
+                    let barPrevisto = null;
+                    let barReal = null;
+                    
                     // Barra Prevista
                     if (task.start_previsto && task.end_previsto) {{
                         const startDate = new Date(task.start_previsto);
@@ -7035,7 +7039,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
                         
                         if (width > 0) {{
-                            const barPrevisto = document.createElement('div');
+                            barPrevisto = document.createElement('div');
                             barPrevisto.className = 'gantt-bar previsto';
                             barPrevisto.style.left = `${{left}}px`;
                             barPrevisto.style.width = `${{width}}px`;
@@ -7068,7 +7072,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
                         
                         if (width > 0) {{
-                            const barReal = document.createElement('div');
+                            barReal = document.createElement('div');
                             barReal.className = 'gantt-bar real';
                             barReal.style.left = `${{left}}px`;
                             barReal.style.width = `${{width}}px`;
@@ -7086,6 +7090,39 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             barReal.addEventListener('mouseleave', hideTooltip);
                             
                             row.appendChild(barReal);
+                        }}
+                    }}
+                    
+                    // --- SOBREPOSIÇÃO: Ajustar z-index se real engloba previsto ---
+                    if (barPrevisto && barReal) {{
+                        const s_prev = new Date(task.start_previsto);
+                        const e_prev = new Date(task.end_previsto);
+                        const s_real = new Date(task.start_real);
+                        const e_real = new Date(task.end_real);
+                        
+                        if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{
+                            barPrevisto.style.zIndex = '8';
+                            barReal.style.zIndex = '7';
+                        }}
+                        
+                        // Renderizar barra de overlap hachurada
+                        const overlap_start = new Date(Math.max(s_prev, s_real));
+                        const overlap_end = new Date(Math.min(e_prev, e_real));
+                        
+                        if (overlap_start < overlap_end) {{
+                            const diffStart = (overlap_start - dataInicio) / (1000 * 60 * 60 * 24);
+                            const diffEnd = (overlap_end - dataInicio) / (1000 * 60 * 60 * 24);
+                            
+                            const left = (diffStart / 30.4375) * larguraMes;
+                            const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                            
+                            if (width > 0) {{
+                                const overlapBar = document.createElement('div');
+                                overlapBar.className = 'gantt-bar-overlap';
+                                overlapBar.style.left = `${{left}}px`;
+                                overlapBar.style.width = `${{width}}px`;
+                                row.appendChild(overlapBar);
+                            }}
                         }}
                     }}
                     
