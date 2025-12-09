@@ -2853,40 +2853,26 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 toast.innerHTML = `⏳ Criando baseline para <b>${{currentProjectName}}</b>...`;
                             }}
 
-                            // D. Enviar mensagem para o parent (Streamlit) via postMessage
+                            // D. SOLUÇÃO SIMPLES: Recarregar página com query params
                             try {{
-                                // Enviar para o parent window (sai do sandbox do iframe)
-                                window.parent.postMessage({{
-                                    action: 'create_baseline',
-                                    empreendimento: currentProjectName,
-                                    timestamp: new Date().getTime()
-                                }},  '*'); // '*' permite qualquer origem (seguro pois é nosso próprio código)
+                                // Encode o nome do projeto
+                                const encodedProject = encodeURIComponent(currentProjectName);
                                 
-                                console.log('✅ Mensagem postMessage enviada ao Streamlit parent');
+                                // Construir URL com query parameters
+                                const currentUrl = window.parent.location.href;
+                                const baseUrl = currentUrl.split('?')[0];
+                                const newUrl = `${{baseUrl}}?create_baseline=${{encodedProject}}&t=${{new Date().getTime()}}`;
                                 
-                                // E. Feedback de sucesso
-                                setTimeout(() => {{
-                                    if (toast) {{
-                                        toast.style.backgroundColor = '#27ae60'; // Verde
-                                        toast.innerHTML = `
-                                            <div style="display:flex; flex-direction:column; gap:5px;">
-                                                <span style="font-weight:bold; font-size:14px;">✅ Baseline enviada!</span>
-                                                <span style="font-size:12px;">Processando no servidor...</span>
-                                            </div>
-                                        `;
-                                    }}
-                                }}, 500);
+                                console.log('🔄 Navegando para:', newUrl);
                                 
-                                // F. Esconder toast após 3 segundos
-                                setTimeout(() => {{
-                                    if (toast) toast.style.display = 'none';
-                                }}, 3500);
+                                // Navegar para a nova URL (recarrega a página e processa a baseline)
+                                window.parent.location.href = newUrl;
                                 
                             }} catch (error) {{
-                                console.error('❌ Erro ao enviar mensagem:', error);
+                                console.error('❌ Erro ao navegar:', error);
                                 if (toast) {{
                                     toast.style.backgroundColor = '#e74c3c'; // Vermelho
-                                    toast.innerHTML = '❌ Erro ao comunicar com Streamlit';
+                                    toast.innerHTML = '❌ Erro ao criar baseline';
                                     setTimeout(() => {{ toast.style.display = 'none'; }}, 3000);
                                 }}
                             }}
@@ -6157,45 +6143,24 @@ with st.spinner("Carregando e processando dados..."):
 
 
         # ===========================================================================================
-        # NOVO: Listener usando API NATIVA do Streamlit (sem dependências externas)
+        # PROCESSAR QUERY PARAMETERS PARA CRIAÇÃO DE BASELINE (SOLUÇÃO SIMPLES E CONFIÁVEL)
         # ===========================================================================================
-        baseline_trigger_html = f"""
-        <script>
-            // Listener para mensagens do iframe Gantt
-            window.addEventListener('message', function(event) {{
-                if (event.data && event.data.action === 'create_baseline') {{
-                    console.log('📨 Listener: Mensagem recebida!', event.data);
-                    
-                    // Usar API NATIVA do Streamlit
-                    window.parent.postMessage({{
-                        isStreamlitMessage: true,
-                        type: "streamlit:setComponentValue",
-                        value: event.data
-                    }}, "*");
-                }}
-            }});
+        query_params = st.query_params
+        
+        if 'create_baseline' in query_params:
+            empreendimento = query_params['create_baseline']
+            empreendimento = urllib.parse.unquote(empreendimento)  # Decodificar
             
-            console.log('✅ Listener nativo configurado');
-        </script>
-        """
-        
-        baseline_trigger_data = components.html(baseline_trigger_html, height=0, scrolling=False)
-        
+            print(f"📨 Query Params: Trigger recebido para '{empreendimento}'")
+            
+            # Limpar query params IMEDIATAMENTE para evitar reprocessamento
+            st.query_params.clear()
+            
+            # Definir trigger  
+            st.session_state.create_baseline_trigger = True
+            st.session_state.baseline_empreendimento = empreendimento
         # ===========================================================================================
-        # Processar resposta do listener
-        # ===========================================================================================
-        print("🔍 DEBUG: Verificando baseline_trigger_data...")
-        print(f"🔍 DEBUG: baseline_trigger_data = {baseline_trigger_data}")
         
-        if baseline_trigger_data and isinstance(baseline_trigger_data, dict) and baseline_trigger_data.get('action') == 'create_baseline':
-            empreendimento = baseline_trigger_data.get('empreendimento')
-            if empreendimento:
-                print(f"📨 Streamlit: Trigger recebido para '{empreendimento}'")
-                st.session_state.create_baseline_trigger = True
-                st.session_state.baseline_empreendimento = empreendimento
-                # Rerun será chamado dentro de process_baseline_trigger após criar a baseline
-        else:
-            print("🔍 DEBUG: Nenhum trigger recebido neste rerun")
         
         # ===========================================================================================
         # NOVO: Processar Trigger de Baseline (via session_state)
