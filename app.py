@@ -7483,138 +7483,135 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // --- INICIALIZAÇÃO DOS FILTROS E EVENT LISTENERS ---
-            // Aguardar carregamento do VirtualSelect
-            document.addEventListener('DOMContentLoaded', function() {{
-                try {{
-                    // Dados dos filtros
-                    const filterOptions = {json.dumps(filter_options)};
-                    
-                    // Configuração padrão do VirtualSelect
-                    const vsConfig = {{
-                        multiple: true,
-                        search: true,
-                        optionsCount: 6,
-                        showResetButton: true,
-                        resetButtonText: 'Limpar',
-                        selectAllText: 'Selecionar Todos',
-                        allOptionsSelectedText: 'Todos',
-                        optionsSelectedText: 'selecionados',
-                        searchPlaceholderText: 'Buscar...',
-                        optionHeight: '30px',
-                        popupDropboxBreakpoint: '3000px',
-                        noOptionsText: 'Nenhuma opção encontrada',
-                        noSearchResultsText: 'Nenhum resultado encontrado'
-                    }};
-                    
-                    // Inicializar VirtualSelect para Grupos
-                    let vsGrupo = null;
-                    if (filterOptions.grupos && filterOptions.grupos.length > 0) {{
-                        const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
-                        vsGrupo = VirtualSelect.init({{
-                            ...vsConfig,
-                            ele: '#filter-grupo-{project["id"]}',
-                            options: grupoOptions,
-                            placeholder: "Selecionar Grupo(s)",
-                            selectedValue: ["Todos"]
-                        }});
-                    }}
-                    
-                    // Inicializar VirtualSelect para Etapas
-                    let vsEtapa = null;
-                    if (filterOptions.etapas && filterOptions.etapas.length > 0) {{
-                        const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
-                        vsEtapa = VirtualSelect.init({{
-                            ...vsConfig,
-                            ele: '#filter-etapa-{project["id"]}',
-                            options: etapaOptions,
-                            placeholder: "Selecionar Etapa(s)",
-                            selectedValue: ["Todas"]
-                        }});
-                    }}
-                    
-                    // --- EVENT LISTENERS DOS BOTÕES ---
-                    // Botão de filtros
-                    const filterBtn = document.getElementById('filter-btn-{project["id"]}');
-                    if (filterBtn) {{
-                        filterBtn.addEventListener('click', () => {{
-                            const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                            const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                            if (filterMenu) filterMenu.classList.toggle('is-open');
-                            if (baselineSelector) baselineSelector.classList.remove('is-open');
-                        }});
-                    }}
-                    
-                    // Botão de baseline
-                    const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
-                    if (baselineBtn) {{
-                        baselineBtn.addEventListener('click', () => {{
-                            const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                            const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
-                            if (baselineSelector) baselineSelector.classList.toggle('is-open');
-                            if (filterMenu) filterMenu.classList.remove('is-open');
-                        }});
-                    }}
-                    
-                    // Botão de tela cheia
-                    const fullscreenBtn = document.getElementById('fullscreen-btn-{project["id"]}');
-                    if (fullscreenBtn) {{
-                        fullscreenBtn.addEventListener('click', () => {{
-                            const container = document.getElementById('gantt-container-{project["id"]}');
-                            if (!document.fullscreenElement) {{
-                                container.requestFullscreen();
-                            }} else {{
-                                document.exitFullscreen();
-                            }}
-                        }});
-                    }}
-                    
-                    // Botão de aplicar filtros
-                    const applyBtn = document.getElementById('filter-apply-btn-{project["id"]}');
-                    if (applyBtn) {{
-                        applyBtn.addEventListener('click', () => {{
-                            const setorSelect = document.getElementById('filter-setor-{project["id"]}');
-                            const projectSelect = document.getElementById('filter-project-{project["id"]}');
-                            const concluidasCheck = document.getElementById('filter-concluidas-{project["id"]}');
-                            const visRadio = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked');
-                            
-                            const setorSelecionado = setorSelect ? setorSelect.value : 'Todos';
-                            const projectSelecionado = projectSelect ? projectSelect.value : 'Todos';
-                            const gruposSelecionados = vsGrupo ? (vsGrupo.value || ["Todos"]) : ["Todos"];
-                            const etapasSelecionadas = vsEtapa ? (vsEtapa.value || ["Todas"]) : ["Todas"];
-                            const mostrarApenasConcluidas = concluidasCheck ? concluidasCheck.checked : false;
-                            const tipoVisualizacao = visRadio ? visRadio.value : 'Ambos';
-                            
-                            // Filtrar tasks
-                            currentTasks = allTasks.filter(task => {{
-                                // Filtro de setor
-                                if (setorSelecionado !== 'Todos' && task.setor !== setorSelecionado) return false;
-                                
-                                // Filtro de empreendimento
-                                if (projectSelecionado !== 'Todos' && task.empreendimento !== projectSelecionado) return false;
-                                
-                                // Filtro de grupo
-                                if (!gruposSelecionados.includes("Todos") && !gruposSelecionados.includes(task.grupo)) return false;
-                                
-                                // Filtro de etapa
-                                if (!etapasSelecionadas.includes("Todas") && !etapasSelecionadas.includes(task.etapa)) return false;
-                                
-                                // Filtro de concluídas
-                                if (mostrarApenasConcluidas && task.progress >= 100) return false;
-                                
-                                return true;
-                            }});
-                            
-                            renderGantt();
-                            
-                            // Fechar menu
-                            const filterMenu = document.getElementById('filter-menu-{project["id"]}');
-                            if (filterMenu) filterMenu.classList.remove('is-open');
-                        }});
-                    }}
-                }} catch (error) {{
-                    console.error('Erro ao inicializar filtros:', error);
+            try {{
+                // Dados dos filtros
+                const filterOptions = {json.dumps(filter_options)};
+                
+                // Configuração padrão do VirtualSelect
+                const vsConfig = {{
+                    multiple: true,
+                    search: true,
+                    optionsCount: 6,
+                    showResetButton: true,
+                    resetButtonText: 'Limpar',
+                    selectAllText: 'Selecionar Todos',
+                    allOptionsSelectedText: 'Todos',
+                    optionsSelectedText: 'selecionados',
+                    searchPlaceholderText: 'Buscar...',
+                    optionHeight: '30px',
+                    popupDropboxBreakpoint: '3000px',
+                    noOptionsText: 'Nenhuma opção encontrada',
+                    noSearchResultsText: 'Nenhum resultado encontrado'
+                }};
+                
+                // Inicializar VirtualSelect para Grupos
+                let vsGrupo = null;
+                if (filterOptions.grupos && filterOptions.grupos.length > 0) {{
+                    const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
+                    vsGrupo = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-grupo-{project["id"]}',
+                        options: grupoOptions,
+                        placeholder: "Selecionar Grupo(s)",
+                        selectedValue: ["Todos"]
+                    }});
                 }}
-            }});
+                
+                // Inicializar VirtualSelect para Etapas
+                let vsEtapa = null;
+                if (filterOptions.etapas && filterOptions.etapas.length > 0) {{
+                    const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
+                    vsEtapa = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-etapa-{project["id"]}',
+                        options: etapaOptions,
+                        placeholder: "Selecionar Etapa(s)",
+                        selectedValue: ["Todas"]
+                    }});
+                }}
+                
+                // --- EVENT LISTENERS DOS BOTÕES ---
+                // Botão de filtros
+                const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+                if (filterBtn) {{
+                    filterBtn.addEventListener('click', () => {{
+                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                        if (filterMenu) filterMenu.classList.toggle('is-open');
+                        if (baselineSelector) baselineSelector.classList.remove('is-open');
+                    }});
+                }}
+                
+                // Botão de baseline
+                const baselineBtn = document.getElementById('baseline-btn-{project["id"]}');
+                if (baselineBtn) {{
+                    baselineBtn.addEventListener('click', () => {{
+                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                        if (baselineSelector) baselineSelector.classList.toggle('is-open');
+                        if (filterMenu) filterMenu.classList.remove('is-open');
+                    }});
+                }}
+                
+                // Botão de tela cheia
+                const fullscreenBtn = document.getElementById('fullscreen-btn-{project["id"]}');
+                if (fullscreenBtn) {{
+                    fullscreenBtn.addEventListener('click', () => {{
+                        const container = document.getElementById('gantt-container-{project["id"]}');
+                        if (!document.fullscreenElement) {{
+                            container.requestFullscreen();
+                        }} else {{
+                            document.exitFullscreen();
+                        }}
+                    }});
+                }}
+                
+                // Botão de aplicar filtros
+                const applyBtn = document.getElementById('filter-apply-btn-{project["id"]}');
+                if (applyBtn) {{
+                    applyBtn.addEventListener('click', () => {{
+                        const setorSelect = document.getElementById('filter-setor-{project["id"]}');
+                        const projectSelect = document.getElementById('filter-project-{project["id"]}');
+                        const concluidasCheck = document.getElementById('filter-concluidas-{project["id"]}');
+                        const visRadio = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked');
+                        
+                        const setorSelecionado = setorSelect ? setorSelect.value : 'Todos';
+                        const projectSelecionado = projectSelect ? projectSelect.value : 'Todos';
+                        const gruposSelecionados = vsGrupo ? (vsGrupo.value || ["Todos"]) : ["Todos"];
+                        const etapasSelecionadas = vsEtapa ? (vsEtapa.value || ["Todas"]) : ["Todas"];
+                        const mostrarApenasConcluidas = concluidasCheck ? concluidasCheck.checked : false;
+                        const tipoVisualizacao = visRadio ? visRadio.value : 'Ambos';
+                        
+                        // Filtrar tasks
+                        currentTasks = allTasks.filter(task => {{
+                            // Filtro de setor
+                            if (setorSelecionado !== 'Todos' && task.setor !== setorSelecionado) return false;
+                            
+                            // Filtro de empreendimento
+                            if (projectSelecionado !== 'Todos' && task.empreendimento !== projectSelecionado) return false;
+                            
+                            // Filtro de grupo
+                            if (!gruposSelecionados.includes("Todos") && !gruposSelecionados.includes(task.grupo)) return false;
+                            
+                            // Filtro de etapa
+                            if (!etapasSelecionadas.includes("Todas") && !etapasSelecionadas.includes(task.etapa)) return false;
+                            
+                            // Filtro de concluídas
+                            if (mostrarApenasConcluidas && task.progress >= 100) return false;
+                            
+                            return true;
+                        }});
+                        
+                        renderGantt();
+                        
+                        // Fechar menu
+                        const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                        if (filterMenu) filterMenu.classList.remove('is-open');
+                    }});
+                }}
+            }} catch (error) {{
+                console.error('Erro ao inicializar filtros:', error);
+            }}
             
             // Renderizar inicial
             renderGantt();
