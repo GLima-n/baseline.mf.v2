@@ -7946,30 +7946,25 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.selected_setor_nome = setor_para_exibir
 
             # --- TRÊS BOTÕES SEPARADOS PARA NAVEGAÇÃO ---
-            st.markdown("#### 📊 Gráficos Gantt")
+            st.markdown("Gráficos Gantt:")
             
-            col1, col2, col3 = st.columns(3)
+            st.button(
+                "Por Projeto", 
+                on_click=set_project_view, 
+                use_container_width=True
+            )
             
-            with col1:
-                st.button(
-                    "Por Projeto", 
-                    on_click=set_project_view, 
-                    use_container_width=True
-                )
+            st.button(
+                "Por Etapa", 
+                on_click=set_consolidated_view, 
+                use_container_width=True
+            )
             
-            with col2:
-                st.button(
-                    "Por Etapa", 
-                    on_click=set_consolidated_view, 
-                    use_container_width=True
-                )
-            
-            with col3:
-                st.button(
-                    "Por Setor", 
-                    on_click=set_sector_view, 
-                    use_container_width=True
-                )
+            st.button(
+                "Por Setor", 
+                on_click=set_sector_view, 
+                use_container_width=True
+            )
             
             # Mensagens centralizadas
             st.markdown("""
