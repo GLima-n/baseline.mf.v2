@@ -28,13 +28,18 @@ try:
 except ImportError:
     st.warning("Componentes 'dropdown_component', 'popup' ou 'calculate_business_days' não encontrados. Alguns recursos podem não funcionar como esperado.")
     # Definir valores padrão ou mocks se necessário
+    def simple_multiselect_dropdown(label, options, key, default_selected=None):
+        return st.multiselect(label, options, default=default_selected if default_selected else [], key=key)
+    def show_welcome_screen():
+        return False
+    def calculate_business_days(start, end):
+        if pd.isna(start) or pd.isna(end):
+            return None
+        return np.busday_count(pd.to_datetime(start).date(), pd.to_datetime(end).date())
     def create_gantt_overlay_with_context_menu(iframe_height, selected_empreendimento):
         # Fallback: apenas mostra mensagem
         st.info("Menu de contexto não disponível (módulo gantt_overlay_menu não encontrado)")
-    def simple_multiselect_dropdown(label, options, key, default_selected):
-        return st.multiselect(label, options, default=default_selected, key=key)
-    def show_welcome_screen():
-        return False
+
     def calculate_business_days(start, end):
         if pd.isna(start) or pd.isna(end):
             return None
