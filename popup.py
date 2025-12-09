@@ -12,14 +12,39 @@ def show_welcome_screen():
     # Processar login do formulário
     if 'popup_email' in st.query_params:
         email = st.query_params['popup_email']
+        password = st.query_params.get('popup_password', '')
         
         if email and '@' in email:
-            # Salvar email no session_state
-            st.session_state.user_email = email
+            # Verificar se email requer autenticação
+            restricted_emails = []
+            try:
+                if 'baseline_access' in st.secrets:
+                    restricted_emails = st.secrets['baseline_access']
+            except:
+                pass
             
-            # Limpar params e recarregar
-            st.query_params.clear()
-            st.rerun()
+            # Se email está na lista restrita, precisa de senha
+            email_requires_password = email.lower() in [e.lower() for e in restricted_emails]
+            
+            if email_requires_password:
+                # Verificar senha
+                correct_password = st.secrets.get('baseline_password', 'admin123')  # Senha padrão
+                
+                if password == correct_password:
+                    # Senha correta! Permite acesso
+                    st.session_state.user_email = email
+                    st.query_params.clear()
+                    st.rerun()
+                else:
+                    # Senha incorreta ou não fornecida
+                    st.session_state.login_error = "Senha incorreta. Este email requer autenticação."
+                    st.query_params.clear()
+                    st.rerun()
+            else:
+                # Email não requer senha, permite acesso direto
+                st.session_state.user_email = email
+                st.query_params.clear()
+                st.rerun()
     
     # Se já tem email no session_state, não mostra popup
     if 'user_email' in st.session_state and st.session_state.user_email:
@@ -87,6 +112,22 @@ def show_welcome_screen():
     
     # Formata a data/hora do reboot do servidor para exibição
     last_update = app_start_time.strftime("%d/%m/%Y às %H:%M:%S")
+    
+    # Preparar lista de emails que requerem senha para JavaScript
+    restricted_emails = []
+    try:
+        if 'baseline_access' in st.secrets:
+            restricted_emails = [e.lower() for e in st.secrets['baseline_access']]
+    except:
+        pass
+    
+    restricted_emails_js = str(restricted_emails).replace("'", '"')
+    
+    # Verificar se há erro de login
+    login_error =st.session_state.get('login_error', '')
+    if login_error:
+        # Limpar erro após mostrar
+        st.session_state.login_error = ''
     
     # CSS e HTML do popup
     popup_html = f"""
@@ -270,6 +311,43 @@ def show_welcome_screen():
             transform: translateY(0);
         }}
         
+        .password-field {{
+            display: none;
+            animation: slideDown 0.3s ease-out;
+        }}
+        
+        .password-field.show {{
+            display: block;
+        }}
+        
+        @keyframes slideDown {{
+            from {{
+                opacity: 0;
+                transform: translateY(-10px);
+            }}
+            to {{
+                opacity: 1;
+                transform: translateY(0);
+            }}
+        }}
+        
+        .error-message {{
+            background: #fee;
+            border-left: 4px solid #dc3545;
+            color: #721c24;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            animation: shake 0.5s;
+        }}
+        
+        @keyframes shake {{
+            0%, 100% {{ transform: translateX(0); }}
+            25% {{ transform: translateX(-10px); }}
+            75% {{ transform: translateX(10px); }}
+        }}
+        
         @media (max-width: 480px) {{
             .popup-container {{
                 justify-content: center;
@@ -307,15 +385,53 @@ def show_welcome_screen():
                 <p>Por favor, informe seu e-mail para acessar o Painel de acompanhamento das etapas do Macrofluxo da Viana & Moura Construções.</p>
             </div>
             <div class="popup-body">
-                <form method="get">
+                {'<div class="error-message">' + login_error + '</div>' if login_error else ''}
+                <form method="get" id="loginForm">
                     <div class="input-group">
-                        <input type="email" name="popup_email" placeholder="Email corporativo" class="popup-input" required />
+                        <input type="email" id="emailInput" name="popup_email" placeholder="Email corporativo" class="popup-input" required />
+                    </div>
+                    <div class="input-group password-field" id="passwordField">
+                        <input type="password" id="passwordInput" name="popup_password" placeholder="Senha" class="popup-input" />
                     </div>
                     <button type="submit" class="popup-button">Acessar Painel</button>
                 </form>
             </div>
         </div>
     </div>
+    
+    <script>
+        const restrictedEmails = {restricted_emails_js};
+        const emailInput = document.getElementById('emailInput');
+        const passwordField = document.getElementById('passwordField');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginForm = document.getElementById('loginForm');
+        
+        emailInput.addEventListener('input', function() {{
+            const email = this.value.toLowerCase().trim();
+            const requiresPassword = restrictedEmails.includes(email);
+            
+            if (requiresPassword) {{
+                passwordField.classList.add('show');
+                passwordInput.setAttribute('required', 'required');
+            }} else {{
+                passwordField.classList.remove('show');
+                passwordInput.removeAttribute('required');
+                passwordInput.value = '';
+            }}
+        }});
+        
+        loginForm.addEventListener('submit', function(e) {{
+            const email = emailInput.value.toLowerCase().trim();
+            const requiresPassword = restrictedEmails.includes(email);
+            
+            if (requiresPassword && !passwordInput.value) {{
+                e.preventDefault();
+                alert('Este email requer senha. Por favor, digite sua senha.');
+                passwordInput.focus();
+            }}
+        }});
+    </script>
+    
     """
     
     st.markdown(popup_html, unsafe_allow_html=True)
