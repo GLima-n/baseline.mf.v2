@@ -6874,17 +6874,31 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             // Função para aplicar baseline em um empreendimento
             function applyBaselineForEmp(emp, baselineName) {{
+                console.log('=== APLICANDO BASELINE ===');
+                console.log('Empreendimento:', emp);
+                console.log('Baseline:', baselineName);
+                console.log('Total de tasks antes:', currentTasks.length);
+                
+                let tasksAtualizadas = 0;
                 currentTasks.forEach(task => {{
-                    if (task.empreendimento === emp && task.baselines && task.baselines[baselineName]) {{
-                        const baselineData = task.baselines[baselineName];
-                        if (baselineData.start && baselineData.end) {{
-                            task.start_previsto = baselineData.start;
-                            task.end_previsto = baselineData.end;
-                            task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                            task.termino_previsto = formatDateDisplay(task.end_previsto);
+                    if (task.empreendimento === emp) {{
+                        console.log('Task encontrada:', task.name, 'Baselines:', task.baselines);
+                        if (task.baselines && task.baselines[baselineName]) {{
+                            const baselineData = task.baselines[baselineName];
+                            if (baselineData.start && baselineData.end) {{
+                                task.start_previsto = baselineData.start;
+                                task.end_previsto = baselineData.end;
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                tasksAtualizadas++;
+                                console.log('Baseline aplicada:', task.name, 'Novo início:', task.inicio_previsto);
+                            }}
                         }}
                     }}
                 }});
+                
+                console.log('Tasks atualizadas:', tasksAtualizadas);
+                console.log('Re-renderizando gráfico...');
                 renderGantt();
             }}
             
