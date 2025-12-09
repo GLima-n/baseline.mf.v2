@@ -2859,6 +2859,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     background: #f5f5f5;
                                     transform: scale(1.1);
                                     box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+                                    border-color: #007AFF;
                                 }}
                                 
                                 .radial-item svg {{
@@ -2869,7 +2870,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-item:hover svg {{
-                                    fill: #000000;
+                                    fill: #007AFF;
                                 }}
                                 
                                 .radial-tooltip {{
