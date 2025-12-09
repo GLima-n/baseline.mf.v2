@@ -6286,6 +6286,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         GRUPO=('GRUPO', 'first')
     ).reset_index()
     
+    # --- FILTRO: Remover etapas pai (mostrar apenas subetapas e etapas normais) ---
+    # Etapas pai são aquelas que têm subetapas definidas em SUBETAPAS
+    etapas_pai = list(SUBETAPAS.keys())  # ["ENG. LIMP.", "ENG. TER.", "ENG. INFRA", "ENG. PAV"]
+    df_gantt_agg = df_gantt_agg[~df_gantt_agg['Etapa'].isin(etapas_pai)]
+    
     # --- 2. Preparar Dados para TODOS os Setores ---
     all_data_by_sector_js = {}
     all_sector_names = []
