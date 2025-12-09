@@ -2905,11 +2905,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                                 
                                 .radial-item:hover + .radial-tooltip {{
-                                    background: #FFC107;
-                                    color: #333;
+                                    background: #007AFF;
+                                    color: white;
                                 }}
                                 
                                 .radial-item:hover + .radial-tooltip .tooltip-badge {{
+                                    background: white;
+                                    color: #007AFF;
+                                }}
+                                
+                                /* Tooltip amarelo para "Em produção" */
+                                .radial-tooltip.yellow-tooltip {{
+                                    background: #FFC107 !important;
+                                    color: #333 !important;
+                                }}
+                                
+                                .radial-item:hover + .radial-tooltip.yellow-tooltip .tooltip-badge {{
                                     background: #333;
                                     color: #FFC107;
                                 }}
