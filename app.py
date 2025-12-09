@@ -6545,10 +6545,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
-        <!-- VirtualSelect CSS e JS -->
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.40/dist/virtual-select.min.css">
-        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.40/dist/virtual-select.min.js"></script>
-        
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
@@ -6831,11 +6827,21 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 </div>
                 <div class="filter-group">
                     <label for="filter-project-{project['id']}">Empreendimento</label>
-                    <div id="filter-project-{project['id']}"></div>
+                    <select id="filter-project-{project['id']}">
+                        <option value="Todos">Todos</option>
+                        {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
+                    </select>
                 </div>
                 <div class="filter-group">
-                    <label for="filter-grupos-{project['id']}">Grupos</label>
-                    <div id="filter-grupos-{project['id']}"></div>
+                    <label>Grupos</label>
+                    <div class="multiselect-container" id="filter-grupos-container-{project['id']}">
+                        {"".join([f'''
+                        <div class="multiselect-item">
+                            <input type="checkbox" id="grupo-{i}-{project['id']}" value="{grupo}" checked>
+                            <label for="grupo-{i}-{project['id']}">{grupo}</label>
+                        </div>
+                        ''' for i, grupo in enumerate(filter_options['grupos'])])}
+                    </div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -7051,20 +7057,20 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 chartContainer.innerHTML = '';
                 
                 // --- APLICAR FILTROS ---
-                // 1. Filtro de Empreendimento (VirtualSelect)
-                const filtroEmpValues = document.querySelector('#filter-project-{project["id"]}').getValue() || [];
-                const filtroEmp = filtroEmpValues.includes('Todos') ? [] : filtroEmpValues;
+                // 1. Filtro de Empreendimento (dropdown simples)
+                const filtroEmp = document.getElementById('filter-project-{project["id"]}')?.value || 'Todos';
                 
-                // 2. Filtro de Grupos (VirtualSelect)
-                const gruposSelecionados = document.querySelector('#filter-grupos-{project["id"]}').getValue() || [];
+                // 2. Filtro de Grupos (checkboxes)
+                const grupoCheckboxes = document.querySelectorAll('#filter-grupos-container-{project["id"]} input[type="checkbox"]:checked');
+                const gruposSelecionados = Array.from(grupoCheckboxes).map(cb => cb.value);
                 
                 // 3. Filtro de Não Concluídas
                 const mostrarApenasNaoConcluidas = document.getElementById('filter-concluidas-{project["id"]}')?.checked || false;
                 
                 // Aplicar filtros
                 let filteredTasks = currentTasks.filter(task => {{
-                    // Filtro de empreendimento (se não for "Todos")
-                    if (filtroEmp.length > 0 && !filtroEmp.includes(task.empreendimento)) {{
+                    // Filtro de empreendimento
+                    if (filtroEmp !== 'Todos' && task.empreendimento !== filtroEmp) {{
                         return false;
                     }}
                     
@@ -7521,57 +7527,20 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }}
             
-            // Inicializar VirtualSelects
-            VirtualSelect.init({{
-                ele: '#filter-project-{project["id"]}',
-                options: [
-                    {{label: 'Todos', value: 'Todos'}},
-                    {", ".join([f"{{label: '{emp}', value: '{emp}'}}" for emp in empreendimentos_no_df])}
-                ],
-                multiple: true,
-                search: true,
-                placeholder: 'Selecione empreendimentos',
-                selectAllText: 'Selecionar Todos',
-                searchPlaceholderText: 'Buscar...',
-                noOptionsText: 'Nenhuma opção',
-                noSearchResultsText: 'Nenhum resultado',
-                allOptionsSelectedText: 'Todos selecionados',
-                optionsSelectedText: 'selecionados',
-                maxWidth: '100%'
-            }});
-            
-            VirtualSelect.init({{
-                ele: '#filter-grupos-{project["id"]}',
-                options: [
-                    {", ".join([f"{{label: '{grupo}', value: '{grupo}'}}" for grupo in filter_options['grupos']])}
-                ],
-                multiple: true,
-                search: true,
-                placeholder: 'Selecione grupos',
-                selectAllText: 'Selecionar Todos',
-                searchPlaceholderText: 'Buscar...',
-                noOptionsText: 'Nenhuma opção',
-                noSearchResultsText: 'Nenhum resultado',
-                allOptionsSelectedText: 'Todos selecionados',
-                optionsSelectedText: 'selecionados',
-                maxWidth: '100%'
-            }});
-            
-            // Selecionar todos por padrão
-            document.querySelector('#filter-project-{project["id"]}').setValue(['Todos', {", ".join([f"'{emp}'" for emp in empreendimentos_no_df])}]);
-            document.querySelector('#filter-grupos-{project["id"]}').setValue([{", ".join([f"'{grupo}'" for grupo in filter_options['grupos']])}]);
-            
-            // Event listeners para re-renderizar ao mudar filtros
-            document.querySelector('#filter-project-{project["id"]}').addEventListener('change', () => {{
-                renderGantt();
-            }});
-            
-            document.querySelector('#filter-grupos-{project["id"]}').addEventListener('change', () => {{
+            // Event listeners para filtros
+            document.getElementById('filter-project-{project["id"]}').addEventListener('change', () => {{
                 renderGantt();
             }});
             
             document.getElementById('filter-concluidas-{project["id"]}').addEventListener('change', () => {{
                 renderGantt();
+            }});
+            
+            // Event listeners para checkboxes de grupos
+            document.querySelectorAll('#filter-grupos-container-{project["id"]} input[type="checkbox"]').forEach(checkbox => {{
+                checkbox.addEventListener('change', () => {{
+                    renderGantt();
+                }});
             }});
             
             // Renderizar inicial
