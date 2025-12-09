@@ -24,9 +24,13 @@ try:
     from dropdown_component import simple_multiselect_dropdown
     from popup import show_welcome_screen
     from calculate_business_days import calculate_business_days
+    from gantt_overlay_menu import create_gantt_overlay_with_context_menu
 except ImportError:
     st.warning("Componentes 'dropdown_component', 'popup' ou 'calculate_business_days' não encontrados. Alguns recursos podem não funcionar como esperado.")
     # Definir valores padrão ou mocks se necessário
+    def create_gantt_overlay_with_context_menu(iframe_height, selected_empreendimento):
+        # Fallback: apenas mostra mensagem
+        st.info("Menu de contexto não disponível (módulo gantt_overlay_menu não encontrado)")
     def simple_multiselect_dropdown(label, options, key, default_selected):
         return st.multiselect(label, options, default=default_selected, key=key)
     def show_welcome_screen():
@@ -6634,6 +6638,33 @@ with st.spinner("Carregando e processando dados..."):
                 pulmao_meses,
                 selected_etapa_nome
             )
+            
+            # --- NOVO: Menu de Contexto com Overlay ---
+            # Verificar se há um único empreendimento selecionado
+            empreendimentos_filtrados = df_para_gantt['Empreendimento'].unique()
+            
+            if len(empreendimentos_filtrados) == 1:
+                selected_emp_for_menu = empreendimentos_filtrados[0]
+                
+                # Calcular altura do iframe do Gantt (mesma lógica usada internamente)
+                num_tasks = len(df_para_gantt)
+                iframe_height = max(400, min(800, (num_tasks * 25) + 200))
+                
+                # Renderizar overlay com menu de contexto
+                st.markdown("---")
+                st.caption("💡 **Dica:** Clique com o botão direito no gráfico acima para criar linhas de base")
+                
+                try:
+                    create_gantt_overlay_with_context_menu(
+                        iframe_height=iframe_height,
+                        selected_empreendimento=selected_emp_for_menu
+                    )
+                except Exception as e:
+                    st.warning(f"Menu de contexto não disponível: {e}")
+            else:
+                pass  # Múltiplos empreendimentos - não mostra menu
+            # --- FIM DO MENU DE CONTEXTO ---
+            
             # Botão para limpar baseline (se houver uma ativa)
                                                                                                                                                       
             st.markdown('<div id="visao-detalhada"></div>', unsafe_allow_html=True)
