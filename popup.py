@@ -118,70 +118,81 @@ def show_welcome_screen():
             justify-content: flex-end;
             align-items: center;
             z-index: 1000000;
-            padding: 20px;
-            padding-right: 80px;
+            padding: 40px;
+            padding-right: 280px;
         }}
         
         .popup-card {{
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 440px;
+            background: linear-gradient(to bottom, #ffffff 0%, #fafafa 100%);
+            border-radius: 20px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.2), 0 0 1px rgba(0, 0, 0, 0.1);
+            max-width: 480px;
             width: 100%;
-            animation: fadeIn 0.4s ease-out;
+            animation: fadeIn 0.5s ease-out;
+            border: 1px solid rgba(255, 255, 255, 0.8);
         }}
         
         .popup-header {{
-            padding: 40px 40px 25px;
+            padding: 50px 45px 30px;
             text-align: center;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent);
+            border-radius: 20px 20px 0 0;
         }}
         
         .logo-container {{
-            margin-bottom: 25px;
+            margin-bottom: 30px;
             display: flex;
             justify-content: center;
             align-items: center;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
         }}
         
         .logo-container img {{
-            max-width: 180px;
+            max-width: 200px;
             height: auto;
+            transition: transform 0.3s ease;
         }}
         
         .popup-header h2 {{
-            margin: 0 0 10px 0;
-            color: #2c3e50;
-            font-size: 1.6em;
-            font-weight: 600;
+            margin: 0 0 15px 0;
+            color: #1a252f;
+            font-size: 1.75em;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
         }}
         
         .popup-header p {{
             margin: 0;
-            color: #7f8c8d;
-            font-size: 0.95em;
-            line-height: 1.5;
+            color: #6c757d;
+            font-size: 0.92em;
+            line-height: 1.6;
+            max-width: 380px;
+            margin-left: auto;
+            margin-right: auto;
         }}
         
         .popup-body {{
-            padding: 0 40px 40px;
+            padding: 10px 45px 50px;
         }}
         
         .input-group {{
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }}
         
         .popup-input {{
             width: 100%;
-            padding: 16px 18px;
+            padding: 18px 20px;
             font-size: 1em;
-            border: 2px solid #e8e8e8;
-            border-radius: 10px;
-            background: #fafafa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #ffffff;
             color: #2c3e50;
             outline: none;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             box-sizing: border-box;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
         }}
         
         .popup-input::placeholder {{
@@ -190,30 +201,34 @@ def show_welcome_screen():
         
         .popup-input:focus {{
             border-color: #ff8c00;
-            background: white;
-            box-shadow: 0 0 0 4px rgba(255, 140, 0, 0.08);
+            background: #ffffff;
+            box-shadow: 0 0 0 4px rgba(255, 140, 0, 0.12), 0 4px 12px rgba(255, 140, 0, 0.15);
+            transform: translateY(-1px);
         }}
         
         .popup-button {{
             width: 100%;
-            padding: 18px;
+            padding: 20px;
             font-size: 1.05em;
-            font-weight: 600;
+            font-weight: 700;
             color: white;
-            background: #ff8c00;
+            background: linear-gradient(135deg, #ff8c00 0%, #ff7700 100%);
             border: none;
-            border-radius: 10px;
+            border-radius: 12px;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 10px;
+            letter-spacing: 1px;
+            margin-top: 15px;
+            box-shadow: 0 6px 20px rgba(255, 140, 0, 0.3);
+            position: relative;
+            overflow: hidden;
         }}
         
         .popup-button:hover {{
-            background: #ff7a00;
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(255, 140, 0, 0.35);
+            background: linear-gradient(135deg, #ff7700 0%, #ff6600 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 35px rgba(255, 140, 0, 0.45);
         }}
         
         .popup-button:active {{
