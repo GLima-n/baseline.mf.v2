@@ -10,7 +10,7 @@ import matplotlib.dates as mdates
 import matplotlib.gridspec as gridspec
 from datetime import datetime, timedelta
 import holidays
-from dateutil.relativedelta import relativedelta #Dados para JavaScript
+from dateutil.relativedelta import relativedelta #baseline
 import json
 
 import streamlit.components.v1 as components  
