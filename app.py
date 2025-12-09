@@ -2991,44 +2991,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     </svg>
                                 </div>
                                 
-                                <!-- 51°: Frame -->
-                                <div class="radial-item" style="top: 70px; left: 170px;">
-                                    <svg viewBox="0 0 24 24">
-                                        <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                        <rect x="14" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                        <rect x="3" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                        <rect x="14" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                </div>
-                                <div class="radial-tooltip" style="top: 70px; left: 210px;">
-                                    Quadro
-                                    <span class="tooltip-badge inactive-badge">F</span>
-                                </div>
-                                
-                                <!-- 103°: Pen Tool -->
-                                <div class="radial-item" style="top: 128px; left: 184px;">
+                                <!-- Direita: Pen Tool (Caneta) -->
+                                <div class="radial-item" style="top: 114px; left: 184px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 128px; left: 224px;">
+                                <div class="radial-tooltip" style="top: 114px; left: 224px;">
                                     Caneta
                                     <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
                                 
-                                <!-- 154°: Text -->
-                                <div class="radial-item" style="top: 176px; left: 145px;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M5 4v3h5.5v12h3V7H19V4z"/>
-                                    </svg>
-                                </div>
-                                <div class="radial-tooltip" style="top: 176px; left: 185px;">
-                                    Texto
-                                    <span class="tooltip-badge inactive-badge">T</span>
-                                </div>
-                                
-                                <!-- 206°: Actions -->
-                                <div class="radial-item" style="top: 176px; left: 83px;">
+                                <!-- Esquerda: Actions (Ações) -->
+                                <div class="radial-item" style="top: 114px; left: 44px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" rx="1"/>
                                         <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -3036,31 +3011,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                         <path d="M18 18l-3-3m3 3l3-3m-3 3v-6" stroke="currentColor" fill="none" stroke-width="2"/>
                                     </svg>
                                 </div>
-                                <div class="radial-tooltip" style="top: 176px; right: 185px;">
+                                <div class="radial-tooltip" style="top: 114px; right: 224px;">
                                     Ações
-                                </div>
-                                
-                                <!-- 257°: Objects -->
-                                <div class="radial-item" style="top: 128px; left: 44px;">
-                                    <svg viewBox="0 0 24 24">
-                                        <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
-                                        <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                </div>
-                                <div class="radial-tooltip" style="top: 128px; right: 224px;">
-                                    Objetos
-                                    <span class="tooltip-badge inactive-badge">O</span>
-                                </div>
-                                
-                                <!-- 309°: Comment -->
-                                <div class="radial-item" style="top: 70px; left: 58px;">
-                                    <svg viewBox="0 0 24 24">
-                                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
-                                    </svg>
-                                </div>
-                                <div class="radial-tooltip" style="top: 70px; right: 210px;">
-                                    Comentário
-                                    <span class="tooltip-badge inactive-badge">C</span>
                                 </div>
                             </div>
                         `;
@@ -3241,7 +3193,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // --- 6. BLOQUINHO DE NOTAS ---
                         let notepadActive = false;
-                        const penIcon = menu.querySelector('[style*="top: 128px; left: 184px"]'); // Ícone Caneta
+                        const penIcon = menu.querySelector('[style*="top: 114px; left: 184px"]'); // Ícone Caneta (reposicionado)
                         const notepadTextarea = notepad.querySelector('.notepad-content');
                         const NOTEPAD_STORAGE_KEY = 'gantt_notepad_content';
                         
@@ -3323,7 +3275,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // --- 7. MODO DE FOCO (BOTÃO AÇÕES) ---
                         let focusModeActive = false;
-                        const actionsIcon = menu.querySelector('[style*="top: 176px; left: 83px"]'); // Botão Ações
+                        const actionsIcon = menu.querySelector('[style*="top: 114px; left: 44px"]'); // Botão Ações (reposicionado)
                         
                         // Toggle modo de foco ao clicar no botão Ações
                         if (actionsIcon) {{
