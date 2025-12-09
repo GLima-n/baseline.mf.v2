@@ -7099,6 +7099,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 const monthHeader = document.createElement('div');
                 monthHeader.className = 'month-header';
                 
+                // CORREÇÃO: Limpar qualquer conteúdo anterior para evitar duplicação
+                monthHeader.innerHTML = '';
+                
                 for (let m = 0; m < totalMeses; m++) {{
                     const date = new Date(dataInicio);
                     date.setMonth(dataInicio.getMonth() + m);
