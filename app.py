@@ -3323,7 +3323,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // --- 7. MODO DE FOCO (BOTÃO AÇÕES) ---
                         let focusModeActive = false;
-                        let focusedBar = null;
                         const actionsIcon = menu.querySelector('[style*="top: 176px; left: 83px"]'); // Botão Ações
                         
                         // Toggle modo de foco ao clicar no botão Ações
@@ -3346,28 +3345,25 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     }});
                                     actionsIcon.style.borderColor = '';
                                     actionsIcon.style.background = '';
-                                    focusedBar = null;
                                 }}
                                 
                                 menu.style.display = 'none';
                             }});
                         }}
                         
-                        // Click em barras para focar individualmente
+                        // Click em barras para focar/desfocar (seleção múltipla com toggle)
                         container.addEventListener('click', (e) => {{
                             if (!focusModeActive) return;
                             
                             const clickedBar = e.target.closest('.gantt-bar');
                             if (!clickedBar) return;
                             
-                            // Remover foco anterior
-                            if (focusedBar) {{
-                                focusedBar.classList.remove('focused');
+                            // Toggle: se já está focada, remove foco; senão, adiciona
+                            if (clickedBar.classList.contains('focused')) {{
+                                clickedBar.classList.remove('focused');
+                            }} else {{
+                                clickedBar.classList.add('focused');
                             }}
-                            
-                            // Adicionar foco na barra clicada
-                            clickedBar.classList.add('focused');
-                            focusedBar = clickedBar;
                         }});
 
                     }})();
