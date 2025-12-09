@@ -3057,45 +3057,59 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Bloquinho de Notas Flutuante
                         const notepad = document.createElement('div');
                         notepad.id = 'floating-notepad';
-                        notepad.style.cssText = "display:none; position:fixed; top:100px; right:50px; width:300px; height:400px; background:white; border:2px solid #007AFF; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); z-index:9999; flex-direction:column; font-family:'Inter', sans-serif;";
+                        notepad.style.cssText = "display:none; position:fixed; top:100px; right:50px; width:320px; height:420px; background:white; border:1px solid #e8e8e8; border-radius:16px; box-shadow:0 8px 32px rgba(0,0,0,0.08); z-index:9999; flex-direction:column; font-family:'Inter', sans-serif; overflow:hidden;";
                         notepad.innerHTML = `
                             <style>
                                 .notepad-header {{
-                                    padding: 12px 16px;
-                                    background: #007AFF;
+                                    padding: 14px 18px;
+                                    background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%);
                                     color: white;
-                                    border-radius: 10px 10px 0 0;
                                     display: flex;
                                     justify-content: space-between;
                                     align-items: center;
                                     cursor: move;
                                     user-select: none;
+                                    border-bottom: 1px solid rgba(255,255,255,0.1);
+                                }}
+                                
+                                .notepad-header span {{
+                                    font-size: 13px;
+                                    font-weight: 600;
+                                    letter-spacing: 0.3px;
                                 }}
                                 
                                 .notepad-close {{
-                                    background: none;
+                                    background: rgba(255,255,255,0.15);
                                     border: none;
                                     color: white;
-                                    font-size: 24px;
+                                    font-size: 20px;
                                     cursor: pointer;
-                                    padding: 0;
+                                    padding: 4px 8px;
                                     line-height: 1;
-                                    transition: transform 0.2s ease;
+                                    border-radius: 6px;
+                                    transition: all 0.2s ease;
                                 }}
                                 
                                 .notepad-close:hover {{
-                                    transform: scale(1.2);
+                                    background: rgba(255,255,255,0.25);
+                                    transform: scale(1.05);
                                 }}
                                 
                                 .notepad-content {{
                                     flex: 1;
-                                    padding: 16px;
+                                    padding: 20px;
                                     border: none;
                                     resize: none;
                                     font-family: 'Inter', sans-serif;
                                     font-size: 14px;
+                                    line-height: 1.6;
                                     outline: none;
-                                    border-radius: 0 0 10px 10px;
+                                    color: #333;
+                                    background: #fafafa;
+                                }}
+                                
+                                .notepad-content::placeholder {{
+                                    color: #aaa;
                                 }}
                             </style>
                             <div class="notepad-header">
