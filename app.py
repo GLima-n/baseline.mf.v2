@@ -7193,17 +7193,21 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }});
             
-            // --- DRAG TO SCROLL: Arrastar com mouse para navegar ---
+            // --- DRAG TO SCROLL: Arrastar com mouse para navegar (2D - Diagonal) ---
             const chartContent = document.getElementById('gantt-chart-content-{project["id"]}');
             let isDragging = false;
             let startX;
+            let startY;
             let scrollLeft;
+            let scrollTop;
             
             chartContent.addEventListener('mousedown', (e) => {{
                 isDragging = true;
                 chartContent.classList.add('active');
                 startX = e.pageX - chartContent.offsetLeft;
+                startY = e.pageY - chartContent.offsetTop;
                 scrollLeft = chartContent.scrollLeft;
+                scrollTop = chartContent.scrollTop;
                 chartContent.style.cursor = 'grabbing';
             }});
             
@@ -7222,9 +7226,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             chartContent.addEventListener('mousemove', (e) => {{
                 if (!isDragging) return;
                 e.preventDefault();
+                
+                // Movimento horizontal
                 const x = e.pageX - chartContent.offsetLeft;
-                const walk = (x - startX) * 2; // Multiplicador para velocidade de scroll
-                chartContent.scrollLeft = scrollLeft - walk;
+                const walkX = (x - startX) * 2; // Multiplicador para velocidade horizontal
+                chartContent.scrollLeft = scrollLeft - walkX;
+                
+                // Movimento vertical
+                const y = e.pageY - chartContent.offsetTop;
+                const walkY = (y - startY) * 2; // Multiplicador para velocidade vertical
+                chartContent.scrollTop = scrollTop - walkY;
             }});
             
             // Renderizar inicial
