@@ -2831,9 +2831,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     top: 50%;
                                     left: 50%;
                                     transform: translate(-50%, -50%);
-                                    width: 160px;
-                                    height: 160px;
-                                    border: 6px solid #f0f0f0;
+                                    width: 140px;
+                                    height: 140px;
+                                    border: 4px solid #f0f0f0;
                                     border-radius: 50%;
                                     background: transparent;
                                     z-index: 1;
@@ -2965,14 +2965,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 <div class="radial-center" title="Menu Radial"></div>
                                 
                                 <!-- Topo: Move Tool (Criar Baseline) -->
-                                <div class="radial-item" id="btn-create-baseline" style="top: 34px; left: 114px;">
+                                <div class="radial-item" id="btn-create-baseline" style="top: 44px; left: 114px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
                                     </svg>
                                 </div>
                                 
                                 <!-- 51°: Frame -->
-                                <div class="radial-item" style="top: 64px; left: 176px;">
+                                <div class="radial-item" style="top: 70px; left: 170px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                         <rect x="14" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -2986,7 +2986,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 
                                 <!-- 103°: Pen Tool -->
-                                <div class="radial-item" style="top: 132px; left: 192px;">
+                                <div class="radial-item" style="top: 128px; left: 184px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
                                     </svg>
@@ -2997,7 +2997,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 
                                 <!-- 154°: Text -->
-                                <div class="radial-item" style="top: 186px; left: 149px;">
+                                <div class="radial-item" style="top: 176px; left: 145px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M5 4v3h5.5v12h3V7H19V4z"/>
                                     </svg>
@@ -3008,7 +3008,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 
                                 <!-- 206°: Actions -->
-                                <div class="radial-item" style="top: 186px; left: 79px;">
+                                <div class="radial-item" style="top: 176px; left: 83px;">
                                     <svg viewBox="0 0 24 24">
                                         <rect x="3" y="3" width="7" height="7" rx="1"/>
                                         <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -3021,7 +3021,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 
                                 <!-- 257°: Objects -->
-                                <div class="radial-item" style="top: 132px; left: 36px;">
+                                <div class="radial-item" style="top: 128px; left: 44px;">
                                     <svg viewBox="0 0 24 24">
                                         <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
                                         <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
@@ -3033,7 +3033,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 </div>
                                 
                                 <!-- 309°: Comment -->
-                                <div class="radial-item" style="top: 64px; left: 52px;">
+                                <div class="radial-item" style="top: 70px; left: 58px;">
                                     <svg viewBox="0 0 24 24">
                                         <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
                                     </svg>
