@@ -2886,15 +2886,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     align-items: center;
                                     gap: 5px;
                                     pointer-events: none;
-                                    transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+                                    transition: background 0.2s ease, color 0.2s ease;
                                     z-index: 15;
-                                    opacity: 0;
-                                    transform: scale(0.9);
+                                    background: #f5f5f5;
+                                    color: #333;
                                 }}
                                 
                                 .radial-item:hover + .radial-tooltip {{
-                                    opacity: 1;
-                                    transform: scale(1);
                                     background: #007AFF;
                                     color: white;
                                 }}
