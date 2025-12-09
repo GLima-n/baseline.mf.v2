@@ -7556,6 +7556,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 // Botão de tela cheia
                 const fullscreenBtn = document.getElementById('fullscreen-btn-{project["id"]}');
                 if (fullscreenBtn) {{
+                    // Fullscreen não funciona em iframe do Streamlit
+                    // Removendo funcionalidade para evitar erro de permissão
+                    fullscreenBtn.style.display = 'none';
+                    /*
                     fullscreenBtn.addEventListener('click', () => {{
                         const container = document.getElementById('gantt-container-{project["id"]}');
                         if (!document.fullscreenElement) {{
@@ -7564,6 +7568,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             document.exitFullscreen();
                         }}
                     }});
+                    */
                 }}
                 
                 // Botão de aplicar filtros
