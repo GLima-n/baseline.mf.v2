@@ -6528,12 +6528,32 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         "PROSPECÇÃO": "🔍",
         "LEGALIZAÇÃO": "📋",
         "PULMÃO": "⏱️",
-        "ENGENHARIA": "🏗️",
-        "INFRA": "🚧",
-        "PRODUÇÃO": "🏭",
-        "ARQUITETURA & URBANISMO": "🏛️",
-        "VENDA": "💰"
+        "ENGENHARIA": "📐",
+        "SUPRIMENTOS": "📦",
+        "OBRAS": "🏗️",
+        "ENTREGA": "🎉"
     }
+    
+    # --- Preparar dados para filtros ---
+    filter_options = {}
+    
+    # Grupos únicos
+    grupos_unicos = sorted(df_gantt_agg['GRUPO'].dropna().unique().tolist())
+    if "Todos" not in grupos_unicos:
+        grupos_unicos.insert(0, "Todos")
+    filter_options['grupos'] = grupos_unicos
+    
+    # Etapas únicas
+    etapas_unicas = sorted(df_gantt_agg['Etapa'].dropna().unique().tolist())
+    if "Todas" not in etapas_unicas:
+        etapas_unicas.insert(0, "Todas")
+    filter_options['etapas'] = etapas_unicas
+    
+    # Empreendimentos únicos
+    empreendimentos_unicos = sorted(df_gantt_agg['Empreendimento'].dropna().unique().tolist())
+    if "Todos" not in empreendimentos_unicos:
+        empreendimentos_unicos.insert(0, "Todos")
+    filter_options['empreendimentos'] = empreendimentos_unicos
     
     # --- 5. Gerar HTML/CSS/JavaScript ---
     # (Baseado no consolidado mas adaptado para setores)
@@ -6543,6 +6563,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
+        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
         
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
@@ -6800,6 +6822,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         <option value="Todos">Todos</option>
                         {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
                     </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-grupo-{project['id']}">Grupo</label>
+                    <div id="filter-grupo-{project['id']}"></div>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-etapa-{project['id']}">Etapa</label>
+                    <div id="filter-etapa-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -7451,6 +7481,113 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     isResizing = false;
                 }});
             }}
+            
+            // --- INICIALIZAÇÃO DOS FILTROS VIRTUALSELECT ---
+            const filterOptions = {json.dumps(filter_options)};
+            
+            // Configuração padrão do VirtualSelect
+            const vsConfig = {{
+                multiple: true,
+                search: true,
+                optionsCount: 6,
+                showResetButton: true,
+                resetButtonText: 'Limpar',
+                selectAllText: 'Selecionar Todos',
+                allOptionsSelectedText: 'Todos',
+                optionsSelectedText: 'selecionados',
+                searchPlaceholderText: 'Buscar...',
+                optionHeight: '30px',
+                popupDropboxBreakpoint: '3000px',
+                noOptionsText: 'Nenhuma opção encontrada',
+                noSearchResultsText: 'Nenhum resultado encontrado'
+            }};
+            
+            // Inicializar VirtualSelect para Grupos
+            const grupoOptions = filterOptions.grupos.map(g => ({{ label: g, value: g }}));
+            const vsGrupo = VirtualSelect.init({{
+                ...vsConfig,
+                ele: '#filter-grupo-{project["id"]}',
+                options: grupoOptions,
+                placeholder: "Selecionar Grupo(s)",
+                selectedValue: ["Todos"]
+            }});
+            
+            // Inicializar VirtualSelect para Etapas
+            const etapaOptions = filterOptions.etapas.map(e => ({{ label: e, value: e }}));
+            const vsEtapa = VirtualSelect.init({{
+                ...vsConfig,
+                ele: '#filter-etapa-{project["id"]}',
+                options: etapaOptions,
+                placeholder: "Selecionar Etapa(s)",
+                selectedValue: ["Todas"]
+            }});
+            
+            // --- EVENT LISTENERS DOS BOTÕES ---
+            // Botão de filtros
+            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', () => {{
+                const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                filterMenu.classList.toggle('is-open');
+                baselineSelector.classList.remove('is-open');
+            }});
+            
+            // Botão de baseline
+            document.getElementById('baseline-btn-{project["id"]}').addEventListener('click', () => {{
+                const filterMenu = document.getElementById('filter-menu-{project["id"]}');
+                const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                baselineSelector.classList.toggle('is-open');
+                filterMenu.classList.remove('is-open');
+            }});
+            
+            // Botão de tela cheia
+            document.getElementById('fullscreen-btn-{project["id"]}').addEventListener('click', () => {{
+                const container = document.getElementById('gantt-container-{project["id"]}');
+                if (!document.fullscreenElement) {{
+                    container.requestFullscreen();
+                }} else {{
+                    document.exitFullscreen();
+                }}
+            }});
+            
+            // Botão de aplicar filtros
+            document.getElementById('filter-apply-btn-{project["id"]}').addEventListener('click', () => {{
+                const setorSelect = document.getElementById('filter-setor-{project["id"]}');
+                const projectSelect = document.getElementById('filter-project-{project["id"]}');
+                const concluidasCheck = document.getElementById('filter-concluidas-{project["id"]}');
+                const visRadio = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked');
+                
+                const setorSelecionado = setorSelect.value;
+                const projectSelecionado = projectSelect.value;
+                const gruposSelecionados = vsGrupo.value || ["Todos"];
+                const etapasSelecionadas = vsEtapa.value || ["Todas"];
+                const mostrarApenasConcluidas = concluidasCheck.checked;
+                const tipoVisualizacao = visRadio ? visRadio.value : 'Ambos';
+                
+                // Filtrar tasks
+                currentTasks = allTasks.filter(task => {{
+                    // Filtro de setor
+                    if (setorSelecionado !== 'Todos' && task.setor !== setorSelecionado) return false;
+                    
+                    // Filtro de empreendimento
+                    if (projectSelecionado !== 'Todos' && task.empreendimento !== projectSelecionado) return false;
+                    
+                    // Filtro de grupo
+                    if (!gruposSelecionados.includes("Todos") && !gruposSelecionados.includes(task.grupo)) return false;
+                    
+                    // Filtro de etapa
+                    if (!etapasSelecionadas.includes("Todas") && !etapasSelecionadas.includes(task.etapa)) return false;
+                    
+                    // Filtro de concluídas
+                    if (mostrarApenasConcluidas && task.progress >= 100) return false;
+                    
+                    return true;
+                }});
+                
+                renderGantt();
+                
+                // Fechar menu
+                document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
+            }});
             
             // Renderizar inicial
             renderGantt();
