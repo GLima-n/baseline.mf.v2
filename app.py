@@ -2867,10 +2867,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     height: 20px;
                                     transition: all 0.2s ease;
                                     fill: #333333;
+                                    stroke: #333333;
                                 }}
                                 
                                 .radial-item:hover svg {{
                                     fill: #007AFF;
+                                    stroke: #007AFF;
                                 }}
                                 
                                 .radial-tooltip {{
@@ -2884,7 +2886,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     align-items: center;
                                     gap: 5px;
                                     pointer-events: none;
-                                    transition: opacity 0.2s ease, transform 0.2s ease;
+                                    transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
                                     z-index: 15;
                                     opacity: 0;
                                     transform: scale(0.9);
@@ -2893,6 +2895,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 .radial-item:hover + .radial-tooltip {{
                                     opacity: 1;
                                     transform: scale(1);
+                                    background: #007AFF;
+                                    color: white;
+                                }}
+                                
+                                .radial-item:hover + .radial-tooltip .tooltip-badge {{
+                                    background: white;
+                                    color: #007AFF;
                                 }}
                                 
                                 .radial-tooltip.active {{
