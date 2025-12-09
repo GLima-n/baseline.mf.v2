@@ -7193,6 +7193,40 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }});
             
+            // --- DRAG TO SCROLL: Arrastar com mouse para navegar ---
+            const chartContent = document.getElementById('gantt-chart-content-{project["id"]}');
+            let isDragging = false;
+            let startX;
+            let scrollLeft;
+            
+            chartContent.addEventListener('mousedown', (e) => {{
+                isDragging = true;
+                chartContent.classList.add('active');
+                startX = e.pageX - chartContent.offsetLeft;
+                scrollLeft = chartContent.scrollLeft;
+                chartContent.style.cursor = 'grabbing';
+            }});
+            
+            chartContent.addEventListener('mouseleave', () => {{
+                isDragging = false;
+                chartContent.classList.remove('active');
+                chartContent.style.cursor = 'grab';
+            }});
+            
+            chartContent.addEventListener('mouseup', () => {{
+                isDragging = false;
+                chartContent.classList.remove('active');
+                chartContent.style.cursor = 'grab';
+            }});
+            
+            chartContent.addEventListener('mousemove', (e) => {{
+                if (!isDragging) return;
+                e.preventDefault();
+                const x = e.pageX - chartContent.offsetLeft;
+                const walk = (x - startX) * 2; // Multiplicador para velocidade de scroll
+                chartContent.scrollLeft = scrollLeft - walk;
+            }});
+            
             // Renderizar inicial
             renderGantt();
         </script>
