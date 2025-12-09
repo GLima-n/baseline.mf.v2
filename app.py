@@ -6410,6 +6410,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         except Exception as e:
             print(f"Erro ao popular baselines no setor: {e}")
         
+        # --- ORDENAÇÃO: Do mais antigo para o mais novo (por data de início prevista) ---
+        tasks_base_data_for_sector.sort(key=lambda t: (
+            datetime.strptime(t["start_previsto"], "%Y-%m-%d") if t.get("start_previsto") else datetime.max
+        ))
+        
         all_data_by_sector_js[setor] = tasks_base_data_for_sector
     
     if not all_data_by_sector_js:
@@ -6905,6 +6910,27 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 sidebarContent.innerHTML = '';
                 chartContainer.innerHTML = '';
                 
+                // --- ORDENAÇÃO DINÂMICA: Por data de início (prevista ou real) ---
+                // Verificar qual visualização está ativa
+                const visualizacaoReal = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value === 'Real';
+                
+                // Ordenar tasks do mais antigo para o mais novo
+                currentTasks.sort((a, b) => {{
+                    let dateA, dateB;
+                    
+                    if (visualizacaoReal) {{
+                        // Se visualização for "Real", ordenar por data real
+                        dateA = a.start_real ? new Date(a.start_real) : new Date('9999-12-31');
+                        dateB = b.start_real ? new Date(b.start_real) : new Date('9999-12-31');
+                    }} else {{
+                        // Caso contrário, ordenar por data prevista
+                        dateA = a.start_previsto ? new Date(a.start_previsto) : new Date('9999-12-31');
+                        dateB = b.start_previsto ? new Date(b.start_previsto) : new Date('9999-12-31');
+                    }}
+                    
+                    return dateA - dateB;
+                }});
+                
                 // --- 1. Renderizar Sidebar ---
                 currentTasks.forEach((task, idx) => {{
                     const row = document.createElement('div');
@@ -7158,6 +7184,13 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }} else {{
                     document.exitFullscreen();
                 }}
+            }});
+            
+            // Event listeners para radio buttons de visualização (para reordenar ao mudar)
+            document.querySelectorAll('input[name="filter-vis-{project["id"]}"]').forEach(radio => {{
+                radio.addEventListener('change', () => {{
+                    renderGantt(); // Re-renderizar com nova ordenação
+                }});
             }});
             
             // Renderizar inicial
