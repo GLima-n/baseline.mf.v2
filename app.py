@@ -7524,7 +7524,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Inicializar VirtualSelects
             VirtualSelect.init({{
                 ele: '#filter-project-{project["id"]}',
-                options: {json.dumps([{"label": "Todos", "value": "Todos"}] + [{"label": emp, "value": emp} for emp in empreendimentos_no_df])},
+                options: [
+                    {{label: 'Todos', value: 'Todos'}},
+                    {", ".join([f"{{label: '{emp}', value: '{emp}'}}" for emp in empreendimentos_no_df])}
+                ],
                 multiple: true,
                 search: true,
                 placeholder: 'Selecione empreendimentos',
@@ -7539,7 +7542,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             VirtualSelect.init({{
                 ele: '#filter-grupos-{project["id"]}',
-                options: {json.dumps([{"label": grupo, "value": grupo} for grupo in filter_options['grupos']])},
+                options: [
+                    {", ".join([f"{{label: '{grupo}', value: '{grupo}'}}" for grupo in filter_options['grupos']])}
+                ],
                 multiple: true,
                 search: true,
                 placeholder: 'Selecione grupos',
@@ -7553,8 +7558,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }});
             
             // Selecionar todos por padrão
-            document.querySelector('#filter-project-{project["id"]}').setValue(['Todos'].concat({json.dumps(empreendimentos_no_df)}));
-            document.querySelector('#filter-grupos-{project["id"]}').setValue({json.dumps(filter_options['grupos'])});
+            document.querySelector('#filter-project-{project["id"]}').setValue(['Todos', {", ".join([f"'{emp}'" for emp in empreendimentos_no_df])}]);
+            document.querySelector('#filter-grupos-{project["id"]}').setValue([{", ".join([f"'{grupo}'" for grupo in filter_options['grupos']])}]);
             
             // Event listeners para re-renderizar ao mudar filtros
             document.querySelector('#filter-project-{project["id"]}').addEventListener('change', () => {{
