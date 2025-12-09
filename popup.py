@@ -61,16 +61,32 @@ def show_welcome_screen():
     bg_style = f"background-image: url('data:image/svg+xml;base64,{svg_base64}');" if svg_base64 else "background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);"
     
     
-    # Data do último reboot (início do app) com horário de Brasília
-    # Armazena no session_state apenas uma vez quando o app inicia
-    if 'app_start_time' not in st.session_state:
-        # Timezone de Brasília
-        brasilia_tz = pytz.timezone('America/Sao_Paulo')
-        # Captura timestamp do reboot (quando o app iniciou)
-        st.session_state.app_start_time = datetime.now(brasilia_tz)
+    # Data do último reboot do SERVIDOR Streamlit com horário de Brasília
+    # Usa arquivo de timestamp que persiste entre TODAS as sessões
+    timestamp_file = '.app_start_timestamp'
+    brasilia_tz = pytz.timezone('America/Sao_Paulo')
     
-    # Formata a data/hora do reboot para exibição
-    last_update = st.session_state.app_start_time.strftime("%d/%m/%Y às %H:%M:%S")
+    # Se o arquivo não existe, o servidor acabou de iniciar
+    if not os.path.exists(timestamp_file):
+        # Captura timestamp do reboot do servidor
+        app_start_time = datetime.now(brasilia_tz)
+        # Salva em arquivo para persistir entre sessões
+        with open(timestamp_file, 'w') as f:
+            f.write(app_start_time.isoformat())
+    else:
+        # Lê o timestamp do arquivo (quando o servidor foi iniciado)
+        try:
+            with open(timestamp_file, 'r') as f:
+                timestamp_str = f.read().strip()
+                app_start_time = datetime.fromisoformat(timestamp_str)
+        except:
+            # Se houver erro ao ler, recria o arquivo
+            app_start_time = datetime.now(brasilia_tz)
+            with open(timestamp_file, 'w') as f:
+                f.write(app_start_time.isoformat())
+    
+    # Formata a data/hora do reboot do servidor para exibição
+    last_update = app_start_time.strftime("%d/%m/%Y às %H:%M:%S")
     
     # CSS e HTML do popup
     popup_html = f"""
