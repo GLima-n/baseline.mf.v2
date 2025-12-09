@@ -3062,7 +3062,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <style>
                                 .notepad-header {{
                                     padding: 14px 18px;
-                                    background: #FF4B4B;
+                                    background: #2E384A;
                                     color: white;
                                     display: flex;
                                     justify-content: space-between;
