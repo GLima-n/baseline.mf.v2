@@ -253,8 +253,8 @@ def show_welcome_screen():
                 <div class="logo-container">
                     {'<img src="' + logo_base64 + '" alt="Logo Viana e Moura" />' if logo_base64 else ''}
                 </div>
-                <h2>Bem-vindo ao Painel</h2>
-                <p>Por favor, informe seu email para acessar</p>
+                <h2>Bem-vindo ao Painel Macrofluxo</h2>
+                <p>Por favor, informe seu e-mail para acessar o Painel de acompanhamento das etapas do Macrofluxo da Viana & Moura Construções.</p>
             </div>
             <div class="popup-body">
                 <form method="get">
