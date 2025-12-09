@@ -6277,8 +6277,41 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     
     # --- FILTRO: Remover etapas pai ANTES da agregação ---
     # Etapas pai são aquelas que têm subetapas definidas em SUBETAPAS
-    etapas_pai = list(SUBETAPAS.keys())  # ["ENG. LIMP.", "ENG. TER.", "ENG. INFRA", "ENG. PAV"]
+    # Incluindo todas as variações possíveis de nomes
+    etapas_pai = [
+        # Variações de ENG. LIMP.
+        "ENG. LIMP.", "ENG. LIMP", "ENG.LIMP", "ENG.LIMP.", "ENGLIMP", "ENG LIMP",
+        # Variações de ENG. TER.
+        "ENG. TER.", "ENG. TER", "ENG.TER", "ENG.TER.", "ENGTER", "ENG TER",
+        # Variações de ENG. INFRA
+        "ENG. INFRA", "ENG.INFRA", "ENGINFRA", "ENG INFRA",
+        # Variações de ENG. PAV
+        "ENG. PAV", "ENG.PAV", "ENGPAV", "ENG PAV",
+        # Adicionar também as chaves do dicionário SUBETAPAS
+    ] + list(SUBETAPAS.keys())
+    
+    # Remover duplicatas
+    etapas_pai = list(set(etapas_pai))
+    
+    # DEBUG: Imprimir etapas únicas ANTES do filtro
+    print("=" * 80)
+    print("DEBUG - ETAPAS ÚNICAS NO DATAFRAME (ANTES DO FILTRO):")
+    etapas_unicas = sorted(df_gantt['Etapa'].unique())
+    for etapa in etapas_unicas:
+        if any(pai.lower() in etapa.lower() for pai in ["eng", "limp", "ter", "infra", "pav"]):
+            print(f"  - '{etapa}'")
+    print(f"\nETAPAS PAI QUE SERÃO FILTRADAS: {etapas_pai}")
+    print("=" * 80)
+    
     df_gantt = df_gantt[~df_gantt['Etapa'].isin(etapas_pai)]
+    
+    # DEBUG: Imprimir etapas únicas DEPOIS do filtro
+    print("DEBUG - ETAPAS ÚNICAS NO DATAFRAME (DEPOIS DO FILTRO):")
+    etapas_unicas_depois = sorted(df_gantt['Etapa'].unique())
+    for etapa in etapas_unicas_depois:
+        if any(pai.lower() in etapa.lower() for pai in ["eng", "limp", "ter", "infra", "pav"]):
+            print(f"  - '{etapa}'")
+    print("=" * 80)
     
     # Agrupar por SETOR, Empreendimento e Etapa
     df_gantt_agg = df_gantt.groupby(['SETOR', 'Empreendimento', 'Etapa']).agg(
