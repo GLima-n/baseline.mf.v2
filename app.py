@@ -6162,25 +6162,44 @@ with st.spinner("Carregando e processando dados..."):
         # que está dentro de um iframe sandboxed via components.html()
         # ===========================================================================================
         baseline_trigger_data = st_javascript("""
-            // Variável global para armazenar a última mensagem
-            let lastMessage = null;
+            // NOVA ABORDAGEM: Usar sessionStorage para persistência entre reruns
             
-            // Escutar mensagens do iframe do Gantt
-            window.addEventListener('message', function(event) {
-                // Verificar se é uma mensagem do nosso menu de contexto
-                if (event.data && event.data.action === 'create_baseline') {
-                    console.log('📨 Streamlit Parent: Mensagem recebida do iframe Gantt:', event.data);
-                    lastMessage = event.data;
-                }
-            });
-            
-            //Retornar a última mensagem capturada
-            if (lastMessage) {
-                const temp = lastMessage;
-                lastMessage = null; // Limpar para não processar duas vezes
-                return temp;
+            // 1. Verificar se já tem uma mensagem pendente armazenada
+            const storedMessage = sessionStorage.getItem('baseline_trigger');
+            if (storedMessage) {
+                console.log('📦 Recuperando mensagem do sessionStorage:', storedMessage);
+                const message = JSON.parse(storedMessage);
+                sessionStorage.removeItem('baseline_trigger'); // Limpar imediatamente
+                return message;
             }
             
+            // 2. Configurar listener (só roda uma vez)
+            if (!window.baselineListenerConfigured) {
+                console.log('🔧 Configurando listener de postMessage...');
+                
+                window.addEventListener('message', function(event) {
+                    // Verificar se é uma mensagem do nosso menu de contexto
+                    if (event.data && event.data.action === 'create_baseline') {
+                        console.log('📨 Streamlit Parent: Mensagem recebida!', event.data);
+                        
+                        // Armazenar no sessionStorage
+                        sessionStorage.setItem('baseline_trigger', JSON.stringify(event.data));
+                        
+                        // Forçar rerun do Streamlit
+                        console.log('🔄 Disparando rerun do Streamlit...');
+                        window.parent.postMessage({
+                            type: 'streamlit:setComponentValue',
+                            key: 'baseline_listener',
+                            value: event.data
+                        }, '*');
+                    }
+                });
+                
+                window.baselineListenerConfigured = true;
+                console.log('✅ Listener configurado com sucesso');
+            }
+            
+            // 3. Retornar null na primeira execução
             return null;
         """, key="baseline_listener")
         
