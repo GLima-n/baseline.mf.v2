@@ -2744,6 +2744,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             realBars.forEach(bar => {{
                                 if (isExpanded) {{
                                     bar.classList.add('parent-task-real', 'expanded');
+                                    // Define a cor da borda com a mesma cor original
                                     const originalColor = bar.style.backgroundColor;
                                     bar.style.borderColor = originalColor;
                                 }} else {{
@@ -2754,11 +2755,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
-                    // --- MENU RADIAL CIRCULAR (ESTILO MODERNO) ---
+                    // --- LÓGICA V6: NOME DINÂMICO (CORREÇÃO FINAL) ---
+                    // --- LÓGICA V15: IFRAME SEGURO + URL VIA REFERRER (DEFINITIVA) ---
                     (function() {{
+                        // 1. Configuração
                         const containerId = 'gantt-container-' + '{project["id"]}';
                         const container = document.getElementById(containerId);
                         
+                        // Garante iframe
                         let iframe = document.getElementById('hidden-iframe');
                         if (!iframe) {{
                             iframe = document.createElement('iframe');
@@ -2769,24 +2773,24 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         if (!container) return;
 
-                        const oldMenu = container.querySelector('#radial-menu');
+                        // Limpeza visual
+                        const oldMenu = container.querySelector('#context-menu');
                         if (oldMenu) oldMenu.remove();
                         const oldToast = container.querySelector('.js-toast-loading');
                         if (oldToast) oldToast.remove();
 
-                        // Criar Menu Radial
+                        // 2. Criar Menu Radial
                         const menu = document.createElement('div');
                         menu.id = 'radial-menu';
-                        menu.style.cssText = "position:fixed; z-index:2147483647; display:none; font-family:'Segoe UI', sans-serif;";
-                        
+                        menu.style.cssText = "position:fixed; z-index:2147483647; display:none; font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;";
                         menu.innerHTML = `
                             <style>
                                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
                                 
-                                .radial-menu-container {{
+                                .radial-menu-wrapper {{
                                     position: relative;
-                                    width: 400px;
-                                    height: 400px;
+                                    width: 500px;
+                                    height: 500px;
                                 }}
                                 
                                 .radial-center {{
@@ -2794,209 +2798,292 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     top: 50%;
                                     left: 50%;
                                     transform: translate(-50%, -50%);
-                                    width: 72px;
-                                    height: 72px;
-                                    background: #4F7CFF;
+                                    width: 80px;
+                                    height: 80px;
+                                    border: 6px solid #007AFF;
                                     border-radius: 50%;
-                                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 8px rgba(255, 255, 255, 0.9);
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
+                                    background: transparent;
                                     cursor: pointer;
                                     transition: all 0.2s ease;
                                     z-index: 10;
                                 }}
                                 
                                 .radial-center:hover {{
-                                    transform: translate(-50%, -50%) scale(1.05);
-                                    box-shadow: 0 4px 12px rgba(79, 124, 255, 0.3), 0 0 0 8px rgba(255, 255, 255, 0.9);
+                                    border-width: 8px;
+                                    transform: translate(-50%, -50%) scale(1.08);
+                                    box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
                                 }}
                                 
-                                .radial-center-play {{
-                                    width: 0;
-                                    height: 0;
-                                    border-left: 16px solid white;
-                                    border-top: 10px solid transparent;
-                                    border-bottom: 10px solid transparent;
-                                    margin-left: 4px;
-                                }}
-                                
-                                .radial-item {{
+                                .radial-svg {{
                                     position: absolute;
-                                    top: 50%;
-                                    left: 50%;
-                                    min-width: 140px;
-                                    height: 40px;
-                                    margin: -20px 0 0 -70px;
-                                    background: rgba(255, 255, 255, 0.95);
-                                    backdrop-filter: blur(10px);
-                                    border-radius: 20px;
-                                    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.06);
-                                    display: flex;
-                                    align-items: center;
-                                    padding: 0 14px 0 10px;
-                                    gap: 8px;
-                                    cursor: pointer;
-                                    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-                                    opacity: 0;
-                                    transform: translate(0, 0) scale(0.7);
-                                    border: 1px solid rgba(0, 0, 0, 0.06);
-                                    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-                                }}
-                                
-                                .radial-item.visible {{
-                                    opacity: 1;
-                                    transform: translate(var(--x), var(--y)) scale(1);
-                                }}
-                                
-                                .radial-item:hover {{
-                                    background: rgba(255, 255, 255, 1);
-                                    transform: translate(var(--x), var(--y)) scale(1.05);
-                                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.08);
-                                    border-color: rgba(79, 124, 255, 0.3);
-                                }}
-                                
-                                .item-icon {{
-                                    font-size: 18px;
-                                    width: 24px;
-                                    height: 24px;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    flex-shrink: 0;
-                                }}
-                                
-                                .item-label {{
-                                    font-size: 13px;
-                                    font-weight: 500;
-                                    color: #1a1a1a;
-                                    white-space: nowrap;
-                                    letter-spacing: -0.01em;
-                                }}
-                                
-                                .item-shortcut {{
-                                    font-size: 11px;
-                                    font-weight: 500;
-                                    color: #999;
-                                    margin-left: auto;
-                                    padding-left: 10px;
-                                    font-family: 'SF Mono', 'Monaco', 'Courier New', monospace;
-                                }}
-                                
-                                .radial-backdrop {{
-                                    position: fixed;
                                     top: 0;
                                     left: 0;
                                     width: 100%;
                                     height: 100%;
-                                    background: rgba(255, 255, 255, 0.01);
-                                    backdrop-filter: blur(2px);
-                                    z-index: -1;
+                                    pointer-events: none;
+                                    z-index: 1;
+                                }}
+                                
+                                .radial-connector {{
+                                    position: absolute;
+                                    top: 50%;
+                                    left: 50%;
+                                    width: 1px;
+                                    height: 90px;
+                                    background: rgba(0, 0, 0, 0.06);
+                                    transform-origin: top center;
+                                    pointer-events: none;
+                                    z-index: 2;
+                                }}
+                                
+                                .radial-item {{
+                                    position: absolute;
+                                    width: 32px;
+                                    height: 32px;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                    z-index: 5;
+                                }}
+                                
+                                .radial-item svg {{
+                                    width: 28px;
+                                    height: 28px;
+                                    transition: all 0.2s ease;
+                                }}
+                                
+                                .radial-item.active svg {{
+                                    fill: #007AFF;
+                                }}
+                                
+                                .radial-item:not(.active) svg {{
+                                    fill: #333333;
+                                }}
+                                
+                                .radial-item:hover:not(.active) svg {{
+                                    fill: #666666;
+                                    transform: scale(1.1);
+                                }}
+                                
+                                .radial-tooltip {{
+                                    position: absolute;
+                                    padding: 8px 14px;
+                                    border-radius: 20px;
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    white-space: nowrap;
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                    pointer-events: none;
+                                    transition: all 0.2s ease;
+                                    z-index: 15;
+                                }}
+                                
+                                .radial-tooltip.active {{
+                                    background: #007AFF;
+                                    color: white;
+                                    box-shadow: 0 2px 12px rgba(0, 122, 255, 0.3);
+                                }}
+                                
+                                .radial-tooltip:not(.active) {{
+                                    background: white;
+                                    color: #333;
+                                    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+                                }}
+                                
+                                .tooltip-badge {{
+                                    padding: 3px 8px;
+                                    border-radius: 5px;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    min-width: 20px;
+                                    text-align: center;
+                                    font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+                                }}
+                                
+                                .tooltip-badge.active-badge {{
+                                    background: white;
+                                    color: #007AFF;
+                                }}
+                                
+                                .tooltip-badge.inactive-badge {{
+                                    background: #f0f0f0;
+                                    color: #666;
+                                }}
+                                
+                                .radial-more {{
+                                    position: absolute;
+                                    padding: 10px 18px;
+                                    background: #e8e8e8;
+                                    color: #666;
+                                    border-radius: 20px;
+                                    font-size: 13px;
+                                    font-weight: 500;
+                                    cursor: pointer;
+                                    transition: all 0.2s ease;
+                                    z-index: 5;
+                                }}
+                                
+                                .radial-more:hover {{
+                                    background: #d8d8d8;
+                                    transform: scale(1.05);
+                                }}
+                                
+                                @keyframes fadeIn {{
+                                    from {{ opacity: 0; transform: scale(0.8); }}
+                                    to {{ opacity: 1; transform: scale(1); }}
+                                }}
+                                
+                                .radial-item, .radial-tooltip, .radial-more {{
+                                    animation: fadeIn 0.3s ease-out;
                                 }}
                             </style>
                             
-                            <div class="radial-backdrop"></div>
-                            <div class="radial-menu-container">
-                                <div class="radial-center" title="Menu">
-                                    <div class="radial-center-play"></div>
+                            <div class="radial-menu-wrapper">
+                                <svg class="radial-svg" viewBox="0 0 500 500">
+                                    <path d="M 250 250 L 250 90 A 160 160 0 0 1 332.8 128.4 Z" 
+                                          fill="rgba(0, 122, 255, 0.08)" 
+                                          stroke="#007AFF" 
+                                          stroke-width="2.5"
+                                          opacity="1"/>
+                                </svg>
+                                
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(0deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(45deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(90deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(135deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(180deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(225deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(270deg);"></div>
+                                <div class="radial-connector" style="transform: translate(-0.5px, -40px) rotate(315deg);"></div>
+                                
+                                <div class="radial-center" title="Menu Radial"></div>
+                                
+                                <div class="radial-item active" id="btn-create-baseline" style="top: 60px; left: 234px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip active" style="top: 20px; left: 50%; transform: translateX(-50%);">
+                                    Criar Baseline
+                                    <span class="tooltip-badge active-badge">M</span>
                                 </div>
                                 
-                                <div class="radial-item" id="item-create-baseline" style="--x: 0px; --y: -140px;">
-                                    <div class="item-icon">📸</div>
-                                    <div class="item-label">Move Tool</div>
-                                    <div class="item-shortcut">M</div>
+                                <div class="radial-item" style="top: 133px; left: 352px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="3" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="14" y="3" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="3" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="14" y="14" width="7" height="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="top: 118px; right: 20px;">
+                                    Frame
+                                    <span class="tooltip-badge inactive-badge">F</span>
                                 </div>
                                 
-                                <div class="radial-item" id="item-frame" style="--x: 121px; --y: -70px;">
-                                    <div class="item-icon">🖼</div>
-                                    <div class="item-label">Frame</div>
-                                    <div class="item-shortcut">F</div>
+                                <div class="radial-item" style="top: 234px; left: 410px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="top: 50%; right: 10px; transform: translateY(-50%);">
+                                    Pen Tool
+                                    <span class="tooltip-badge inactive-badge">P</span>
                                 </div>
                                 
-                                <div class="radial-item" id="item-pen" style="--x: 121px; --y: 70px;">
-                                    <div class="item-icon">✏</div>
-                                    <div class="item-label">Pen Tool</div>
-                                    <div class="item-shortcut">P</div>
+                                <div class="radial-item" style="top: 335px; left: 352px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M5 4v3h5.5v12h3V7H19V4z"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="bottom: 118px; right: 20px;">
+                                    Text
+                                    <span class="tooltip-badge inactive-badge">T</span>
                                 </div>
                                 
-                                <div class="radial-item" id="item-text" style="--x: 0px; --y: 140px;">
-                                    <div class="item-icon">T</div>
-                                    <div class="item-label">Text</div>
-                                    <div class="item-shortcut">T</div>
+                                <div class="radial-more" style="top: 420px; left: 50%; transform: translateX(-50%);">
+                                    More ...
                                 </div>
                                 
-                                <div class="radial-item" id="item-actions" style="--x: -121px; --y: 70px;">
-                                    <div class="item-icon">⚡</div>
-                                    <div class="item-label">Actions</div>
+                                <div class="radial-item" style="top: 335px; left: 116px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <rect x="3" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="14" y="3" width="7" height="7" rx="1"/>
+                                        <rect x="3" y="14" width="7" height="7" rx="1"/>
+                                        <path d="M18 18l-3-3m3 3l3-3m-3 3v-6" stroke="currentColor" fill="none" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="bottom: 118px; left: 20px;">
+                                    Actions
                                 </div>
                                 
-                                <div class="radial-item" id="item-more" style="--x: -121px; --y: -70px;">
-                                    <div class="item-icon">⋯</div>
-                                    <div class="item-label">More</div>
-                                    <div class="item-shortcut">⋯</div>
+                                <div class="radial-item" style="top: 234px; left: 58px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <circle cx="10" cy="10" r="7" fill="none" stroke="currentColor" stroke-width="2"/>
+                                        <rect x="12" y="12" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="top: 50%; left: 10px; transform: translateY(-50%);">
+                                    Objects
+                                    <span class="tooltip-badge inactive-badge">O</span>
+                                </div>
+                                
+                                <div class="radial-item" style="top: 133px; left: 116px;">
+                                    <svg viewBox="0 0 24 24">
+                                        <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z" fill="none" stroke="currentColor" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="radial-tooltip" style="top: 118px; left: 20px;">
+                                    Comment
+                                    <span class="tooltip-badge inactive-badge">C</span>
                                 </div>
                             </div>
                         `;
                         container.appendChild(menu);
 
-                        // Criar Toast
+                        // 3. Criar Toast
                         const toast = document.createElement('div');
                         toast.className = 'js-toast-loading';
                         toast.style.cssText = "position:fixed; bottom:20px; right:20px; background:#2c3e50; color:white; padding:15px 25px; border-radius:8px; z-index:2147483647; display:none; font-family:sans-serif; box-shadow:0 5px 15px rgba(0,0,0,0.3); transition: all 0.3s ease;";
                         container.appendChild(toast);
 
-                        // Funções do Menu Radial
-                        function showRadialMenu(x, y) {{
-                            menu.style.display = 'block';
-                            menu.style.left = (x - 200) + 'px';
-                            menu.style.top = (y - 200) + 'px';
-                            
-                            setTimeout(() => {{
-                                const items = menu.querySelectorAll('.radial-item');
-                                items.forEach((item, index) => {{
-                                    setTimeout(() => {{
-                                        item.classList.add('visible');
-                                    }}, index * 40);
-                                }});
-                            }}, 10);
-                        }}
-                        
-                        function hideRadialMenu() {{
-                            const items = menu.querySelectorAll('.radial-item');
-                            items.forEach(item => {{
-                                item.classList.remove('visible');
-                            }});
-                            setTimeout(() => {{
-                                menu.style.display = 'none';
-                            }}, 200);
-                        }}
-
-                        // Event Listeners
+                        // 4. Listeners
                         container.addEventListener('contextmenu', function(e) {{
                             if (e.target.closest('.gantt-chart-content') || e.target.closest('.gantt-sidebar-wrapper') || e.target.closest('.gantt-row')) {{
                                 e.preventDefault();
-                                showRadialMenu(e.clientX, e.clientY);
+                                menu.style.display = 'block';
+                                menu.style.left = (e.clientX - 250) + 'px';  // Centraliza menu de 500px
+                                menu.style.top = (e.clientY - 250) + 'px';
                             }}
                         }});
 
                         document.addEventListener('click', function(e) {{
-                            if (menu.style.display === 'block' && !e.target.closest('#radial-menu')) {{
-                                hideRadialMenu();
+                            if (menu.style.display === 'block' && !menu.contains(e.target)) {{
+                                menu.style.display = 'none';
                             }}
                         }}, true);
                         
+                        // Fechar ao clicar no centro
                         const centerBtn = menu.querySelector('.radial-center');
-                        centerBtn.addEventListener('click', function(e) {{
-                            e.stopPropagation();
-                            hideRadialMenu();
-                        }});
+                        if (centerBtn) {{
+                            centerBtn.addEventListener('click', function(e) {{
+                                e.stopPropagation();
+                                menu.style.display = 'none';
+                            }});
+                        }}
 
-                        // AÇÕES DOS ITENS
-                        const btnCreate = menu.querySelector('#item-create-baseline');
+                        // --- 5. AÇÃO DO BOTÃO ---
+                        const btnCreate = menu.querySelector('#btn-create-baseline');
+                        
                         btnCreate.addEventListener('click', function(e) {{
                             e.stopPropagation();
                             e.preventDefault();
 
+                            // A. Nome do Projeto
                             let currentProjectName = "Desconhecido";
                             if (typeof projectData !== 'undefined' && projectData.length > 0) {{
                                 currentProjectName = projectData[0].name;
@@ -3005,28 +3092,38 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 if (titleEl) currentProjectName = titleEl.textContent;
                             }}
 
-                            hideRadialMenu();
+                            // B. Feedback Visual (Laranja = Processando)
+                            menu.style.display = 'none';
                             toast.style.display = 'block';
-                            toast.style.backgroundColor = "#e67e22";
+                            toast.style.backgroundColor = "#e67e22"; // Laranja
                             toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
 
+                            // C. Montar URL CORRETA
                             const encodedProject = encodeURIComponent(currentProjectName);
                             const timestamp = new Date().getTime();
                             
+                            // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
+                            // Isso corrige o bug do "about:srcdoc"
                             let baseUrl = document.referrer;
                             if (!baseUrl || baseUrl === "") {{
+                                // Fallback raro
                                 baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
                             }}
+                            // Remove barra final
                             if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
+                            // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
                             const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
 
                             console.log("🚀 URL Iframe:", finalUrl);
                             
+                            // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
                             if (iframe) iframe.src = finalUrl;
 
+                            // E. Feedback Final
+                            // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
                             setTimeout(() => {{
-                                toast.style.backgroundColor = "#27ae60";
+                                toast.style.backgroundColor = "#27ae60"; // Verde
                                 toast.innerHTML = `
                                     <div style="display:flex; flex-direction:column; gap:5px;">
                                         <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
@@ -3036,21 +3133,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 `;
                                 setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
                             }}, 4000);
-                        }});
-                        
-                        // Outras ações (em breve)
-                        ['frame', 'pen', 'text', 'actions', 'more'].forEach(action => {{
-                            const item = menu.querySelector(`#item-${{action}}`);
-                            if (item) {{
-                                item.addEventListener('click', function(e) {{
-                                    e.stopPropagation();
-                                    hideRadialMenu();
-                                    toast.style.display = 'block';
-                                    toast.style.backgroundColor = "#3498db";
-                                    toast.innerHTML = `ℹ️ Função "${{action}}" em desenvolvimento...`;
-                                    setTimeout(() => {{ toast.style.display = 'none'; }}, 3000);
-                                }});
-                            }}
                         }});
 
                     }})();
