@@ -2798,9 +2798,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     top: 50%;
                                     left: 50%;
                                     transform: translate(-50%, -50%);
-                                    width: 40px;
-                                    height: 40px;
-                                    border: 3px solid #007AFF;
+                                    width: 44px;
+                                    height: 44px;
+                                    border: none;
                                     border-radius: 50%;
                                     background: #007AFF;
                                     cursor: pointer;
@@ -2809,19 +2809,20 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
+                                    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
                                 }}
                                 
                                 .radial-center:hover {{
                                     transform: translate(-50%, -50%) scale(1.1);
-                                    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2);
+                                    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
                                 }}
                                 
                                 .radial-center-play {{
                                     width: 0;
                                     height: 0;
-                                    border-left: 10px solid white;
-                                    border-top: 6px solid transparent;
-                                    border-bottom: 6px solid transparent;
+                                    border-left: 11px solid white;
+                                    border-top: 7px solid transparent;
+                                    border-bottom: 7px solid transparent;
                                     margin-left: 3px;
                                 }}
                                 
@@ -2836,6 +2837,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     transition: all 0.2s ease;
                                     z-index: 5;
                                     background: white;
+                                    border: 1px solid #e0e0e0;
                                     border-radius: 6px;
                                     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
                                 }}
