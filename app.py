@@ -6656,6 +6656,55 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
+        # ===========================================================================================
+        # BOTÃO PARA CRIAR BASELINE (Solução funcional sem dependência de iframe)
+        # ===========================================================================================
+        empreendimentos_selecionados = selected_emp if selected_emp else []
+        
+        if len(empreendimentos_selecionados) == 1:
+            empreendimento_alvo = empreendimentos_selecionados[0]
+            
+            # Criar botão discreto e bonito
+            col1, col2, col3 = st.columns([2, 1, 2])
+            with col2:
+                if st.button(
+                    "📸 Criar Baseline", 
+                    key="btn_criar_baseline_final",
+                    use_container_width=True,
+                    type="primary"
+                ):
+                    with st.spinner(f"Criando baseline para {empreendimento_alvo}..."):
+                        try:
+                            print(f"🔔 BOTÃO: Criando baseline para '{empreendimento_alvo}'")
+                            
+                            # Criar baseline
+                            version_name = take_gantt_baseline(
+                                df_data, 
+                                empreendimento_alvo, 
+                                "Gantt"
+                            )
+                            
+                            st.success(f"✅ Baseline **{version_name}** criada com sucesso!")
+                            print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
+                            
+                            # Aguardar um momento para garantir que salvou
+                            time.sleep(0.5)
+                            
+                            # Recarregar
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"❌ Erro ao criar baseline: {e}")
+                            print(f"❌ Erro: {e}")
+        
+        elif len(empreendimentos_selecionados) > 1:
+            st.info("ℹ️ Para criar uma baseline, selecione apenas **um empreendimento** nos filtros.")
+        
+        elif len(empreendimentos_selecionados) == 0:
+            st.info("ℹ️ Selecione um empreendimento nos filtros para criar baselines.")
+        
+        # ===========================================================================================
+        
         
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
