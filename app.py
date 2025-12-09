@@ -2800,27 +2800,26 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     transform: translate(-50%, -50%);
                                     width: 44px;
                                     height: 44px;
-                                    border: none;
+                                    border: 2px solid #007AFF;
                                     border-radius: 50%;
-                                    background: #007AFF;
+                                    background: transparent;
                                     cursor: pointer;
                                     transition: all 0.2s ease;
                                     z-index: 10;
                                     display: flex;
                                     align-items: center;
                                     justify-content: center;
-                                    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.3);
                                 }}
                                 
                                 .radial-center:hover {{
                                     transform: translate(-50%, -50%) scale(1.1);
-                                    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.4);
+                                    border-width: 3px;
                                 }}
                                 
                                 .radial-center-play {{
                                     width: 0;
                                     height: 0;
-                                    border-left: 11px solid white;
+                                    border-left: 11px solid #007AFF;
                                     border-top: 7px solid transparent;
                                     border-bottom: 7px solid transparent;
                                     margin-left: 3px;
@@ -2834,9 +2833,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     transform: translate(-50%, -50%);
                                     width: 180px;
                                     height: 180px;
-                                    border: 1px solid #e0ecff;
+                                    border: 1px solid #e0e0e0;
                                     border-radius: 50%;
-                                    background: rgba(0, 122, 255, 0.04);
+                                    background: transparent;
                                     z-index: 1;
                                 }}
                                 
