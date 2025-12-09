@@ -6206,6 +6206,9 @@ with st.spinner("Carregando e processando dados..."):
         # ===========================================================================================
         # Processar resposta do listener
         # ===========================================================================================
+        print("🔍 DEBUG: Verificando baseline_trigger_data...")
+        print(f"🔍 DEBUG: baseline_trigger_data = {baseline_trigger_data}")
+        
         if baseline_trigger_data and baseline_trigger_data.get('action') == 'create_baseline':
             empreendimento = baseline_trigger_data.get('empreendimento')
             if empreendimento:
@@ -6213,6 +6216,8 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.create_baseline_trigger = True
                 st.session_state.baseline_empreendimento = empreendimento
                 # Rerun será chamado dentro de process_baseline_trigger após criar a baseline
+        else:
+            print("🔍 DEBUG: Nenhum trigger recebido neste rerun")
         
         # ===========================================================================================
         # NOVO: Processar Trigger de Baseline (via session_state)
