@@ -6891,7 +6891,13 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 "Não especificado": {{"previsto": "#ffffff", "real": "#FFFFFF"}}
             }};
             
-            // Renderizar Gantt
+            // Dados do projeto
+            const dataInicio = new Date("{data_min_proj.strftime('%Y-%m-%d')}");
+            const dataFim = new Date("{data_max_proj.strftime('%Y-%m-%d')}");
+            const totalMeses = {total_meses_proj};
+            const larguraMes = 30;
+            
+            // Renderizar Gantt completo
             function renderGantt() {{
                 const sidebarContent = document.getElementById('gantt-sidebar-content-{project["id"]}');
                 const chartContainer = document.getElementById('chart-container-{project["id"]}');
@@ -6899,7 +6905,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 sidebarContent.innerHTML = '';
                 chartContainer.innerHTML = '';
                 
-                // Renderizar sidebar
+                // --- 1. Renderizar Sidebar ---
                 currentTasks.forEach((task, idx) => {{
                     const row = document.createElement('div');
                     row.className = 'sidebar-row';
@@ -6919,20 +6925,215 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     sidebarContent.appendChild(row);
                 }});
                 
-                // Renderizar gráfico (simplificado - adicionar lógica completa depois)
+                // --- 2. Renderizar Header do Gráfico (Anos e Meses) ---
                 const header = document.createElement('div');
                 header.className = 'chart-header';
-                header.innerHTML = '<div class="year-header"><div class="year-section">2025</div></div><div class="month-header"></div>';
+                
+                // Header de anos
+                const yearHeader = document.createElement('div');
+                yearHeader.className = 'year-header';
+                
+                let currentYear = dataInicio.getFullYear();
+                let currentYearStart = 0;
+                let currentYearWidth = 0;
+                
+                for (let m = 0; m < totalMeses; m++) {{
+                    const date = new Date(dataInicio);
+                    date.setMonth(dataInicio.getMonth() + m);
+                    const year = date.getFullYear();
+                    
+                    if (year !== currentYear) {{
+                        const yearSection = document.createElement('div');
+                        yearSection.className = 'year-section';
+                        yearSection.style.width = `${{currentYearWidth}}px`;
+                        yearSection.textContent = currentYear;
+                        yearHeader.appendChild(yearSection);
+                        
+                        currentYear = year;
+                        currentYearStart = m * larguraMes;
+                        currentYearWidth = larguraMes;
+                    }} else {{
+                        currentYearWidth += larguraMes;
+                    }}
+                }}
+                
+                // Adicionar último ano
+                const lastYearSection = document.createElement('div');
+                lastYearSection.className = 'year-section';
+                lastYearSection.style.width = `${{currentYearWidth}}px`;
+                lastYearSection.textContent = currentYear;
+                yearHeader.appendChild(lastYearSection);
+                
+                header.appendChild(yearHeader);
+                
+                // Header de meses
+                const monthHeader = document.createElement('div');
+                monthHeader.className = 'month-header';
+                
+                const meses = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+                
+                for (let m = 0; m < totalMeses; m++) {{
+                    const date = new Date(dataInicio);
+                    date.setMonth(dataInicio.getMonth() + m);
+                    
+                    const monthCell = document.createElement('div');
+                    monthCell.className = 'month-cell';
+                    monthCell.textContent = meses[date.getMonth()];
+                    monthHeader.appendChild(monthCell);
+                }}
+                
+                header.appendChild(monthHeader);
                 chartContainer.appendChild(header);
                 
+                // --- 3. Renderizar Body do Gráfico (Barras) ---
                 const body = document.createElement('div');
                 body.className = 'chart-body';
-                currentTasks.forEach(task => {{
+                body.style.minWidth = `${{totalMeses * larguraMes}}px`;
+                
+                currentTasks.forEach((task, idx) => {{
                     const row = document.createElement('div');
                     row.className = 'gantt-row';
+                    
+                    // Obter cores do setor
+                    const cores = coresPorSetor[task.setor] || coresPorSetor["Não especificado"];
+                    
+                    // Barra Prevista
+                    if (task.start_previsto && task.end_previsto) {{
+                        const startDate = new Date(task.start_previsto);
+                        const endDate = new Date(task.end_previsto);
+                        
+                        const diffStart = (startDate - dataInicio) / (1000 * 60 * 60 * 24);
+                        const diffEnd = (endDate - dataInicio) / (1000 * 60 * 60 * 24);
+                        
+                        const left = (diffStart / 30.4375) * larguraMes;
+                        const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        
+                        if (width > 0) {{
+                            const barPrevisto = document.createElement('div');
+                            barPrevisto.className = 'gantt-bar previsto';
+                            barPrevisto.style.left = `${{left}}px`;
+                            barPrevisto.style.width = `${{width}}px`;
+                            barPrevisto.style.backgroundColor = cores.previsto;
+                            barPrevisto.style.border = `1px solid ${{cores.real}}`;
+                            
+                            const label = document.createElement('div');
+                            label.className = 'bar-label';
+                            label.textContent = task.empreendimento || task.name;
+                            barPrevisto.appendChild(label);
+                            
+                            // Tooltip
+                            barPrevisto.addEventListener('mouseenter', (e) => {{
+                                showTooltip(e, task, 'previsto');
+                            }});
+                            barPrevisto.addEventListener('mouseleave', hideTooltip);
+                            
+                            row.appendChild(barPrevisto);
+                        }}
+                    }}
+                    
+                    // Barra Real
+                    if (task.start_real && task.end_real) {{
+                        const startDate = new Date(task.start_real);
+                        const endDate = new Date(task.end_real);
+                        
+                        const diffStart = (startDate - dataInicio) / (1000 * 60 * 60 * 24);
+                        const diffEnd = (endDate - dataInicio) / (1000 * 60 * 60 * 24);
+                        
+                        const left = (diffStart / 30.4375) * larguraMes;
+                        const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        
+                        if (width > 0) {{
+                            const barReal = document.createElement('div');
+                            barReal.className = 'gantt-bar real';
+                            barReal.style.left = `${{left}}px`;
+                            barReal.style.width = `${{width}}px`;
+                            barReal.style.backgroundColor = cores.real;
+                            
+                            const label = document.createElement('div');
+                            label.className = 'bar-label';
+                            label.textContent = `${{task.progress}}%`;
+                            barReal.appendChild(label);
+                            
+                            // Tooltip
+                            barReal.addEventListener('mouseenter', (e) => {{
+                                showTooltip(e, task, 'real');
+                            }});
+                            barReal.addEventListener('mouseleave', hideTooltip);
+                            
+                            row.appendChild(barReal);
+                        }}
+                    }}
+                    
                     body.appendChild(row);
                 }});
+                
                 chartContainer.appendChild(body);
+                
+                // --- 4. Adicionar Divisores de Mês ---
+                for (let m = 0; m < totalMeses; m++) {{
+                    const date = new Date(dataInicio);
+                    date.setMonth(dataInicio.getMonth() + m);
+                    
+                    const divider = document.createElement('div');
+                    divider.className = date.getDate() === 1 ? 'month-divider first' : 'month-divider';
+                    divider.style.left = `${{m * larguraMes}}px`;
+                    body.appendChild(divider);
+                }}
+                
+                // --- 5. Adicionar Linha do Hoje ---
+                const hoje = new Date();
+                const diffHoje = (hoje - dataInicio) / (1000 * 60 * 60 * 24);
+                const leftHoje = (diffHoje / 30.4375) * larguraMes;
+                
+                if (leftHoje >= 0 && leftHoje <= totalMeses * larguraMes) {{
+                    const todayLine = document.createElement('div');
+                    todayLine.className = 'today-line';
+                    todayLine.style.left = `${{leftHoje}}px`;
+                    body.appendChild(todayLine);
+                }}
+            }}
+            
+            // Funções de Tooltip
+            function showTooltip(event, task, tipo) {{
+                const tooltip = document.getElementById('tooltip');
+                
+                let content = `
+                    <strong>${{task.name}}</strong><br>
+                    <strong>Setor:</strong> ${{task.setor}}<br>
+                    <strong>UGB:</strong> ${{task.ugb}}<br>
+                `;
+                
+                if (tipo === 'previsto') {{
+                    content += `
+                        <strong>Previsto:</strong><br>
+                        Início: ${{task.inicio_previsto}}<br>
+                        Término: ${{task.termino_previsto}}<br>
+                        Duração: ${{task.duracao_prev_meses}} meses
+                    `;
+                }} else {{
+                    content += `
+                        <strong>Real:</strong><br>
+                        Início: ${{task.inicio_real}}<br>
+                        Término: ${{task.termino_real}}<br>
+                        Duração: ${{task.duracao_real_meses}} meses<br>
+                        Progresso: ${{task.progress}}%<br>
+                        VT: ${{task.vt_text}} | VD: ${{task.vd_text}}
+                    `;
+                }}
+                
+                tooltip.innerHTML = content;
+                tooltip.classList.add('show');
+                
+                // Posicionar tooltip
+                const x = event.clientX + 10;
+                const y = event.clientY + 10;
+                tooltip.style.left = `${{x}}px`;
+                tooltip.style.top = `${{y}}px`;
+            }}
+            
+            function hideTooltip() {{
+                const tooltip = document.getElementById('tooltip');
+                tooltip.classList.remove('show');
             }}
             
             // Event listeners
