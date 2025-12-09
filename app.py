@@ -6811,7 +6811,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             Aplicar Selecionados
                         </button>
                     </div>
-                    </div>
                 </div>
                 
                 <div class="baseline-selector-table" style="max-height: 400px; overflow-y: auto; margin-top: 10px;">
