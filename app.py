@@ -2875,6 +2875,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     stroke: #007AFF;
                                 }}
                                 
+                                /* Modo de Foco - Escurecer barras */
+                                .gantt-bar.focus-mode {{
+                                    filter: grayscale(100%) brightness(0.4) !important;
+                                    opacity: 0.5 !important;
+                                    transition: all 0.3s ease;
+                                }}
+                                
+                                .gantt-bar.focus-mode.focused {{
+                                    filter: none !important;
+                                    opacity: 1 !important;
+                                }}
+                                
                                 .radial-tooltip {{
                                     position: absolute;
                                     padding: 5px 9px;
@@ -3307,6 +3319,55 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 isDragging = false;
                                 if (notepadHeader) notepadHeader.style.cursor = 'move';
                             }}
+                        }});
+                        
+                        // --- 7. MODO DE FOCO (BOTÃO AÇÕES) ---
+                        let focusModeActive = false;
+                        let focusedBar = null;
+                        const actionsIcon = menu.querySelector('[style*="top: 176px; left: 83px"]'); // Botão Ações
+                        
+                        // Toggle modo de foco ao clicar no botão Ações
+                        if (actionsIcon) {{
+                            actionsIcon.addEventListener('click', (e) => {{
+                                e.stopPropagation();
+                                focusModeActive = !focusModeActive;
+                                
+                                const allBars = container.querySelectorAll('.gantt-bar');
+                                
+                                if (focusModeActive) {{
+                                    // Ativar modo foco - escurecer todas as barras
+                                    allBars.forEach(bar => bar.classList.add('focus-mode'));
+                                    actionsIcon.style.borderColor = '#007AFF';
+                                    actionsIcon.style.background = '#e6f2ff';
+                                }} else {{
+                                    // Desativar modo foco - restaurar todas as cores
+                                    allBars.forEach(bar => {{
+                                        bar.classList.remove('focus-mode', 'focused');
+                                    }});
+                                    actionsIcon.style.borderColor = '';
+                                    actionsIcon.style.background = '';
+                                    focusedBar = null;
+                                }}
+                                
+                                menu.style.display = 'none';
+                            }});
+                        }}
+                        
+                        // Click em barras para focar individualmente
+                        container.addEventListener('click', (e) => {{
+                            if (!focusModeActive) return;
+                            
+                            const clickedBar = e.target.closest('.gantt-bar');
+                            if (!clickedBar) return;
+                            
+                            // Remover foco anterior
+                            if (focusedBar) {{
+                                focusedBar.classList.remove('focused');
+                            }}
+                            
+                            // Adicionar foco na barra clicada
+                            clickedBar.classList.add('focused');
+                            focusedBar = clickedBar;
                         }});
 
                     }})();
