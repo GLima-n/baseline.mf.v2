@@ -36,16 +36,6 @@ except ImportError:
             return None
         return np.busday_count(pd.to_datetime(start).date(), pd.to_datetime(end).date())
 
-# Importar streamlit-javascript para comunicação com iframe
-try:
-    from streamlit_javascript import st_javascript
-except ImportError:
-    st.warning("streamlit-javascript não encontrado. Menu de contexto pode não funcionar. Execute: pip install streamlit-javascript")
-    # Mock function
-    def st_javascript(code, key=None):
-        return None
-
-
 # --- Bloco de Importação de Dados ---
 try:
     from tratamento_dados_reais import buscar_e_processar_dados_completos
@@ -346,47 +336,51 @@ def aplicar_baseline_automaticamente(empreendimento):
             st.session_state.current_empreendimento = None
             
 
-
-# --- NOVO: Processar Trigger de Baseline (via streamlit-javascript) ---
-def process_baseline_trigger():
-    """
-    Processa o trigger de criação de baseline vindo do iframe via postMessage.
-    Esta função substitui a antiga process_context_menu_actions que usava query params.
-    """
-    if st.session_state.get('create_baseline_trigger'):
-        empreendimento = st.session_state.get('baseline_empreendimento')
+# --- Processar Ações (ADAPTADO DO SEU EXEMPLO) ---
+def process_context_menu_actions(df=None):
+    query_params = st.query_params
+    
+    if 'context_action' in query_params and query_params['context_action'] == 'take_baseline':
+        # 1. Decodifica parâmetros
+        raw_emp = query_params.get('empreendimento', None)
+        empreendimento = urllib.parse.unquote(raw_emp) if raw_emp else None
         
-        if empreendimento:
+        print(f"🔔 BACKEND: Recebido comando para '{empreendimento}'")
+
+        # 2. Garantia de Dados (Pois o iframe é uma sessão nova)
+        if df is None or df.empty:
+            print("⚠️ Sessão Iframe. Carregando dados...")
             try:
-                print(f"🔔 TRIGGER: Criando baseline para '{empreendimento}'")
-                
-                # Carregar dados
-                df = load_data()
-                
-                # Criar baseline
-                version_name = take_gantt_baseline(
-                    df, 
-                    empreendimento, 
-                    "Gantt"
-                )
-                
-                st.success(f"✅ Baseline {version_name} criada com sucesso!")
+                df = load_data() # Sua função de carregar Excel/SQL
+            except Exception as e:
+                print(f"❌ Erro load_data: {e}")
+                return
+
+        # 3. Executa Salvamento
+        if empreendimento and df is not None:
+            try:
+                # Cria a baseline (usa sua função take_gantt_baseline existente)
+                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
+                print(f"✅ FINALIZADO: {version_name} criado.")
+                # Limpa URL
+                st.query_params.clear()
+            except Exception as e:
+                print(f"❌ Erro take_gantt_baseline: {e}")
+
+        # 4. Executa a criação
+        if empreendimento and df is not None and not df.empty:
+            try:
+                # Cria e Salva no MySQL
+                version_name = take_gantt_baseline(df, empreendimento, "Gantt")
                 print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
                 
-                # Limpar trigger
-                st.session_state.create_baseline_trigger = False
-                st.session_state.baseline_empreendimento = None
-                
-                # Recarregar para mostrar nova baseline
-                time.sleep(0.5)  # Pequeno delay para garantir que o banco processou
-                st.rerun()
+                # Limpa params para não repetir na próxima carga
+                st.query_params.clear()
                 
             except Exception as e:
-                st.error(f"❌ Erro ao criar baseline: {e}")
-                print(f"❌ Erro ao criar baseline: {e}")
-                st.session_state.create_baseline_trigger = False
-                st.session_state.baseline_empreendimento = None
-
+                print(f"❌ Erro ao salvar baseline: {e}")
+        else:
+            print(f"❌ Erro: Empreendimento não encontrado ou dados vazios.")
 
 # --- Funções do Novo Gráfico Gantt ---
 def ajustar_datas_com_pulmao(df, meses_pulmao=0):
@@ -2820,7 +2814,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             }}
                         }}, true);
 
-                        // --- 5. AÇÃO DO BOTÃO (NOVA VERSÃO COM POST MESSAGE) ---
+                        // --- 5. AÇÃO DO BOTÃO ---
                         const btnCreate = menu.querySelector('#btn-create-baseline');
                         
                         btnCreate.addEventListener('click', function(e) {{
@@ -2833,60 +2827,51 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 currentProjectName = projectData[0].name;
                             }} else {{
                                 const titleEl = container.querySelector('.project-title-row span');
-                                if (titleEl) {{
-                                    currentProjectName = titleEl.textContent.trim();
-                                    // Remover indicador de baseline se houver
-                                    // Ex: "Residencial Jardins - 📊 P2-(08/12/2024)" → "Residencial Jardins"
-                                    currentProjectName = currentProjectName.split(' - 📊')[0].trim();
-                                }}
+                                if (titleEl) currentProjectName = titleEl.textContent;
                             }}
 
-                            console.log('🏢 Criando baseline para:', currentProjectName);
-
-                            // B. Fechar menu
+                            // B. Feedback Visual (Laranja = Processando)
                             menu.style.display = 'none';
+                            toast.style.display = 'block';
+                            toast.style.backgroundColor = "#e67e22"; // Laranja
+                            toast.innerHTML = `⏳ Processando baseline de <b>${{currentProjectName}}</b>...`; 
+
+                            // C. Montar URL CORRETA
+                            const encodedProject = encodeURIComponent(currentProjectName);
+                            const timestamp = new Date().getTime();
                             
-                            // C. Mostrar feedback
-                            if (toast) {{
-                                toast.style.display = 'block';
-                                toast.style.backgroundColor = '#3498db'; // Azul
-                                toast.innerHTML = `⏳ Criando baseline para <b>${{currentProjectName}}</b>...`;
+                            // Usa REFERRER para pegar a URL real do app (ex: https://app.streamlit...)
+                            // Isso corrige o bug do "about:srcdoc"
+                            let baseUrl = document.referrer;
+                            if (!baseUrl || baseUrl === "") {{
+                                // Fallback raro
+                                baseUrl = window.location.ancestorOrigins && window.location.ancestorOrigins[0] ? window.location.ancestorOrigins[0] : "";
                             }}
+                            // Remove barra final
+                            if (baseUrl.endsWith('/')) baseUrl = baseUrl.slice(0, -1);
 
-                            // D. SOLUÇÃO FINAL: Usar link invisível com target="_top" (funciona em sandbox!)
-                            try {{
-                                // Encode o nome do projeto
-                                const encodedProject = encodeURIComponent(currentProjectName);
-                                
-                                // Construir URL com query parameters
-                                const currentUrl = window.top.location.href;
-                                const baseUrl = currentUrl.split('?')[0];
-                                const newUrl = `${{baseUrl}}?create_baseline=${{encodedProject}}&t=${{new Date().getTime()}}`;
-                                
-                                console.log('🔄 Criando link para navegação:', newUrl);
-                                
-                                // Criar link invisível com target="_top" (FUNCIONA em iframe sandboxed!)
-                                const link = document.createElement('a');
-                                link.href = newUrl;
-                                link.target = '_top';  // Navega a janela top-level
-                                link.style.display = 'none';
-                                document.body.appendChild(link);
-                                
-                                // Clicar no link (navegação permitida mesmo em sandbox)
-                                link.click();
-                                
-                                console.log('✅ Navegação iniciada via link');
-                                
-                            }} catch (error) {{
-                                console.error('❌ Erro ao navegar:', error);
-                                if (toast) {{
-                                    toast.style.backgroundColor = '#e74c3c'; // Vermelho
-                                    toast.innerHTML = '❌ Erro ao criar baseline';
-                                    setTimeout(() => {{ toast.style.display = 'none'; }}, 3000);
-                                }}
-                            }}
+                            // Se falhar tudo, tenta relativo (mas geralmente referrer resolve no Streamlit Cloud)
+                            const finalUrl = baseUrl ? (baseUrl + `/?context_action=take_baseline&empreendimento=${{encodedProject}}&t=${{timestamp}}`) : `?context_action=take_baseline&empreendimento=${{encodedProject}}`;
+
+                            console.log("🚀 URL Iframe:", finalUrl);
+                            
+                            // D. Enviar via Iframe (Não recarrega a página, mas salva no banco)
+                            if (iframe) iframe.src = finalUrl;
+
+                            // E. Feedback Final
+                            // Espera 4 segundos (tempo pro Python salvar) e avisa para atualizar
+                            setTimeout(() => {{
+                                toast.style.backgroundColor = "#27ae60"; // Verde
+                                toast.innerHTML = `
+                                    <div style="display:flex; flex-direction:column; gap:5px;">
+                                        <span style="font-weight:bold; font-size:14px;">✅ Salvo no Banco!</span>
+                                        <span style="font-size:12px;">Dados processados em segundo plano.</span>
+                                        <span style="font-weight:bold; text-decoration:underline; cursor:pointer;">🔄 Pressione F5 agora para ver.</span>
+                                    </div>
+                                `;
+                                setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
+                            }}, 4000);
                         }});
-
 
                     }})();
                     
@@ -6150,34 +6135,11 @@ with st.spinner("Carregando e processando dados..."):
         if 'context_menu_trigger' not in st.session_state:
             st.session_state.context_menu_trigger = False
 
-
-        # ===========================================================================================
-        # PROCESSAR QUERY PARAMETERS PARA CRIAÇÃO DE BASELINE (SOLUÇÃO SIMPLES E CONFIÁVEL)
-        # ===========================================================================================
-        query_params = st.query_params
-        
-        if 'create_baseline' in query_params:
-            empreendimento = query_params['create_baseline']
-            empreendimento = urllib.parse.unquote(empreendimento)  # Decodificar
-            
-            print(f"📨 Query Params: Trigger recebido para '{empreendimento}'")
-            
-            # Limpar query params IMEDIATAMENTE para evitar reprocessamento
-            st.query_params.clear()
-            
-            # Definir trigger  
-            st.session_state.create_baseline_trigger = True
-            st.session_state.baseline_empreendimento = empreendimento
-        # ===========================================================================================
-        
-        
-        # ===========================================================================================
-        # NOVO: Processar Trigger de Baseline (via session_state)
-        # Substitui a antiga process_context_menu_actions que usava query params
-        # ===========================================================================================
-        process_baseline_trigger()
-        # ===========================================================================================
-
+        # --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
+        # Chamamos a função passando o df_data carregado AGORA.
+        # Não confiamos apenas no session_state antigo.
+        process_context_menu_actions(df_data)
+        # --------------------------------------
 
         with st.sidebar:
             st.markdown("<br>", unsafe_allow_html=True)
@@ -6655,55 +6617,6 @@ with st.spinner("Carregando e processando dados..."):
         
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
-        
-        # ===========================================================================================
-        # BOTÃO PARA CRIAR BASELINE (Solução funcional sem dependência de iframe)
-        # ===========================================================================================
-        empreendimentos_selecionados = selected_emp if selected_emp else []
-        
-        if len(empreendimentos_selecionados) == 1:
-            empreendimento_alvo = empreendimentos_selecionados[0]
-            
-            # Criar botão discreto e bonito
-            col1, col2, col3 = st.columns([2, 1, 2])
-            with col2:
-                if st.button(
-                    "📸 Criar Baseline", 
-                    key="btn_criar_baseline_final",
-                    use_container_width=True,
-                    type="primary"
-                ):
-                    with st.spinner(f"Criando baseline para {empreendimento_alvo}..."):
-                        try:
-                            print(f"🔔 BOTÃO: Criando baseline para '{empreendimento_alvo}'")
-                            
-                            # Criar baseline
-                            version_name = take_gantt_baseline(
-                                df_data, 
-                                empreendimento_alvo, 
-                                "Gantt"
-                            )
-                            
-                            st.success(f"✅ Baseline **{version_name}** criada com sucesso!")
-                            print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
-                            
-                            # Aguardar um momento para garantir que salvou
-                            time.sleep(0.5)
-                            
-                            # Recarregar
-                            st.rerun()
-                            
-                        except Exception as e:
-                            st.error(f"❌ Erro ao criar baseline: {e}")
-                            print(f"❌ Erro: {e}")
-        
-        elif len(empreendimentos_selecionados) > 1:
-            st.info("ℹ️ Para criar uma baseline, selecione apenas **um empreendimento** nos filtros.")
-        
-        elif len(empreendimentos_selecionados) == 0:
-            st.info("ℹ️ Selecione um empreendimento nos filtros para criar baselines.")
-        
-        # ===========================================================================================
         
         
         if df_para_exibir.empty:
