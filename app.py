@@ -6157,51 +6157,29 @@ with st.spinner("Carregando e processando dados..."):
 
 
         # ===========================================================================================
-        # NOVO: Listener para mensagens do iframe (Menu de Contexto)
-        # Este componente captura mensagens postMessage enviadas pelo menu de contexto no Gantt
-        # que está dentro de um iframe sandboxed via components.html()
+        # NOVO: Listener usando API NATIVA do Streamlit (sem dependências externas)
         # ===========================================================================================
-        baseline_trigger_data = st_javascript("""
-            // NOVA ABORDAGEM: Usar sessionStorage para persistência entre reruns
+        baseline_trigger_html = f"""
+        <script>
+            // Listener para mensagens do iframe Gantt
+            window.addEventListener('message', function(event) {{
+                if (event.data && event.data.action === 'create_baseline') {{
+                    console.log('📨 Listener: Mensagem recebida!', event.data);
+                    
+                    // Usar API NATIVA do Streamlit
+                    window.parent.postMessage({{
+                        isStreamlitMessage: true,
+                        type: "streamlit:setComponentValue",
+                        value: event.data
+                    }}, "*");
+                }}
+            }});
             
-            // 1. Verificar se já tem uma mensagem pendente armazenada
-            const storedMessage = sessionStorage.getItem('baseline_trigger');
-            if (storedMessage) {
-                console.log('📦 Recuperando mensagem do sessionStorage:', storedMessage);
-                const message = JSON.parse(storedMessage);
-                sessionStorage.removeItem('baseline_trigger'); // Limpar imediatamente
-                return message;
-            }
-            
-            // 2. Configurar listener (só roda uma vez)
-            if (!window.baselineListenerConfigured) {
-                console.log('🔧 Configurando listener de postMessage...');
-                
-                window.addEventListener('message', function(event) {
-                    // Verificar se é uma mensagem do nosso menu de contexto
-                    if (event.data && event.data.action === 'create_baseline') {
-                        console.log('📨 Streamlit Parent: Mensagem recebida!', event.data);
-                        
-                        // Armazenar no sessionStorage
-                        sessionStorage.setItem('baseline_trigger', JSON.stringify(event.data));
-                        
-                        // Forçar rerun do Streamlit
-                        console.log('🔄 Disparando rerun do Streamlit...');
-                        window.parent.postMessage({
-                            type: 'streamlit:setComponentValue',
-                            key: 'baseline_listener',
-                            value: event.data
-                        }, '*');
-                    }
-                });
-                
-                window.baselineListenerConfigured = true;
-                console.log('✅ Listener configurado com sucesso');
-            }
-            
-            // 3. Retornar null na primeira execução
-            return null;
-        """, key="baseline_listener")
+            console.log('✅ Listener nativo configurado');
+        </script>
+        """
+        
+        baseline_trigger_data = components.html(baseline_trigger_html, height=0, scrolling=False)
         
         # ===========================================================================================
         # Processar resposta do listener
@@ -6209,7 +6187,7 @@ with st.spinner("Carregando e processando dados..."):
         print("🔍 DEBUG: Verificando baseline_trigger_data...")
         print(f"🔍 DEBUG: baseline_trigger_data = {baseline_trigger_data}")
         
-        if baseline_trigger_data and baseline_trigger_data.get('action') == 'create_baseline':
+        if baseline_trigger_data and isinstance(baseline_trigger_data, dict) and baseline_trigger_data.get('action') == 'create_baseline':
             empreendimento = baseline_trigger_data.get('empreendimento')
             if empreendimento:
                 print(f"📨 Streamlit: Trigger recebido para '{empreendimento}'")
