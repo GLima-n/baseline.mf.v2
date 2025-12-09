@@ -6704,44 +6704,6 @@ with st.spinner("Carregando e processando dados..."):
         # Processar mudança de baseline PRIMEIRO
         process_baseline_change()
         
-        # ===========================================================================================
-        # BOTÃO NATIVO para criar baseline (SOLUÇÃO ALTERNATIVA SIMPLES E CONFIÁVEL)
-        # ===========================================================================================
-        # Verificar se há um único empreendimento selecionado
-        empreendimentos_unicos = selected_emp if selected_emp else []
-        
-        if len(empreendimentos_unicos) == 1:
-            empreendimento_para_baseline = empreendimentos_unicos[0]
-            
-            col1, col2, col3 = st.columns([3, 1, 3])
-            with col2:
-                if st.button("📸 Criar Baseline", key="btn_criar_baseline_simples", use_container_width=True):
-                    try:
-                        print(f"🔔 BOTÃO: Criando baseline para '{empreendimento_para_baseline}'")
-                        
-                        # Criar baseline
-                        version_name = take_gantt_baseline(
-                            df_data, 
-                            empreendimento_para_baseline, 
-                            "Gantt"
-                        )
-                        
-                        st.success(f"✅ Baseline **{version_name}** criada com sucesso para **{empreendimento_para_baseline}**!")
-                        print(f"✅ SUCESSO: Baseline '{version_name}' salva no banco!")
-                        
-                        # Recarregar
-                        time.sleep(0.5)
-                        st.rerun()
-                        
-                    except Exception as e:
-                        st.error(f"❌ Erro ao criar baseline: {e}")
-                        print(f"❌ Erro ao criar baseline: {e}")
-        
-        elif len(empreendimentos_unicos) > 1:
-            st.info("ℹ️ **Para criar uma baseline**, selecione apenas **um empreendimento** nos filtros.")
-        
-        # ===========================================================================================
-        
         
         if df_para_exibir.empty:
             st.warning("⚠️ Nenhum dado encontrado com os filtros aplicados.")
