@@ -3053,6 +3053,58 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             </div>
                         `;
                         container.appendChild(menu);
+                        
+                        // Bloquinho de Notas Flutuante
+                        const notepad = document.createElement('div');
+                        notepad.id = 'floating-notepad';
+                        notepad.style.cssText = "display:none; position:fixed; top:100px; right:50px; width:300px; height:400px; background:white; border:2px solid #007AFF; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.15); z-index:9999; flex-direction:column; font-family:'Inter', sans-serif;";
+                        notepad.innerHTML = `
+                            <style>
+                                .notepad-header {{
+                                    padding: 12px 16px;
+                                    background: #007AFF;
+                                    color: white;
+                                    border-radius: 10px 10px 0 0;
+                                    display: flex;
+                                    justify-content: space-between;
+                                    align-items: center;
+                                    cursor: move;
+                                    user-select: none;
+                                }}
+                                
+                                .notepad-close {{
+                                    background: none;
+                                    border: none;
+                                    color: white;
+                                    font-size: 24px;
+                                    cursor: pointer;
+                                    padding: 0;
+                                    line-height: 1;
+                                    transition: transform 0.2s ease;
+                                }}
+                                
+                                .notepad-close:hover {{
+                                    transform: scale(1.2);
+                                }}
+                                
+                                .notepad-content {{
+                                    flex: 1;
+                                    padding: 16px;
+                                    border: none;
+                                    resize: none;
+                                    font-family: 'Inter', sans-serif;
+                                    font-size: 14px;
+                                    outline: none;
+                                    border-radius: 0 0 10px 10px;
+                                }}
+                            </style>
+                            <div class="notepad-header">
+                                <span>📝 Notas</span>
+                                <button class="notepad-close">×</button>
+                            </div>
+                            <textarea class="notepad-content" placeholder="Digite suas notas aqui..."></textarea>
+                        `;
+                        container.appendChild(notepad);
 
                         // 3. Criar Toast
                         const toast = document.createElement('div');
@@ -3142,6 +3194,72 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 `;
                                 setTimeout(() => {{ toast.style.display = 'none'; }}, 12000);
                             }}, 4000);
+                        }});
+                        
+                        // --- 6. BLOQUINHO DE NOTAS ---
+                        let notepadActive = false;
+                        const penIcon = menu.querySelector('[style*="top: 128px; left: 184px"]'); // Ícone Caneta
+                        
+                        // Toggle notepad ao clicar no ícone Caneta
+                        if (penIcon) {{
+                            penIcon.addEventListener('click', (e) => {{
+                                e.stopPropagation();
+                                notepadActive = !notepadActive;
+                                notepad.style.display = notepadActive ? 'flex' : 'none';
+                                
+                                // Marcar ícone como ativo/inativo
+                                if (notepadActive) {{
+                                    penIcon.style.borderColor = '#007AFF';
+                                    penIcon.style.background = '#e6f2ff';
+                                }} else {{
+                                    penIcon.style.borderColor = '';
+                                    penIcon.style.background = '';
+                                }}
+                                
+                                menu.style.display = 'none';
+                            }});
+                        }}
+                        
+                        // Fechar notepad com botão X
+                        const closeBtn = notepad.querySelector('.notepad-close');
+                        if (closeBtn) {{
+                            closeBtn.addEventListener('click', () => {{
+                                notepadActive = false;
+                                notepad.style.display = 'none';
+                                if (penIcon) {{
+                                    penIcon.style.borderColor = '';
+                                    penIcon.style.background = '';
+                                }}
+                            }});
+                        }}
+                        
+                        // Drag-and-drop do bloquinho
+                        let isDragging = false;
+                        let offsetX, offsetY;
+                        const notepadHeader = notepad.querySelector('.notepad-header');
+                        
+                        if (notepadHeader) {{
+                            notepadHeader.addEventListener('mousedown', (e) => {{
+                                isDragging = true;
+                                offsetX = e.clientX - notepad.offsetLeft;
+                                offsetY = e.clientY - notepad.offsetTop;
+                                notepadHeader.style.cursor = 'grabbing';
+                            }});
+                        }}
+                        
+                        document.addEventListener('mousemove', (e) => {{
+                            if (isDragging) {{
+                                notepad.style.left = (e.clientX - offsetX) + 'px';
+                                notepad.style.top = (e.clientY - offsetY) + 'px';
+                                notepad.style.right = 'auto';
+                            }}
+                        }});
+                        
+                        document.addEventListener('mouseup', () => {{
+                            if (isDragging) {{
+                                isDragging = false;
+                                if (notepadHeader) notepadHeader.style.cursor = 'move';
+                            }}
                         }});
 
                     }})();
