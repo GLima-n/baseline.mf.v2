@@ -3062,7 +3062,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             <style>
                                 .notepad-header {{
                                     padding: 14px 18px;
-                                    background: linear-gradient(135deg, #007AFF 0%, #0051D5 100%);
+                                    background: #FF4B4B;
                                     color: white;
                                     display: flex;
                                     justify-content: space-between;
@@ -3070,6 +3070,18 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     cursor: move;
                                     user-select: none;
                                     border-bottom: 1px solid rgba(255,255,255,0.1);
+                                }}
+                                
+                                .notepad-header-title {{
+                                    display: flex;
+                                    align-items: center;
+                                    gap: 8px;
+                                }}
+                                
+                                .notepad-header-title svg {{
+                                    width: 18px;
+                                    height: 18px;
+                                    fill: white;
                                 }}
                                 
                                 .notepad-header span {{
@@ -3113,7 +3125,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 }}
                             </style>
                             <div class="notepad-header">
-                                <span>📝 Notas</span>
+                                <div class="notepad-header-title">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                    </svg>
+                                    <span>Notas</span>
+                                </div>
                                 <button class="notepad-close">×</button>
                             </div>
                             <textarea class="notepad-content" placeholder="Digite suas notas aqui..."></textarea>
