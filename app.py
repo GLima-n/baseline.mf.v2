@@ -7395,6 +7395,57 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }}
             
+            // --- REDIMENSIONAMENTO DO SELETOR DE BASELINE ---
+            const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+            const resizeCorner = baselineSelector ? baselineSelector.querySelector('.baseline-resize-corner') : null;
+            
+            if (resizeCorner) {{
+                let isResizing = false;
+                let startX, startY, startWidth, startHeight;
+                
+                resizeCorner.addEventListener('mousedown', (e) => {{
+                    isResizing = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    startWidth = parseInt(document.defaultView.getComputedStyle(baselineSelector).width, 10);
+                    startHeight = parseInt(document.defaultView.getComputedStyle(baselineSelector).height, 10);
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+                }});
+                
+                document.addEventListener('mousemove', (e) => {{
+                    if (!isResizing) return;
+                    
+                    // Calcular nova largura e altura
+                    const deltaX = e.clientX - startX;
+                    const deltaY = e.clientY - startY;
+                    
+                    const newWidth = startWidth + deltaX;
+                    const newHeight = startHeight + deltaY;
+                    
+                    // Aplicar com limites
+                    if (newWidth >= 250 && newWidth <= 700) {{
+                        baselineSelector.style.width = newWidth + 'px';
+                    }}
+                    if (newHeight >= 200 && newHeight <= 800) {{
+                        baselineSelector.style.height = newHeight + 'px';
+                        
+                        // Ajustar altura da tabela interna para preencher o espaço
+                        const table = baselineSelector.querySelector('.baseline-selector-table');
+                        if (table) {{
+                            // Altura disponível = altura total - padding - título - aplicação rápida - margens
+                            const availableHeight = newHeight - 150; // 150px para cabeçalho e padding
+                            table.style.maxHeight = Math.max(200, availableHeight) + 'px';
+                        }}
+                    }}
+                }});
+                
+                document.addEventListener('mouseup', () => {{
+                    isResizing = false;
+                }});
+            }}
+            
             // Renderizar inicial
             renderGantt();
         </script>
