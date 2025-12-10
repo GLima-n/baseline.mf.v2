@@ -6482,7 +6482,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     # Coletar todas as etapas únicas do setor atual
     # *** NOVO: Mapear etapas por setor para filtro dinâmico ***
     etapas_por_setor_dict = {}
+    # *** NOVO: Mapear UGBs por setor para filtro dinâmico ***
+    ugbs_por_setor_dict = {}
+    
     for setor_nome in all_sector_names:
+        # Etapas
         etapas_do_setor = sorted(list(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['Etapa'].unique()))
         etapas_data = []
         for e in etapas_do_setor:
@@ -6492,14 +6496,29 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             })
         etapas_por_setor_dict[setor_nome] = etapas_data
         
+        # UGBs
+        ugbs_do_setor = sorted(list(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['UGB'].unique()))
+        # Tratar NaN ou vazios como "N/D" de forma segura
+        ugbs_limpas = []
+        for u in ugbs_do_setor:
+             if pd.isna(u) or u == "":
+                 if "N/D" not in ugbs_limpas: ugbs_limpas.append("N/D")
+             else:
+                 ugbs_limpas.append(str(u))
+        ugbs_por_setor_dict[setor_nome] = sorted(list(set(ugbs_limpas)))
+        
     # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
     etapas_iniciais_html = [e['nome'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
+    # Definir UGBs iniciais
+    ugbs_iniciais_html = ugbs_por_setor_dict.get(setor_selecionado_inicialmente, [])
         
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
         "etapas": etapas_iniciais_html, # Apenas etapas do setor inicial
-        "etapas_por_setor": etapas_por_setor_dict
+        "etapas_por_setor": etapas_por_setor_dict,
+        "ugbs": ugbs_iniciais_html,
+        "ugbs_por_setor": ugbs_por_setor_dict
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6918,6 +6937,25 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         ''' for etapa in filter_options['etapas']])}
                     </div>
                 </div>
+                
+                <!-- FILTRO: UGBs -->
+                <div class="filter-group">
+                    <label>UGBs</label>
+                    <div class="ugb-multiselect-container" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; padding: 8px; border-radius: 4px;">
+                        <div>
+                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" id="filter-ugbs-all-{project['id']}" checked style="margin-right: 6px;">
+                                <span>Todas as UGBs</span>
+                            </label>
+                        </div>
+                        {"".join([f'''
+                        <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
+                            <input type="checkbox" class="filter-ugb-checkbox" data-ugb="{ugb.replace('"', '&quot;')}" checked style="margin-right: 6px;">
+                            <span style="font-size: 13px;">{ugb}</span>
+                        </label>
+                        ''' for ugb in filter_options['ugbs']])}
+                    </div>
+                </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
                         <input type="checkbox" id="filter-concluidas-{project['id']}">
@@ -7013,6 +7051,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
             const etapasBySector = JSON.parse(document.getElementById('etapas-by-sector').textContent);
+            const ugbsBySector = JSON.parse(document.getElementById('ugbs-by-sector').textContent);
             
             // *** NOVAS VARIÁVEIS GLOBAIS ***
             const initialSectorName = "{setor_selecionado_inicialmente}";
@@ -7076,6 +7115,59 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }}
 
+            // *** FUNÇÃO AUXILIAR: Renderizar Checkboxes de UGBs ***
+            function renderUgbCheckboxes(sectorName) {{
+                const container = document.querySelector('.ugb-multiselect-container');
+                if (!container) return;
+                
+                const ugbs = ugbsBySector[sectorName] || [];
+                
+                let html = `
+                    <div>
+                        <label>
+                            <input type="checkbox" id="filter-ugbs-all-{project['id']}" checked>
+                            <span>Todas as UGBs</span>
+                        </label>
+                    </div>
+                `;
+                
+                ugbs.forEach(ugb => {{
+                    // Escapar aspas duplas para não quebrar o atributo HTML
+                    const ugbNomeSafe = ugb.replace(/"/g, '&quot;');
+                    html += `
+                    <label>
+                        <input type="checkbox" class="filter-ugb-checkbox" data-ugb="${{ugbNomeSafe}}" checked>
+                        <span>${{ugb}}</span>
+                    </label>
+                    `;
+                }});
+                
+                container.innerHTML = html;
+                
+                // Reatribuir Event Listeners
+                const checkboxAll = document.getElementById('filter-ugbs-all-{project["id"]}');
+                const ugbCheckboxes = container.querySelectorAll('.filter-ugb-checkbox');
+                
+                if (checkboxAll) {{
+                    checkboxAll.addEventListener('change', function() {{
+                        ugbCheckboxes.forEach(cb => {{
+                            cb.checked = this.checked;
+                        }});
+                    }});
+                }}
+                
+                ugbCheckboxes.forEach(cb => {{
+                    cb.addEventListener('change', function() {{
+                        const allChecked = Array.from(ugbCheckboxes).every(c => c.checked);
+                        const someChecked = Array.from(ugbCheckboxes).some(c => c.checked);
+                        if (checkboxAll) {{
+                            checkboxAll.checked = allChecked;
+                            checkboxAll.indeterminate = someChecked && !allChecked;
+                        }}
+                    }});
+                }});
+            }}
+
             // *** FUNÇÃO AUXILIAR: Atualizar Título do Projeto ***
             function updateProjectTitle(newSectorName) {{
                 const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
@@ -7111,6 +7203,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     const selEmp = document.getElementById('filter-project-{project["id"]}').value;
                     let etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
                     let etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
+                    
+                    // Ler filtro de UGBs
+                    let ugbCheckboxes = document.querySelectorAll('.filter-ugb-checkbox:checked');
+                    let ugbsSelecionadas = Array.from(ugbCheckboxes).map(cb => cb.dataset.ugb);
+
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
@@ -7119,6 +7216,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     console.log('Visualização:', selVis);
                     console.log('Mostrar apenas não concluídas:', selConcluidas);
                     console.log('Etapas selecionadas:', etapasSelecionadas.length);
+                    console.log('UGBs selecionadas:', ugbsSelecionadas.length);
                     
                     // 3. ATUALIZAR DADOS BASE SE SETOR MUDOU
                     if (selSetor !== currentSector) {{
@@ -7127,14 +7225,19 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
                         updateProjectTitle(currentSector);
                         
-                        // *** NOVO: Atualizar checkboxes de etapa para o novo setor ***
+                        // *** Atualizar checkboxes de etapa para o novo setor ***
                         renderStageCheckboxes(currentSector);
+                        // *** Atualizar checkboxes de UGB para o novo setor ***
+                        renderUgbCheckboxes(currentSector);
                         
-                        // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
-                        // atualizamos a lista de etapas selecionadas para incluir todas as novas etapas.
+                        // Atualizar listas de selecionados (pois foram resetadas para "todos")
                         const novasEtapas = etapasBySector[currentSector] || [];
                         etapasSelecionadas = novasEtapas.map(e => e.nome);
-                        console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
+                        
+                        const novasUgbs = ugbsBySector[currentSector] || [];
+                        ugbsSelecionadas = novasUgbs.map(u => u);
+                        
+                        console.log('🔄 Filtros de etapa e UGB atualizados para novo setor.');
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
@@ -7146,6 +7249,24 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // Filtro de empreendimento
                     if (selEmp !== 'Todos') {{
                         filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
+                    }}
+                    
+                    // Filtro de UGBs
+                    if (ugbsSelecionadas.length > 0) {{
+                        const countAntes = filteredTasks.length;
+                        filteredTasks = filteredTasks.filter(task => {{
+                            // Normalizar UGB da task (tratar vazios como N/D)
+                            let taskUgb = task.ugb;
+                            if (!taskUgb || taskUgb === "") taskUgb = "N/D";
+                            else taskUgb = String(taskUgb);
+                            
+                            const match = ugbsSelecionadas.includes(taskUgb);
+                            if (!match && Math.random() < 0.001) {{
+                                console.log(`❌ UGB Rejeitada: Task="${{taskUgb}}" vs Filtro=[${{ugbsSelecionadas.slice(0,3)}}...]`);
+                            }}
+                            return match;
+                        }});
+                        console.log(`📉 Filtro UGBs: ${{countAntes}} -> ${{filteredTasks.length}}`);
                     }}
                     
                     // Filtro de etapas (melhorado - comparação exata)
@@ -7787,6 +7908,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     }}
                 }});
                 
+```
                 document.addEventListener('mouseup', () => {{
                     isResizing = false;
                 }});
@@ -7794,6 +7916,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             // Inicializar checkboxes de etapas para o setor atual
             renderStageCheckboxes(initialSectorName);
+            renderUgbCheckboxes(initialSectorName);
             
             // Renderizar inicial com filtros aplicados
             applyFiltersAndRedraw();
