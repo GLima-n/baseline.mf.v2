@@ -6818,31 +6818,31 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 font-size: 13px; font-weight: 500;
                 color: #2d3748; margin-bottom: 0; text-transform: none;
             }}
-            .filter-apply-btn {
+            .filter-apply-btn {{
                 width: 100%; padding: 8px; font-size: 14px; font-weight: 600;
                 color: white; background-color: #2d3748;
                 border: none; border-radius: 4px; cursor: pointer;
                 margin-top: 5px;
-            }
+            }}
             
             /* Estilos específicos para Virtual Select no menu de filtros */
-            .floating-filter-menu .vscomp-toggle-button {
+            .floating-filter-menu .vscomp-toggle-button {{
                 border: 1px solid #cbd5e0;
                 border-radius: 4px;
                 padding: 6px 8px;
                 font-size: 13px;
                 min-height: 30px;
-            }
-            .floating-filter-menu .vscomp-options {
+            }}
+            .floating-filter-menu .vscomp-options {{
                 font-size: 13px;
-            }
-            .floating-filter-menu .vscomp-option {
+            }}
+            .floating-filter-menu .vscomp-option {{
                 min-height: 30px;
-            }
-            .floating-filter-menu .vscomp-search-input {
+            }}
+            .floating-filter-menu .vscomp-search-input {{
                 height: 30px;
                 font-size: 13px;
-            }
+            }}
             
             .baseline-selector {{
                 display: none;
