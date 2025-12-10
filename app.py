@@ -9225,4 +9225,3 @@ if __name__ == "__main__":
 
     else:
             st.error("❌ Não foi possível carregar ou gerar os dados.")
-
