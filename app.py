@@ -7703,18 +7703,29 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // ===== EVENT LISTENERS =====
             
             // Event listener para abrir/fechar menu de filtros
-            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', function() {{
-                const menu = document.getElementById('filter-menu-{project["id"]}');
-                menu.classList.toggle('is-open');
-                
-                // Fechar baseline selector se estiver aberto
-                document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
-                
-                // Inicializar filtros na primeira vez
-                if (!filtersPopulated) {{
-                    populateFiltersSetor();
-                }}
-            }});
+            console.log('🔍 Tentando registrar event listener do botão de filtros...');
+            const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+            console.log('Botão de filtros encontrado:', filterBtn);
+            
+            if (filterBtn) {{
+                filterBtn.addEventListener('click', function() {{
+                    console.log('🎯 Botão de filtros clicado!');
+                    const menu = document.getElementById('filter-menu-{project["id"]}');
+                    console.log('Menu de filtros:', menu);
+                    menu.classList.toggle('is-open');
+                    
+                    // Fechar baseline selector se estiver aberto
+                    document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
+                    
+                    // Inicializar filtros na primeira vez
+                    if (!filtersPopulated) {{
+                        populateFiltersSetor();
+                    }}
+                }});
+                console.log('✅ Event listener registrado com sucesso');
+            }} else {{
+                console.error('❌ Botão de filtros NÃO encontrado! ID:', 'filter-btn-{project["id"]}');
+            }}
             
             // Event listener para aplicar filtros
             document.getElementById('filter-apply-btn-{project["id"]}').addEventListener('click', function() {{
