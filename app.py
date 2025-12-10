@@ -6997,93 +6997,141 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         <script>
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
-            let currentSector = "{setor_selecionado_inicialmente}";
-            let currentTasks = allDataBySector[currentSector] || [];
+            
+            // *** NOVAS VARIÁVEIS GLOBAIS ***
+            const initialSectorName = "{setor_selecionado_inicialmente}";
+            let currentSector = initialSectorName;
+            let allTasks_baseData = JSON.parse(JSON.stringify(allDataBySector[currentSector] || []));
+            let currentTasks = [...allTasks_baseData];
             
             // Variável para armazenar o tipo de visualização selecionado
-            // Só é atualizada quando o usuário clica em "Aplicar Filtros"
             let savedVisualizationType = 'Ambos';
 
+            // *** FUNÇÃO AUXILIAR: Atualizar Título do Projeto ***
+            function updateProjectTitle(newSectorName) {{
+                const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
+                if (projectTitle) {{
+                    projectTitle.textContent = `Setor: ${{newSectorName}}`;
+                }}
+            }}
             
-            // Função para aplicar filtros
-            function applyFilters() {{
-                // Obter valores dos filtros
-                const empSelecionado = document.getElementById('filter-emp-{project["id"]}')?.value || 'Todos';
-                const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
-                const mostrarConcluidas = !document.getElementById('filter-concluidas-{project["id"]}')?.checked;
-                
-                // Obter etapas selecionadas
-                const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
-                const etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
-                
-                // Salvar o tipo de visualização selecionado
-                savedVisualizationType = tipoVis;
-                
-                console.log('=== APLICANDO FILTROS ===');
-                console.log('Empreendimento:', empSelecionado);
-                console.log('Visualização:', tipoVis, '(salvo em savedVisualizationType)');
-                console.log('Mostrar concluídas:', mostrarConcluidas);
-                console.log('Etapas selecionadas:', etapasSelecionadas.length, 'de', document.querySelectorAll('.filter-etapa-checkbox').length);
-                
-                // Pegar todos os dados do setor atual
-                const allTasks = allDataBySector[currentSector] || [];
-                
-                // Aplicar filtros
-                currentTasks = allTasks.filter(task => {{
+            // *** FUNÇÃO AUXILIAR: Formatar Data para Exibição ***
+            function formatDateDisplay(dateStr) {{
+                if (!dateStr) return "N/D";
+                try {{
+                    const date = new Date(dateStr);
+                    if (isNaN(date.getTime())) return "N/D";
+                    const day = String(date.getUTCDate()).padStart(2, '0');
+                    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                    const year = String(date.getUTCFullYear()).slice(-2);
+                    return `${{day}}/${{month}}/${{year}}`;
+                }} catch (e) {{
+                    return "N/D";
+                }}
+            }}
+            
+            // *** FUNÇÃO PRINCIPAL: Aplicar Filtros e Redesenhar ***
+            function applyFiltersAndRedraw() {{
+                try {{
+                    console.log('=== APLICANDO FILTROS E REDESENHANDO ===');
+                    
+                    // 1. LER SETOR SELECIONADO
+                    const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
+                    
+                    // 2. LER OUTROS FILTROS
+                    const selEmp = document.getElementById('filter-project-{project["id"]}').value;
+                    const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
+                    const etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
+                    const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
+                    const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
+                    
+                    console.log('Setor:', selSetor);
+                    console.log('Empreendimento:', selEmp);
+                    console.log('Visualização:', selVis);
+                    console.log('Mostrar apenas não concluídas:', selConcluidas);
+                    console.log('Etapas selecionadas:', etapasSelecionadas.length);
+                    
+                    // 3. ATUALIZAR DADOS BASE SE SETOR MUDOU
+                    if (selSetor !== currentSector) {{
+                        currentSector = selSetor;
+                        allTasks_baseData = JSON.parse(JSON.stringify(allDataBySector[currentSector] || []));
+                        console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
+                        updateProjectTitle(currentSector);
+                    }}
+                    
+                    // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
+                    let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
+                    
+                    // 5. APLICAR FILTROS SECUNDÁRIOS
+                    let filteredTasks = baseTasks;
+                    
                     // Filtro de empreendimento
-                    if (empSelecionado !== 'Todos' && task.empreendimento !== empSelecionado) {{
-                        return false;
+                    if (selEmp !== 'Todos') {{
+                        filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
                     }}
                     
-                    // Filtro de tarefas concluídas
-                    if (!mostrarConcluidas && task.progress >= 100) {{
-                        return false;
-                    }}
-                    
-                    // Filtro de etapas selecionadas
+                    // Filtro de etapas (melhorado - comparação exata)
                     if (etapasSelecionadas.length > 0) {{
-                        // task.etapa contém o nome completo, precisamos verificar contra a sigla
-                        // Converter nome completo para sigla para comparar
-                        const taskEtapaSigla = task.name.split(' - ')[1]; // Pega a etapa do nome "EMP - ETAPA"
-                        
-                        // Verificar se a etapa da task está nas selecionadas
-                        // Precisamos comparar tanto por sigla quanto por nome completo
-                        const etapaMatch = etapasSelecionadas.some(etapaSel => {{
-                            return task.etapa === etapaSel || 
-                                   task.etapa.includes(etapaSel) ||
-                                   etapaSel.includes(task.etapa);
+                        filteredTasks = filteredTasks.filter(task => {{
+                            // Comparar diretamente a etapa da task com as selecionadas
+                            return etapasSelecionadas.includes(task.etapa);
                         }});
-                        
-                        if (!etapaMatch) {{
-                            return false;
-                        }}
                     }}
                     
-                    return true;
-                }});
-                
-                console.log('Tasks após filtro:', currentTasks.length, 'de', allTasks.length);
-                
-                // Re-renderizar
-                renderGantt();
+                    // Filtro de concluídas
+                    if (selConcluidas) {{
+                        filteredTasks = filteredTasks.filter(t => t.progress < 100);
+                    }}
+                    
+                    console.log(`📊 Tasks após filtros: ${{filteredTasks.length}} de ${{baseTasks.length}}`);
+                    
+                    // 6. REAPLICAR BASELINES SELECIONADAS
+                    filteredTasks.forEach(task => {{
+                        const emp = task.empreendimento;
+                        const dropdown = document.querySelector(`select[data-emp="${{emp}}"]`);
+                        
+                        if (dropdown && dropdown.value !== "P0-(padrão)") {{
+                            const baselineName = dropdown.value;
+                            
+                            if (task.baselines && task.baselines[baselineName]) {{
+                                const baselineData = task.baselines[baselineName];
+                                
+                                if (baselineData.start && baselineData.end) {{
+                                    task.start_previsto = baselineData.start;
+                                    task.end_previsto = baselineData.end;
+                                    task.inicio_previsto = formatDateDisplay(baselineData.start);
+                                    task.termino_previsto = formatDateDisplay(baselineData.end);
+                                    console.log(`🔄 Baseline ${{baselineName}} reaplicada para ${{emp}}`);
+                                }}
+                            }}
+                        }}
+                    }});
+                    
+                    // 7. ATUALIZAR VARIÁVEIS GLOBAIS
+                    currentTasks = filteredTasks;
+                    savedVisualizationType = selVis;
+                    
+                    // 8. REDESENHAR GRÁFICO
+                    renderGantt();
+                    
+                    // 9. FECHAR MENU DE FILTROS
+                    document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
+                    
+                    console.log('✅ Filtros aplicados e gráfico redesenhado');
+                    
+                }} catch (error) {{
+                    console.error('❌ Erro ao aplicar filtros:', error);
+                    alert('Erro ao aplicar filtros. Verifique o console para detalhes.');
+                }}
             }}
             
-            // Função para trocar de setor
-            function switchSector(newSectorName) {{
-                currentSector = newSectorName;
-                document.querySelector('.project-title-row span').textContent = `Setor: ${{newSectorName}}`;
-                // Aplicar filtros ao trocar de setor
-                applyFilters();
-            }}
-            
-            // Event listener para dropdown de setor
+            // Event listener para dropdown de setor (apenas atualiza, não aplica filtros automaticamente)
             document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
-                switchSector(this.value);
+                // Não fazer nada aqui - deixar para o botão "Aplicar Filtros"
             }});
             
             // Event listener APENAS para botão "Aplicar Filtros"
-            // Removidos os listeners automáticos dos controles individuais
-            document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFilters);
+            document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFiltersAndRedraw);
             
             // Event listeners para o filtro multiselect de etapas
             // Checkbox "Todas as Etapas"
