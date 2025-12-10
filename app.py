@@ -6950,16 +6950,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 switchSector(this.value);
             }});
             
-            // Event listeners para os filtros
-            document.getElementById('filter-emp-{project["id"]}')?.addEventListener('change', applyFilters);
-            document.getElementById('filter-concluidas-{project["id"]}')?.addEventListener('change', applyFilters);
-            
-            // Event listeners para radio buttons de visualização
-            document.querySelectorAll('input[name="filter-vis-{project["id"]}"]').forEach(radio => {{
-                radio.addEventListener('change', applyFilters);
-            }});
-            
-            // Event listener para botão "Aplicar Filtros"
+            // Event listener APENAS para botão "Aplicar Filtros"
+            // Removidos os listeners automáticos dos controles individuais
             document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFilters);
 
             
