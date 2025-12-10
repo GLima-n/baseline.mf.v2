@@ -7699,39 +7699,55 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 // Fechar menu de filtros
                 document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
             }}
-            
+
             // ===== EVENT LISTENERS =====
-            
-            // Event listener para abrir/fechar menu de filtros
-            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', function() {{
-                const menu = document.getElementById('filter-menu-{project["id"]}');
-                menu.classList.toggle('is-open');
+            // Aguardar DOM estar completamente carregado
+            document.addEventListener('DOMContentLoaded', function() {{
+                console.log('✅ DOM carregado, registrando event listeners...');
                 
-                // Fechar baseline selector se estiver aberto
-                document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
-                
-                // Inicializar filtros na primeira vez
-                if (!filtersPopulated) {{
-                    populateFiltersSetor();
+                // Event listener para abrir/fechar menu de filtros
+                const filterBtn = document.getElementById('filter-btn-{project["id"]}');
+                if (filterBtn) {{
+                    filterBtn.addEventListener('click', function() {{
+                        const menu = document.getElementById('filter-menu-{project["id"]}');
+                        menu.classList.toggle('is-open');
+                        
+                        // Fechar baseline selector se estiver aberto
+                        const baselineSelector = document.getElementById('baseline-selector-{project["id"]}');
+                        if (baselineSelector) {{
+                            baselineSelector.classList.remove('is-open');
+                        }}
+                        
+                        // Inicializar filtros na primeira vez
+                        if (!filtersPopulated) {{
+                            populateFiltersSetor();
+                        }}
+                    }});
                 }}
-            }});
-            
-            // Event listener para aplicar filtros
-            document.getElementById('filter-apply-btn-{project["id"]}').addEventListener('click', function() {{
-                applyFiltersSetor();
-            }});
-            
-            // Event listener para mudança de setor
-            document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
-                const novoSetor = this.value;
-                console.log('🔄 Trocando para setor:', novoSetor);
                 
-                // Trocar dados do setor
-                currentSector = novoSetor;
-                currentTasks = allDataBySector[novoSetor] || [];
+                // Event listener para aplicar filtros
+                const applyBtn = document.getElementById('filter-apply-btn-{project["id"]}');
+                if (applyBtn) {{
+                    applyBtn.addEventListener('click', function() {{
+                        applyFiltersSetor();
+                    }});
+                }}
                 
-                // Re-renderizar
-                renderGantt(currentTasks);
+                // Event listener para mudança de setor
+                const setorSelect = document.getElementById('filter-setor-{project["id"]}');
+                if (setorSelect) {{
+                    setorSelect.addEventListener('change', function() {{
+                        const novoSetor = this.value;
+                        console.log('🔄 Trocando para setor:', novoSetor);
+                        
+                        // Trocar dados do setor
+                        currentSector = novoSetor;
+                        currentTasks = allDataBySector[novoSetor] || [];
+                        
+                        // Re-renderizar
+                        renderGantt(currentTasks);
+                    }});
+                }});
             }});
             
         </script>
