@@ -6493,7 +6493,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         etapas_por_setor_dict[setor_nome] = etapas_data
         
     # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
-    etapas_iniciais_html = [e['sigla'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
+    etapas_iniciais_html = [e['nome'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
         
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
@@ -7042,7 +7042,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 etapas.forEach(etapa => {{
                     html += `
                     <label>
-                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapa.sigla}}" checked>
+                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapa.nome}}" checked>
                         <span>${{etapa.nome}}</span>
                     </label>
                     `;
@@ -7131,7 +7131,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
                         // atualizamos a lista de etapas selecionadas para incluir todas as novas etapas.
                         const novasEtapas = etapasBySector[currentSector] || [];
-                        etapasSelecionadas = novasEtapas.map(e => e.sigla);
+                        etapasSelecionadas = novasEtapas.map(e => e.nome);
                         console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
                     }}
                     
