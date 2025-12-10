@@ -6246,154 +6246,6 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 setupBaselineListeners();  // *** NOVO: Ativar event listeners de baseline ***
                 setupBaselineResize();      // *** NOVO: Ativar redimensionamento arrastável ***
             </script>
-            // ===== FUNÇÕES DE FILTROS COM VIRTUAL SELECT =====
-            
-            // Configuração comum para Virtual Selects
-            const vsConfig = {{
-                multiple: true,
-                search: true,
-                optionsCount: 6,
-                showResetButton: true,
-                resetButtonText: 'Limpar',
-                selectAllText: 'Selecionar Todos',
-                allOptionsSelectedText: 'Todos',
-                optionsSelectedText: 'selecionados',
-                searchPlaceholderText: 'Buscar...',
-                optionHeight: '30px',
-                popupDropboxBreakpoint: '3000px',
-                noOptionsText: 'Nenhuma opção encontrada',
-                noSearchResultsText: 'Nenhum resultado encontrado',
-            }};
-            
-            function populateFiltersSetor() {{
-                if (filtersPopulated) return;
-                
-                console.log('📋 Inicializando filtros do setor...');
-                
-                // 1. Virtual Select de Empreendimento
-                const empOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
-                vsEmpreendimentoSetor = VirtualSelect.init({{
-                    ...vsConfig,
-                    ele: '#filter-empreendimento-setor-{project["id"]}',
-                    options: empOptions,
-                    placeholder: "Selecionar Empreendimento(s)",
-                    selectedValue: ["Todos"]
-                }});
-                
-                console.log('✅ Virtual Select de Empreendimento inicializado');
-                
-                // 2. Virtual Select de Etapas
-                let etapasOptions = filterOptions.etapas || [];
-                
-                const etapaOptionsFormatted = etapasOptions.map(e => {{
-                    const nomeCompleto = siglaParaNomeCompleto[e] || e;
-                    return {{ label: nomeCompleto, value: e }};
-                }});
-                
-                // Adicionar "Todas" no início
-                etapaOptionsFormatted.unshift({{ label: 'Todas', value: 'Todas' }});
-                
-                vsEtapasSetor = VirtualSelect.init({{
-                    ...vsConfig,
-                    ele: '#filter-etapas-setor-{project["id"]}',
-                    options: etapaOptionsFormatted,
-                    placeholder: "Selecionar Etapa(s)",
-                    selectedValue: ["Todas"]
-                }});
-                
-                console.log('✅ Virtual Select de Etapas inicializado');
-                
-                filtersPopulated = true;
-            }}
-            
-            function applyFiltersSetor() {{
-                console.log('🔄 Aplicando filtros do setor...');
-                
-                // 1. Obter valores selecionados dos Virtual Selects
-                const selectedEmps = vsEmpreendimentoSetor ? vsEmpreendimentoSetor.getSelectedValues() : ["Todos"];
-                const selectedEtapas = vsEtapasSetor ? vsEtapasSetor.getSelectedValues() : ["Todas"];
-                
-                console.log('Empreendimentos selecionados:', selectedEmps);
-                console.log('Etapas selecionadas:', selectedEtapas);
-                
-                // 2. Obter outros filtros
-                const selectedSetor = document.getElementById('filter-setor-{project["id"]}').value;
-                const filterConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
-                const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
-                
-                // 3. Trocar setor se necessário
-                if (selectedSetor !== currentSector) {{
-                    currentSector = selectedSetor;
-                    currentTasks = allDataBySector[currentSector] || [];
-                }}
-                
-                // 4. Filtrar tasks
-                let filteredTasks = currentTasks.filter(task => {{
-                    // Filtro de Empreendimento
-                    if (!selectedEmps.includes("Todos") && !selectedEmps.includes(task.empreendimento)) {{
-                        return false;
-                    }}
-                    
-                    // Filtro de Etapas
-                    if (!selectedEtapas.includes("Todas") && !selectedEtapas.includes(task.etapa)) {{
-                        return false;
-                    }}
-                    
-                    // Filtro de Concluídas
-                    if (filterConcluidas && task.progress >= 100) {{
-                        return false;
-                    }}
-                    
-                    return true;
-                }});
-                
-                console.log(`✅ Filtros aplicados: ${{filteredTasks.length}} tasks de ${{currentTasks.length}}`);
-                
-                // 5. Atualizar tipo de visualização
-                savedVisualizationType = tipoVis;
-                
-                // 6. Re-renderizar com tasks filtradas
-                renderGantt(filteredTasks);
-                
-                // Fechar menu de filtros
-                document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
-            }}
-            
-            // ===== EVENT LISTENERS =====
-            
-            // Event listener para abrir/fechar menu de filtros
-            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', function() {{
-                const menu = document.getElementById('filter-menu-{project["id"]}');
-                menu.classList.toggle('is-open');
-                
-                // Fechar baseline selector se estiver aberto
-                document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
-                
-                // Inicializar filtros na primeira vez
-                if (!filtersPopulated) {{
-                    populateFiltersSetor();
-                }}
-            }});
-            
-            // Event listener para aplicar filtros
-            document.getElementById('filter-apply-btn-{project["id"]}').addEventListener('click', function() {{
-                applyFiltersSetor();
-            }});
-            
-            // Event listener para mudança de setor
-            document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
-                const novoSetor = this.value;
-                console.log('🔄 Trocando para setor:', novoSetor);
-                
-                // Trocar dados do setor
-                currentSector = novoSetor;
-                currentTasks = allDataBySector[novoSetor] || [];
-                
-                // Re-renderizar
-                renderGantt(currentTasks);
-            }});
-            
-        </script>
         </body>
         </html>
     """
@@ -7741,6 +7593,146 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     isResizing = false;
                 }});
             }}
+            
+            // ===== FUNÇÕES DE FILTROS COM VIRTUAL SELECT =====
+            
+            // Configuração comum para Virtual Selects
+            const vsConfig = {{
+                multiple: true,
+                search: true,
+                optionsCount: 6,
+                showResetButton: true,
+                resetButtonText: 'Limpar',
+                selectAllText: 'Selecionar Todos',
+                allOptionsSelectedText: 'Todos',
+                optionsSelectedText: 'selecionados',
+                searchPlaceholderText: 'Buscar...',
+                optionHeight: '30px',
+                popupDropboxBreakpoint: '3000px',
+                noOptionsText: 'Nenhuma opção encontrada',
+                noSearchResultsText: 'Nenhum resultado encontrado',
+            }};
+            
+            function populateFiltersSetor() {{
+                if (filtersPopulated) return;
+                
+                console.log('📋 Inicializando filtros do setor...');
+                
+                // 1. Virtual Select de Empreendimento
+                const empOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
+                vsEmpreendimentoSetor = VirtualSelect.init({{
+                    ...vsConfig,
+                    ele: '#filter-empreendimento-setor-{project["id"]}',
+                    options: empOptions,
+                    placeholder: "Selecionar Empreendimento(s)",
+                    selectedValue: ["Todos"]
+                }});
+                
+                console.log('✅ Virtual Select de Empreendimento inicializado');
+                
+                // 2. Virtual Select de Etapas
+                let etapasOptions = filterOptions.etapas || [];
+                
+                const etapaOptionsFormatted = etapasOptions.map(e => {{
+                    const nomeCompleto = siglaParaNomeCompleto[e] || e;
+                    return {{ label: nomeCompleto, value: e }};
+                }});
+                
+                // Adicionar "Todas" no início
+                etapaOptionsFormatted.unshift({{ label: 'Todas', value: 'Todas' }});
+                
+                vsEtapasSetor = VirtualSelect.init({{
+                    ...vsConfig,
+                    ele: '#filter-etapas-setor-{project["id"]}',
+                    options: etapaOptionsFormatted,
+                    placeholder: "Selecionar Etapa(s)",
+                    selectedValue: ["Todas"]
+                }});
+                
+                console.log('✅ Virtual Select de Etapas inicializado');
+                
+                filtersPopulated = true;
+            }}
+            
+            function applyFiltersSetor() {{
+                console.log('🔄 Aplicando filtros do setor...');
+                
+                // 1. Obter valores selecionados dos Virtual Selects
+                const selectedEmps = vsEmpreendimentoSetor ? vsEmpreendimentoSetor.getSelectedValues() : ["Todos"];
+                const selectedEtapas = vsEtapasSetor ? vsEtapasSetor.getSelectedValues() : ["Todas"];
+                
+                console.log('Empreendimentos selecionados:', selectedEmps);
+                console.log('Etapas selecionadas:', selectedEtapas);
+                
+                // 2. Obter setor atual e outros filtros
+                const filterConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
+                const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
+                
+                // 3. Filtrar tasks do setor atual
+                let filteredTasks = currentTasks.filter(task => {{
+                    // Filtro de Empreendimento
+                    if (!selectedEmps.includes("Todos") && !selectedEmps.includes(task.empreendimento)) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de Etapas
+                    if (!selectedEtapas.includes("Todas") && !selectedEtapas.includes(task.etapa)) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de Concluídas
+                    if (filterConcluidas && task.progress >= 100) {{
+                        return false;
+                    }}
+                    
+                    return true;
+                }});
+                
+                console.log(`✅ Filtros aplicados: ${{filteredTasks.length}} tasks de ${{currentTasks.length}}`);
+                
+                // 4. Atualizar tipo de visualização
+                savedVisualizationType = tipoVis;
+                
+                // 5. Re-renderizar com tasks filtradas
+                renderGantt(filteredTasks);
+                
+                // Fechar menu de filtros
+                document.getElementById('filter-menu-{project["id"]}').classList.remove('is-open');
+            }}
+            
+            // ===== EVENT LISTENERS =====
+            
+            // Event listener para abrir/fechar menu de filtros
+            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', function() {{
+                const menu = document.getElementById('filter-menu-{project["id"]}');
+                menu.classList.toggle('is-open');
+                
+                // Fechar baseline selector se estiver aberto
+                document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
+                
+                // Inicializar filtros na primeira vez
+                if (!filtersPopulated) {{
+                    populateFiltersSetor();
+                }}
+            }});
+            
+            // Event listener para aplicar filtros
+            document.getElementById('filter-apply-btn-{project["id"]}').addEventListener('click', function() {{
+                applyFiltersSetor();
+            }});
+            
+            // Event listener para mudança de setor
+            document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
+                const novoSetor = this.value;
+                console.log('🔄 Trocando para setor:', novoSetor);
+                
+                // Trocar dados do setor
+                currentSector = novoSetor;
+                currentTasks = allDataBySector[novoSetor] || [];
+                
+                // Re-renderizar
+                renderGantt(currentTasks);
+            }});
             
             // Renderizar inicial com filtros aplicados
             applyFilters();
