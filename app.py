@@ -6547,9 +6547,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
-        <!-- Virtual Select CSS -->
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
-        
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
@@ -6676,26 +6673,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 border: none; border-radius: 4px; cursor: pointer;
                 margin-top: 5px;
             }}
-            
-            /* Estilos específicos para Virtual Select no menu de filtros */
-            .floating-filter-menu .vscomp-toggle-button {{
-                border: 1px solid #cbd5e0;
-                border-radius: 4px;
-                padding: 6px 8px;
-                font-size: 13px;
-                min-height: 30px;
-            }}
-            .floating-filter-menu .vscomp-options {{
-                font-size: 13px;
-            }}
-            .floating-filter-menu .vscomp-option {{
-                min-height: 30px;
-            }}
-            .floating-filter-menu .vscomp-search-input {{
-                height: 30px;
-                font-size: 13px;
-            }}
-            
             .baseline-selector {{
                 display: none;
                 position: absolute;
@@ -6821,12 +6798,28 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label for="filter-empreendimento-setor-{project['id']}">Empreendimento</label>
-                    <div id="filter-empreendimento-setor-{project['id']}"></div>
+                    <label for="filter-project-{project['id']}">Empreendimento</label>
+                    <select id="filter-project-{project['id']}">
+                        <option value="Todos">Todos</option>
+                        {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
+                    </select>
                 </div>
                 <div class="filter-group">
-                    <label for="filter-etapas-setor-{project['id']}">Etapas</label>
-                    <div id="filter-etapas-setor-{project['id']}"></div>
+                    <label>Etapas</label>
+                    <div style="max-height: 150px; overflow-y: auto; border: 1px solid #cbd5e0; border-radius: 4px; padding: 8px; background: white;">
+                        <div style="margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
+                                <input type="checkbox" id="filter-etapas-all-{project['id']}" checked style="margin-right: 6px;">
+                                <span>Todas as Etapas</span>
+                            </label>
+                        </div>
+                        {"".join([f'''
+                        <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
+                            <input type="checkbox" class="filter-etapa-checkbox" data-etapa="{etapa}" checked style="margin-right: 6px;">
+                            <span style="font-size: 13px;">{sigla_para_nome_completo.get(etapa, etapa)}</span>
+                        </label>
+                        ''' for etapa in filter_options['etapas']])}
+                    </div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -6919,19 +6912,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             <div class="tooltip" id="tooltip"></div>
         </div>
         
-        <!-- Virtual Select JavaScript -->
-        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
-        
         <script>
-            // Dados de filtros
-            const filterOptions = {json.dumps(filter_options)};
-            const siglaParaNomeCompleto = {json.dumps(sigla_para_nome_completo)};
-            
-            // Variáveis globais para Virtual Selects
-            let vsEmpreendimentoSetor = null;
-            let vsEtapasSetor = null;
-            let filtersPopulated = false;
-            
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
             let currentSector = "{setor_selecionado_inicialmente}";
@@ -7593,62 +7574,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     isResizing = false;
                 }});
             }}
-
-            // Inicializar virtual selects quando o menu de filtros abrir
-            document.getElementById('filter-btn-{project["id"]}').addEventListener('click', function() {{
-                const menu = document.getElementById('filter-menu-{project["id"]}');
-                const wasOpen = menu.classList.contains('is-open');
-                
-                // Se estava fechado e vai abrir, inicializar virtual selects
-                if (!wasOpen && !filtersPopulated) {{
-                    // Configuração comum para Virtual Selects
-                    const vsConfig = {{
-                        multiple: true,
-                        search: true,
-                        optionsCount: 6,
-                        showResetButton: true,
-                        resetButtonText: 'Limpar',
-                        selectAllText: 'Selecionar Todos',
-                        allOptionsSelectedText: 'Todos',
-                        optionsSelectedText: 'selecionados',
-                        searchPlaceholderText: 'Buscar...',
-```
-                        optionHeight: '30px',
-                        popupDropboxBreakpoint: '3000px',
-                        noOptionsText: 'Nenhuma opção encontrada',
-                        noSearchResultsText: 'Nenhum resultado encontrado',
-                    }};
-                    
-                    // 1. Virtual Select de Empreendimento
-                    const empOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
-                    vsEmpreendimentoSetor = VirtualSelect.init({{
-                        ...vsConfig,
-                        ele: '#filter-empreendimento-setor-{project["id"]}',
-                        options: empOptions,
-                        placeholder: "Selecionar Empreendimento(s)",
-                        selectedValue: ["Todos"]
-                    }});
-                    
-                    // 2. Virtual Select de Etapas
-                    let etapasOptions = filterOptions.etapas || [];
-                    const etapaOptionsFormatted = etapasOptions.map(e => {{
-                        const nomeCompleto = siglaParaNomeCompleto[e] || e;
-                        return {{ label: nomeCompleto, value: e }};
-                    }});
-                    etapaOptionsFormatted.unshift({{ label: 'Todas', value: 'Todas' }});
-                    
-                    vsEtapasSetor = VirtualSelect.init({{
-                        ...vsConfig,
-                        ele: '#filter-etapas-setor-{project["id"]}',
-                        options: etapaOptionsFormatted,
-                        placeholder: "Selecionar Etapa(s)",
-                        selectedValue: ["Todas"]
-                    }});
-                    
-                    filtersPopulated = true;
-                }}
-            }});
             
+            // Renderizar inicial com filtros aplicados
+            applyFilters();
         </script>
     </body>
     </html>
