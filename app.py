@@ -7706,7 +7706,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // Renderizar inicial com filtros aplicados
-            applyFilters();
+            applyFiltersAndRedraw();
         </script>
     </body>
     </html>
