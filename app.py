@@ -7612,6 +7612,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         allOptionsSelectedText: 'Todos',
                         optionsSelectedText: 'selecionados',
                         searchPlaceholderText: 'Buscar...',
+```
                         optionHeight: '30px',
                         popupDropboxBreakpoint: '3000px',
                         noOptionsText: 'Nenhuma opção encontrada',
