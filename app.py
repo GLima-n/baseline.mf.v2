@@ -6806,20 +6806,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 </div>
                 <div class="filter-group">
                     <label>Etapas</label>
-                    <div style="max-height: 150px; overflow-y: auto; border: 1px solid #cbd5e0; border-radius: 4px; padding: 8px; background: white;">
-                        <div style="margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
-                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
-                                <input type="checkbox" id="filter-etapas-all-{project['id']}" checked style="margin-right: 6px;">
-                                <span>Todas as Etapas</span>
-                            </label>
-                        </div>
-                        {"".join([f'''
-                        <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
-                            <input type="checkbox" class="filter-etapa-checkbox" data-etapa="{etapa}" checked style="margin-right: 6px;">
-                            <span style="font-size: 13px;">{sigla_para_nome_completo.get(etapa, etapa)}</span>
-                        </label>
-                        ''' for etapa in filter_options['etapas']])}
-                    </div>
+                    <div id="filter-etapas-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -6930,9 +6917,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
                 const mostrarConcluidas = !document.getElementById('filter-concluidas-{project["id"]}')?.checked;
                 
-                // Obter etapas selecionadas
-                const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
-                const etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
+                // Obter etapas selecionadas do Virtual Select
+                const etapasSelecionadas = document.querySelector('#filter-etapas-{project["id"]}').value || [];
                 
                 // Salvar o tipo de visualização selecionado
                 savedVisualizationType = tipoVis;
@@ -6941,7 +6927,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 console.log('Empreendimento:', empSelecionado);
                 console.log('Visualização:', tipoVis, '(salvo em savedVisualizationType)');
                 console.log('Mostrar concluídas:', mostrarConcluidas);
-                console.log('Etapas selecionadas:', etapasSelecionadas.length, 'de', document.querySelectorAll('.filter-etapa-checkbox').length);
+                console.log('Etapas selecionadas:', etapasSelecionadas.length, 'de', {len(filter_options['etapas'])});
                 
                 // Pegar todos os dados do setor atual
                 const allTasks = allDataBySector[currentSector] || [];
@@ -6999,36 +6985,33 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 switchSector(this.value);
             }});
             
+            // Inicializar Virtual Select para etapas
+            VirtualSelect.init({{
+                ele: '#filter-etapas-{project["id"]}',
+                options: {json.dumps([{"label": sigla_para_nome_completo.get(etapa, etapa), "value": etapa} for etapa in filter_options['etapas']])},
+                multiple: true,
+                search: true,
+                placeholder: 'Selecione as etapas',
+                noOptionsText: 'Nenhuma etapa encontrada',
+                noSearchResultsText: 'Nenhum resultado',
+                selectAllText: 'Selecionar todas',
+                searchPlaceholderText: 'Buscar...',
+                optionsSelectedText: 'etapas selecionadas',
+                optionSelectedText: 'etapa selecionada',
+                allOptionsSelectedText: 'Todas',
+                clearButtonText: 'Limpar',
+                maxWidth: '100%',
+                zIndex: 10,
+                popupDropboxBreakpoint: '3000px',
+                selectAllOnlyVisible: false,
+                alwaysShowSelectedOptionsCount: true,
+                showValueAsTags: false,
+                selectedValue: {json.dumps(filter_options['etapas'])}  // Todas selecionadas por padrão
+            }});
+            
             // Event listener APENAS para botão "Aplicar Filtros"
             // Removidos os listeners automáticos dos controles individuais
             document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFilters);
-            
-            // Event listeners para o filtro multiselect de etapas
-            // Checkbox "Todas as Etapas"
-            const checkboxAll = document.getElementById('filter-etapas-all-{project["id"]}');
-            if (checkboxAll) {{
-                checkboxAll.addEventListener('change', function() {{
-                    const checkboxes = document.querySelectorAll('.filter-etapa-checkbox');
-                    checkboxes.forEach(cb => {{
-                        cb.checked = this.checked;
-                    }});
-                }});
-            }}
-            
-            // Checkboxes individuais de etapas
-            const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox');
-            etapaCheckboxes.forEach(cb => {{
-                cb.addEventListener('change', function() {{
-                    // Atualizar checkbox "Todas" baseado no estado dos individuais
-                    const allChecked = Array.from(etapaCheckboxes).every(checkbox => checkbox.checked);
-                    const someChecked = Array.from(etapaCheckboxes).some(checkbox => checkbox.checked);
-                    
-                    if (checkboxAll) {{
-                        checkboxAll.checked = allChecked;
-                        checkboxAll.indeterminate = someChecked && !allChecked;
-                    }}
-                }});
-            }});
 
             
             // Função para aplicar baseline em um empreendimento
