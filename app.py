@@ -7619,7 +7619,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 console.log('📋 Inicializando filtros do setor...');
                 
                 // 1. Virtual Select de Empreendimento
-                const empOptions = filterOptions.empreendimentos.map(e => ({ label: e, value: e }));
+                const empOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
                 vsEmpreendimentoSetor = VirtualSelect.init({{
                     ...vsConfig,
                     ele: '#filter-empreendimento-setor-{project["id"]}',
