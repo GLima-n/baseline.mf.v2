@@ -6480,12 +6480,26 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     empreendimentos_no_df = sorted(list(df_gantt_agg["Empreendimento"].unique()))
     
     # Coletar todas as etapas únicas do setor atual
-    etapas_unicas_no_df = sorted(list(df_gantt_agg["Etapa"].unique()))
-    
+    # *** NOVO: Mapear etapas por setor para filtro dinâmico ***
+    etapas_por_setor_dict = {}
+    for setor_nome in all_sector_names:
+        etapas_do_setor = sorted(list(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['Etapa'].unique()))
+        etapas_data = []
+        for e in etapas_do_setor:
+            etapas_data.append({
+                "sigla": e,
+                "nome": sigla_para_nome_completo.get(e, e)
+            })
+        etapas_por_setor_dict[setor_nome] = etapas_data
+        
+    # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
+    etapas_iniciais_html = [e['sigla'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
+        
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
-        "etapas": etapas_unicas_no_df  # Lista de etapas para o filtro multiselect
+        "etapas": etapas_iniciais_html, # Apenas etapas do setor inicial
+        "etapas_por_setor": etapas_por_setor_dict
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6843,6 +6857,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     </head>
     <body>
         <script id="all-data-by-sector" type="application/json">{json.dumps(all_data_by_sector_js)}</script>
+        <script id="etapas-by-sector" type="application/json">{json.dumps(etapas_por_setor_dict)}</script>
         
         <div class="gantt-container" id="gantt-container-{project['id']}">
             <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
@@ -6997,6 +7012,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         <script>
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
+            const etapasBySector = JSON.parse(document.getElementById('etapas-by-sector').textContent);
             
             // *** NOVAS VARIÁVEIS GLOBAIS ***
             const initialSectorName = "{setor_selecionado_inicialmente}";
@@ -7006,6 +7022,57 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             // Variável para armazenar o tipo de visualização selecionado
             let savedVisualizationType = 'Ambos';
+
+            // *** FUNÇÃO AUXILIAR: Renderizar Checkboxes de Etapas ***
+            function renderStageCheckboxes(sectorName) {{
+                const container = document.querySelector('.etapas-multiselect-container');
+                if (!container) return;
+                
+                const etapas = etapasBySector[sectorName] || [];
+                
+                let html = `
+                    <div>
+                        <label>
+                            <input type="checkbox" id="filter-etapas-all-{project['id']}" checked>
+                            <span>Todas as Etapas</span>
+                        </label>
+                    </div>
+                `;
+                
+                etapas.forEach(etapa => {{
+                    html += `
+                    <label>
+                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapa.sigla}}" checked>
+                        <span>${{etapa.nome}}</span>
+                    </label>
+                    `;
+                }});
+                
+                container.innerHTML = html;
+                
+                // Reatribuir Event Listeners
+                const checkboxAll = document.getElementById('filter-etapas-all-{project["id"]}');
+                const etapaCheckboxes = container.querySelectorAll('.filter-etapa-checkbox');
+                
+                if (checkboxAll) {{
+                    checkboxAll.addEventListener('change', function() {{
+                        etapaCheckboxes.forEach(cb => {{
+                            cb.checked = this.checked;
+                        }});
+                    }});
+                }}
+                
+                etapaCheckboxes.forEach(cb => {{
+                    cb.addEventListener('change', function() {{
+                        const allChecked = Array.from(etapaCheckboxes).every(c => c.checked);
+                        const someChecked = Array.from(etapaCheckboxes).some(c => c.checked);
+                        if (checkboxAll) {{
+                            checkboxAll.checked = allChecked;
+                            checkboxAll.indeterminate = someChecked && !allChecked;
+                        }}
+                    }});
+                }});
+            }}
 
             // *** FUNÇÃO AUXILIAR: Atualizar Título do Projeto ***
             function updateProjectTitle(newSectorName) {{
@@ -7040,8 +7107,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     
                     // 2. LER OUTROS FILTROS
                     const selEmp = document.getElementById('filter-project-{project["id"]}').value;
-                    const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
-                    const etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
+                    let etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
+                    let etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
@@ -7057,6 +7124,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         allTasks_baseData = JSON.parse(JSON.stringify(allDataBySector[currentSector] || []));
                         console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
                         updateProjectTitle(currentSector);
+                        
+                        // *** NOVO: Atualizar checkboxes de etapa para o novo setor ***
+                        renderStageCheckboxes(currentSector);
+                        
+                        // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
+                        // atualizamos a lista de etapas selecionadas para incluir todas as novas etapas.
+                        const novasEtapas = etapasBySector[currentSector] || [];
+                        etapasSelecionadas = novasEtapas.map(e => e.sigla);
+                        console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
@@ -7704,6 +7780,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     isResizing = false;
                 }});
             }}
+            
+            // Inicializar checkboxes de etapas para o setor atual
+            renderStageCheckboxes(initialSectorName);
             
             // Renderizar inicial com filtros aplicados
             applyFiltersAndRedraw();
