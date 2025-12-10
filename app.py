@@ -6897,6 +6897,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let currentSector = "{setor_selecionado_inicialmente}";
             let currentTasks = allDataBySector[currentSector] || [];
             
+            // Variável para armazenar o tipo de visualização selecionado
+            // Só é atualizada quando o usuário clica em "Aplicar Filtros"
+            let savedVisualizationType = 'Ambos';
+
+            
             // Função para aplicar filtros
             function applyFilters() {{
                 // Obter valores dos filtros
@@ -6904,9 +6909,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
                 const mostrarConcluidas = !document.getElementById('filter-concluidas-{project["id"]}')?.checked;
                 
+                // Salvar o tipo de visualização selecionado
+                savedVisualizationType = tipoVis;
+                
                 console.log('=== APLICANDO FILTROS ===');
                 console.log('Empreendimento:', empSelecionado);
-                console.log('Visualização:', tipoVis);
+                console.log('Visualização:', tipoVis, '(salvo em savedVisualizationType)');
                 console.log('Mostrar concluídas:', mostrarConcluidas);
                 
                 // Pegar todos os dados do setor atual
@@ -7059,8 +7067,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 chartContainer.innerHTML = '';
                 
                 // --- ORDENAÇÃO DINÂMICA: Por data de início (prevista ou real) ---
-                // Verificar qual visualização está ativa
-                const visualizacaoReal = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value === 'Real';
+                // Usar o tipo de visualização SALVO
+                const visualizacaoReal = savedVisualizationType === 'Real';
                 
                 // Ordenar tasks do mais antigo para o mais novo
                 currentTasks.sort((a, b) => {{
@@ -7173,8 +7181,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // Obter cores do setor
                     const cores = coresPorSetor[task.setor] || coresPorSetor["Não especificado"];
                     
-                    // Verificar qual visualização está selecionada
-                    const tipoVisualizacao = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
+                    // Usar o tipo de visualização SALVO (não ler diretamente dos radio buttons)
+                    // Isso garante que o filtro só seja aplicado ao clicar em "Aplicar Filtros"
+                    const tipoVisualizacao = savedVisualizationType;
                     
                     let barPrevisto = null;
                     let barReal = null;
