@@ -6897,18 +6897,71 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let currentSector = "{setor_selecionado_inicialmente}";
             let currentTasks = allDataBySector[currentSector] || [];
             
+            // Função para aplicar filtros
+            function applyFilters() {{
+                // Obter valores dos filtros
+                const empSelecionado = document.getElementById('filter-emp-{project["id"]}')?.value || 'Todos';
+                const tipoVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked')?.value || 'Ambos';
+                const mostrarConcluidas = !document.getElementById('filter-concluidas-{project["id"]}')?.checked;
+                
+                console.log('=== APLICANDO FILTROS ===');
+                console.log('Empreendimento:', empSelecionado);
+                console.log('Visualização:', tipoVis);
+                console.log('Mostrar concluídas:', mostrarConcluidas);
+                
+                // Pegar todos os dados do setor atual
+                const allTasks = allDataBySector[currentSector] || [];
+                
+                // Aplicar filtros
+                currentTasks = allTasks.filter(task => {{
+                    // Filtro de empreendimento
+                    if (empSelecionado !== 'Todos' && task.empreendimento !== empSelecionado) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de tarefas concluídas
+                    if (!mostrarConcluidas && task.progress >= 100) {{
+                        return false;
+                    }}
+                    
+                    // Filtro de visualização (Previsto/Real/Ambos)
+                    // Este filtro afeta apenas a renderização, não a filtragem de tasks
+                    // A lógica de renderização já está implementada em renderGantt()
+                    
+                    return true;
+                }});
+                
+                console.log('Tasks após filtro:', currentTasks.length, 'de', allTasks.length);
+                
+                // Re-renderizar
+                renderGantt();
+            }}
+            
             // Função para trocar de setor
             function switchSector(newSectorName) {{
                 currentSector = newSectorName;
-                currentTasks = allDataBySector[newSectorName] || [];
                 document.querySelector('.project-title-row span').textContent = `Setor: ${{newSectorName}}`;
-                renderGantt();
+                // Aplicar filtros ao trocar de setor
+                applyFilters();
             }}
             
             // Event listener para dropdown de setor
             document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
                 switchSector(this.value);
             }});
+            
+            // Event listeners para os filtros
+            document.getElementById('filter-emp-{project["id"]}')?.addEventListener('change', applyFilters);
+            document.getElementById('filter-concluidas-{project["id"]}')?.addEventListener('change', applyFilters);
+            
+            // Event listeners para radio buttons de visualização
+            document.querySelectorAll('input[name="filter-vis-{project["id"]}"]').forEach(radio => {{
+                radio.addEventListener('change', applyFilters);
+            }});
+            
+            // Event listener para botão "Aplicar Filtros"
+            document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFilters);
+
             
             // Função para aplicar baseline em um empreendimento
             function applyBaselineForEmp(emp, baselineName) {{
@@ -7453,8 +7506,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }}
             
-            // Renderizar inicial
-            renderGantt();
+            // Renderizar inicial com filtros aplicados
+            applyFilters();
         </script>
     </body>
     </html>
