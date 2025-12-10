@@ -6421,19 +6421,35 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         if baseline_data and 'tasks' in baseline_data:
                             baseline_tasks = baseline_data['tasks']
                             
+                            # *** ESTRATÉGIA TRIPLA DE BUSCA (igual ao consolidado) ***
+                            baseline_task = None
+                            
+                            # Estratégia 1: Nome completo exato
                             baseline_task = next(
                                 (bt for bt in baseline_tasks 
-                                 if bt.get('etapa') == etapa_nome or bt.get('Etapa') == etapa_nome),
+                                 if bt.get('etapa') == etapa_nome or 
+                                    bt.get('Etapa') == etapa_nome),
                                 None
                             )
                             
+                            # Estratégia 2: Tentar com sigla
                             if not baseline_task:
                                 etapa_sigla = nome_completo_para_sigla.get(etapa_nome, etapa_nome)
                                 baseline_task = next(
                                     (bt for bt in baseline_tasks 
-                                     if bt.get('etapa') == etapa_sigla or bt.get('Etapa') == etapa_sigla),
+                                     if bt.get('etapa') == etapa_sigla or 
+                                        bt.get('Etapa') == etapa_sigla),
                                     None
                                 )
+                            
+                            # Estratégia 3: Converter etapa da baseline para nome completo e comparar
+                            if not baseline_task:
+                                for bt in baseline_tasks:
+                                    bt_etapa = bt.get('etapa', bt.get('Etapa', ''))
+                                    bt_etapa_nome = sigla_para_nome_completo.get(bt_etapa, bt_etapa)
+                                    if bt_etapa_nome == etapa_nome:
+                                        baseline_task = bt
+                                        break
                             
                             if baseline_task:
                                 task["baselines"][baseline_name] = {
@@ -6441,6 +6457,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                                     "end": baseline_task.get('termino_previsto', baseline_task.get('Termino_Prevista'))
                                 }
                             else:
+                                # Etapa não existe nesta baseline
                                 task["baselines"][baseline_name] = {
                                     "start": None,
                                     "end": None
@@ -6672,6 +6689,71 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 color: white; background-color: #2d3748;
                 border: none; border-radius: 4px; cursor: pointer;
                 margin-top: 5px;
+                transition: background-color 0.2s ease;
+            }}
+            .filter-apply-btn:hover {{
+                background-color: #1a202c;
+            }}
+            
+            /* Estilos para o container de checkboxes de etapas */
+            .filter-group .etapas-multiselect-container {{
+                max-height: 150px;
+                overflow-y: auto;
+                border: 1px solid #cbd5e0;
+                border-radius: 4px;
+                padding: 8px;
+                background: white;
+            }}
+            
+            /* Scrollbar customizado para o container de etapas */
+            .filter-group .etapas-multiselect-container::-webkit-scrollbar {{
+                width: 6px;
+            }}
+            .filter-group .etapas-multiselect-container::-webkit-scrollbar-track {{
+                background: #f1f1f1;
+                border-radius: 3px;
+            }}
+            .filter-group .etapas-multiselect-container::-webkit-scrollbar-thumb {{
+                background: #cbd5e0;
+                border-radius: 3px;
+            }}
+            .filter-group .etapas-multiselect-container::-webkit-scrollbar-thumb:hover {{
+                background: #a0aec0;
+            }}
+            
+            /* Estilos para labels de checkbox de etapas */
+            .filter-group .etapas-multiselect-container label {{
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                padding: 4px 0;
+                transition: background-color 0.15s ease;
+                border-radius: 3px;
+                margin: 0;
+                text-transform: none;
+            }}
+            .filter-group .etapas-multiselect-container label:hover {{
+                background-color: #f7fafc;
+            }}
+            
+            /* Checkbox "Todas as Etapas" */
+            .filter-group .etapas-multiselect-container \u003e div:first-child {{
+                margin-bottom: 8px;
+                border-bottom: 1px solid #e2e8f0;
+                padding-bottom: 6px;
+            }}
+            .filter-group .etapas-multiselect-container \u003e div:first-child label {{
+                font-weight: 600;
+            }}
+            
+            /* Checkboxes individuais */
+            .filter-group .etapas-multiselect-container input[type="checkbox"] {{
+                margin-right: 6px;
+                cursor: pointer;
+            }}
+            .filter-group .etapas-multiselect-container span {{
+                font-size: 13px;
+                color: #2d3748;
             }}
             .baseline-selector {{
                 display: none;
@@ -6806,8 +6888,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 </div>
                 <div class="filter-group">
                     <label>Etapas</label>
-                    <div style="max-height: 150px; overflow-y: auto; border: 1px solid #cbd5e0; border-radius: 4px; padding: 8px; background: white;">
-                        <div style="margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+                    <div class="etapas-multiselect-container">
+                        <div>
                             <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
                                 <input type="checkbox" id="filter-etapas-all-{project['id']}" checked style="margin-right: 6px;">
                                 <span>Todas as Etapas</span>
