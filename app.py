@@ -6912,8 +6912,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         </div>
                         {"".join([f'''
                         <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
-                            <input type="checkbox" class="filter-etapa-checkbox" data-etapa="{etapa}" checked style="margin-right: 6px;">
-                            <span style="font-size: 13px;">{sigla_para_nome_completo.get(etapa, etapa)}</span>
+                            <input type="checkbox" class="filter-etapa-checkbox" data-etapa="{etapa.replace('"', '&quot;')}" checked style="margin-right: 6px;">
+                            <span style="font-size: 13px;">{etapa}</span>
                         </label>
                         ''' for etapa in filter_options['etapas']])}
                     </div>
@@ -7040,9 +7040,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 `;
                 
                 etapas.forEach(etapa => {{
+                    // Escapar aspas duplas para não quebrar o atributo HTML
+                    const etapaNomeSafe = etapa.nome.replace(/"/g, '&quot;');
                     html += `
                     <label>
-                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapa.nome}}" checked>
+                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapaNomeSafe}}" checked>
                         <span>${{etapa.nome}}</span>
                     </label>
                     `;
@@ -7148,10 +7150,19 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     
                     // Filtro de etapas (melhorado - comparação exata)
                     if (etapasSelecionadas.length > 0) {{
+                        const countAntes = filteredTasks.length;
                         filteredTasks = filteredTasks.filter(task => {{
                             // Comparar diretamente a etapa da task com as selecionadas
-                            return etapasSelecionadas.includes(task.etapa);
+                            const match = etapasSelecionadas.includes(task.etapa);
+                            if (!match) {{
+                                // Debug para entender o que está sendo filtrado
+                                if (Math.random() < 0.001) {{
+                                    console.log(`❌ Rejeitado: Task="${{task.etapa}}" vs Filtro=[${{etapasSelecionadas.slice(0,3)}}...]`);
+                                }}
+                            }}
+                            return match;
                         }});
+                        console.log(`📉 Filtro Etapas: ${{countAntes}} -> ${{filteredTasks.length}}`);
                     }}
                     
                     // Filtro de concluídas
