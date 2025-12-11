@@ -7180,6 +7180,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const novasEtapas = etapasBySector[currentSector] || [];
                         etapasSelecionadas = novasEtapas.map(e => e.nome);
                         console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
+                        
+                        // Forçar redesenho após pequeno delay para garantir que Virtual Selects foram inicializados
+                        setTimeout(() => {{
+                            applyFiltersAndRedraw();
+                        }}, 100);
+                        return; // Sair da função pois o setTimeout vai chamar de novo
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
