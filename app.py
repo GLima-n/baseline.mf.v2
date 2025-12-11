@@ -7069,6 +7069,22 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let vsGrupo;
             let vsMacroetapas;
 
+            const vsConfig = {{
+                multiple: true,
+                search: true,
+                optionsCount: 6,
+                showResetButton: true,
+                resetButtonText: 'Limpar',
+                selectAllText: 'Selecionar Todos',
+                allOptionsSelectedText: 'Todos',
+                optionsSelectedText: 'selecionados',
+                searchPlaceholderText: 'Buscar...',
+                optionHeight: '30px',
+                popupDropboxBreakpoint: '3000px',
+                noOptionsText: 'Nenhuma opção encontrada',
+                noSearchResultsText: 'Nenhum resultado encontrado',
+            }};
+
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
                 const etapas = etapasBySector[sectorName] || [];
@@ -7086,16 +7102,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsEtapa = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-etapa-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione etapas',
                     noOptionsText: 'Nenhuma etapa disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7119,16 +7131,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsGrupo = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-grupo-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione grupos',
                     noOptionsText: 'Nenhum grupo disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todos',
-                    allOptionsSelectedText: 'Todos selecionados'
                 }});
                 
                 console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7152,16 +7160,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsMacroetapas = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-macroetapa-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione macroetapas',
                     noOptionsText: 'Nenhuma macroetapa disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
