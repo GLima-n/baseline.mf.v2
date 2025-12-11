@@ -7473,7 +7473,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const diffEnd = (endDate - dataInicio) / (1000 * 60 * 60 * 24);
                         
                         const left = (diffStart / 30.4375) * larguraMes;
-                        const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        let width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        
+                        // Se início e fim são o mesmo dia (width = 0), definir largura mínima
+                        if (width === 0) {{
+                            width = larguraMes / 30.4375; // Largura de 1 dia
+                        }}
                         
                         if (width > 0) {{
                             barPrevisto = document.createElement('div');
@@ -7506,7 +7511,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const diffEnd = (endDate - dataInicio) / (1000 * 60 * 60 * 24);
                         
                         const left = (diffStart / 30.4375) * larguraMes;
-                        const width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        let width = ((diffEnd - diffStart) / 30.4375) * larguraMes;
+                        
+                        // Se início e fim são o mesmo dia (width = 0), definir largura mínima
+                        if (width === 0) {{
+                            width = larguraMes / 30.4375; // Largura de 1 dia
+                        }}
                         
                         if (width > 0) {{
                             barReal = document.createElement('div');
