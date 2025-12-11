@@ -6766,41 +6766,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 font-size: 13px;
                 min-height: 30px;
             }}
-            
-            
-            /* *** INÍCIO: Arredondar Dropdown Virtual Select *** */
-            .floating-filter-menu .vscomp-dropbox {{
-                border-radius: 8px; /* Controla o arredondamento dos cantos do dropdown */
-                overflow: hidden;   /* Necessário para que o conteúdo interno não "vaze" pelos cantos arredondados */
-                box-shadow: 0 5px 15px rgba(0,0,0,0.2); /* Sombra para melhor visualização (opcional) */
-                border: 1px solid #ccc; /* Borda sutil (opcional) */
-            }}
-
-            /* Opcional: Arredondar também o campo de busca interno, se ele ficar visível no topo */
-            .floating-filter-menu .vscomp-search-wrapper {{
-            /* Remove o arredondamento padrão se houver, para não conflitar com o container */
-            border-radius: 0;
-            }}
-
-            /* Opcional: Garantir que a lista de opções não ultrapasse */
-            .floating-filter-menu .vscomp-options-container {{
-                /* Geralmente não precisa de arredondamento próprio se o overflow:hidden funcionar */
-            }}
-            .floating-filter-menu .vscomp-toggle-button .vscomp-value-tag .vscomp-clear-button {{
-                display: inline-flex;    /* Usa flex para alinhar o ícone interno */
-                align-items: center;     /* Alinha verticalmente o ícone */
-                justify-content: center; /* Alinha horizontalmente o ícone */
-                vertical-align: middle;  /* Ajuda no alinhamento com o texto adjacente */
-                margin-left: 4px;        /* Espaçamento à esquerda (ajuste conforme necessário) */
-                padding: 0;            /* Remove padding interno se houver */
-                position: static;        /* Garante que não use posicionamento absoluto/relativo que possa quebrar o fluxo */
-                transform: none;         /* Remove qualquer translação que possa estar desalinhando */
-            }}
-
-            /* Opcional: Se o próprio ícone 'X' (geralmente uma tag <i>) precisar de ajuste */
-            .floating-filter-menu .vscomp-toggle-button .vscomp-value-tag .vscomp-clear-button i {{
-            }}
-            
             .floating-filter-menu .vscomp-options {{
                 font-size: 13px;
             }}
@@ -7073,22 +7038,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let vsGrupo;
             let vsMacroetapas;
 
-            const vsConfig = {{
-                multiple: true,
-                search: true,
-                optionsCount: 6,
-                showResetButton: true,
-                resetButtonText: 'Limpar',
-                selectAllText: 'Selecionar Todos',
-                allOptionsSelectedText: 'Todos',
-                optionsSelectedText: 'selecionados',
-                searchPlaceholderText: 'Buscar...',
-                optionHeight: '30px',
-                popupDropboxBreakpoint: '3000px',
-                noOptionsText: 'Nenhuma opção encontrada',
-                noSearchResultsText: 'Nenhum resultado encontrado',
-            }};
-
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
                 const etapas = etapasBySector[sectorName] || [];
@@ -7106,12 +7055,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsEtapa = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-etapa-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione etapas',
                     noOptionsText: 'Nenhuma etapa disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7135,12 +7088,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsGrupo = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-grupo-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione grupos',
                     noOptionsText: 'Nenhum grupo disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todos',
+                    allOptionsSelectedText: 'Todos selecionados'
                 }});
                 
                 console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7164,12 +7121,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsMacroetapas = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-macroetapa-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione macroetapas',
                     noOptionsText: 'Nenhuma macroetapa disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7204,25 +7165,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     console.log('=== APLICANDO FILTROS E REDESENHANDO ===');
                     
                     // 1. LER SETOR SELECIONADO
-                    const setorSelecionado = document.getElementById('filter-setor-{project["id"]}').value;
+                    const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
                     
                     // 2. LER OUTROS FILTROS
-                    const empSelecionado = document.getElementById('filter-project-{project["id"]}').value;
+                    const selEmp = document.getElementById('filter-project-{project["id"]}').value;
                     
-                    // CORREÇÃO: Se Virtual Select ainda não foi iniciado (ex: carregamento inicial), assumir 'Todos'
-                    // para que nada seja filtrado indevidamente.
-                    let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : ['Todos'];
-                    // Se getValue retornar algo vazio/nulo (mas vsEtapa existe), garantir array vazio
-                    if (!etapasSelecionadas) etapasSelecionadas = [];
-                    // Mas para inicialização (vsEtapa undefined), usamos ['Todos'].
-                    
-                    let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : ['Todos'];
-                    if (!gruposSelecionados) gruposSelecionados = [];
-
-                    let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : ['Todos'];
-                    if (!macroetapasSelecionadas) macroetapasSelecionadas = [];
-                    
-
+                    // *** ATUALIZADO: Obter etapas, grupos e macroetapas selecionados do Virtual Select ***
+                    let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : [];
+                    let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : [];
+                    let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : [];
                     
                     console.log('=== DEBUG FILTROS ===');
                     console.log('Setor atual:', currentSector);
@@ -7235,16 +7186,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
-
-                    console.log('Setor:', setorSelecionado);
-                    console.log('Empreendimento:', empSelecionado);
+                    console.log('Setor:', selSetor);
+                    console.log('Empreendimento:', selEmp);
                     console.log('Visualização:', selVis);
                     console.log('Mostrar apenas não concluídas:', selConcluidas);
                     console.log('Etapas selecionadas:', etapasSelecionadas.length);
                     
                     // 3. ATUALIZAR DADOS BASE SE SETOR MUDOU
-                    if (setorSelecionado !== currentSector) {{
-                        currentSector = setorSelecionado;
+                    if (selSetor !== currentSector) {{
+                        currentSector = selSetor;
                         allTasks_baseData = JSON.parse(JSON.stringify(allDataBySector[currentSector] || []));
                         console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
                         updateProjectTitle(currentSector);
@@ -7278,8 +7228,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     let filteredTasks = baseTasks;
                     
                     // Filtro de empreendimento
-                    if (empSelecionado !== 'Todos') {{
-                        filteredTasks = filteredTasks.filter(t => t.empreendimento === empSelecionado);
+                    if (selEmp !== 'Todos') {{
+                        filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
                     }}
                     
                     // *** MODIFICADO: Filtro de grupos usando mapeamento ***
@@ -7822,20 +7772,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // Event listeners
-            let filtersInitialized = false;
-
             document.getElementById('filter-btn-{project["id"]}').addEventListener('click', () => {{
-                const menu = document.getElementById('filter-menu-{project["id"]}');
-                menu.classList.toggle('is-open');
+                document.getElementById('filter-menu-{project["id"]}').classList.toggle('is-open');
                 document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
-                
-                // *** CORREÇÃO: Inicializar filtros apenas quando visíveis (para garantir layout correto) ***
-                if (menu.classList.contains('is-open') && !filtersInitialized) {{
-                    renderStageCheckboxes(initialSectorName);
-                    renderGroupCheckboxes(initialSectorName);
-                    renderMacroetapasCheckboxes(initialSectorName);
-                    filtersInitialized = true;
-                }}
             }});
             
             document.getElementById('baseline-btn-{project["id"]}').addEventListener('click', () => {{
@@ -7979,10 +7918,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // Inicializar filtros de etapas, grupos e macroetapas para o setor atual
-            // REMOVIDO: Inicialização agora ocorre ao abrir o menu (lazy load) para garantir display correto.
-            // renderStageCheckboxes(initialSectorName);
-            // renderGroupCheckboxes(initialSectorName);
-            // renderMacroetapasCheckboxes(initialSectorName);
+            renderStageCheckboxes(initialSectorName);
+            renderGroupCheckboxes(initialSectorName);
+            renderMacroetapasCheckboxes(initialSectorName);
             
             // Renderizar inicial com filtros aplicados
             // Pequeno delay para garantir que Virtual Selects estão completamente inicializados
