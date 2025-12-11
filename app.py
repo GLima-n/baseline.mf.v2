@@ -6491,15 +6491,24 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 "nome": sigla_para_nome_completo.get(e, e)
             })
         etapas_por_setor_dict[setor_nome] = etapas_data
+    
+    # *** NOVO: Mapear grupos por setor para filtro dinâmico ***
+    grupos_por_setor_dict = {}
+    for setor_nome in all_sector_names:
+        grupos_do_setor = sorted(list(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['GRUPO'].unique()))
+        grupos_por_setor_dict[setor_nome] = grupos_do_setor
         
     # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
     etapas_iniciais_html = [e['nome'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
+    grupos_iniciais_html = grupos_por_setor_dict.get(setor_selecionado_inicialmente, [])
         
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
         "etapas": etapas_iniciais_html, # Apenas etapas do setor inicial
-        "etapas_por_setor": etapas_por_setor_dict
+        "etapas_por_setor": etapas_por_setor_dict,
+        "grupos": grupos_iniciais_html, # Apenas grupos do setor inicial
+        "grupos_por_setor": grupos_por_setor_dict
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6818,6 +6827,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <body>
         <script id="all-data-by-sector" type="application/json">{json.dumps(all_data_by_sector_js)}</script>
         <script id="etapas-by-sector" type="application/json">{json.dumps(etapas_por_setor_dict)}</script>
+        <script id="grupos-by-sector" type="application/json">{json.dumps(grupos_por_setor_dict)}</script>
         
         <div class="gantt-container" id="gantt-container-{project['id']}">
             <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
@@ -6860,6 +6870,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         <option value="Todos">Todos</option>
                         {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
                     </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-grupo-{project['id']}">Grupo</label>
+                    <div id="filter-grupo-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <label for="filter-etapa-{project['id']}">Etapa</label>
@@ -6962,6 +6976,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
             const etapasBySector = JSON.parse(document.getElementById('etapas-by-sector').textContent);
+            const gruposBySector = JSON.parse(document.getElementById('grupos-by-sector').textContent);
             
             // *** NOVAS VARIÁVEIS GLOBAIS ***
             const initialSectorName = "{setor_selecionado_inicialmente}";
@@ -6974,6 +6989,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             // *** Variável Global para Virtual Select ***
             let vsEtapa;
+            let vsGrupo;
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
@@ -6997,6 +7013,31 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     multiple: true,
                     search: true,
                     selectedValue: options.map(o => o.value)
+                }});
+            }}
+
+            // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Grupos ***
+            function renderGroupCheckboxes(sectorName) {{
+                const grupos = gruposBySector[sectorName] || [];
+                
+                // Converter para formato do Virtual Select
+                const options = grupos.map(grupo => ({{
+                    label: grupo,
+                    value: grupo
+                }}));
+                
+                // Destruir instância anterior se existir
+                if (vsGrupo) {{
+                    vsGrupo.destroy();
+                }}
+                
+                // Inicializar Virtual Select
+                vsGrupo = VirtualSelect.init({{
+                    ele: '#filter-grupo-{project["id"]}',
+                    options: options,
+                    multiple: true,
+                    search: true,
+                    selectedValue: options.map(o => o.value)  // Todos selecionados por padrão
                 }});
             }}
 
@@ -7034,8 +7075,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // 2. LER OUTROS FILTROS
                     const selEmp = document.getElementById('filter-project-{project["id"]}').value;
                     
-                    // *** ATUALIZADO: Obter etapas selecionadas do Virtual Select ***
+                    // *** ATUALIZADO: Obter etapas e grupos selecionados do Virtual Select ***
                     let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : [];
+                    let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : [];
                     
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
@@ -7055,12 +7097,18 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         
                         // *** NOVO: Atualizar checkboxes de etapa para o novo setor ***
                         renderStageCheckboxes(currentSector);
+                        renderGroupCheckboxes(currentSector);
                         
                         // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
                         // atualizamos a lista de etapas selecionadas para incluir todas as novas etapas.
                         const novasEtapas = etapasBySector[currentSector] || [];
                         etapasSelecionadas = novasEtapas.map(e => e.nome);
                         console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
+                        
+                        // Atualizar grupos selecionados
+                        const novosGrupos = gruposBySector[currentSector] || [];
+                        gruposSelecionados = novosGrupos;
+                        console.log('🔄 Filtro de grupos atualizado para o novo setor. Total:', gruposSelecionados.length);
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
@@ -7072,6 +7120,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // Filtro de empreendimento
                     if (selEmp !== 'Todos') {{
                         filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
+                    }}
+                    
+                    // *** NOVO: Filtro de grupos ***
+                    if (gruposSelecionados.length > 0) {{
+                        const countAntes = filteredTasks.length;
+                        filteredTasks = filteredTasks.filter(task => {{
+                            const match = gruposSelecionados.includes(task.grupo);
+                            return match;
+                        }});
+                        console.log(`📉 Filtro Grupos: ${{countAntes}} -> ${{filteredTasks.length}}`);
                     }}
                     
                     // Filtro de etapas (melhorado - comparação exata)
@@ -7693,8 +7751,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 }});
             }}
             
-            // Inicializar checkboxes de etapas para o setor atual
+            // Inicializar filtros de etapas e grupos para o setor atual
             renderStageCheckboxes(initialSectorName);
+            renderGroupCheckboxes(initialSectorName);
             
             // Renderizar inicial com filtros aplicados
             applyFiltersAndRedraw();
