@@ -6314,25 +6314,44 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     print("=" * 80)
     
     # *** NOVO: Atribuir GRUPO baseado no dicionário GRUPOS para etapas que não têm grupo ***
-    # Criar mapeamento reverso: etapa -> grupo
+    # Criar mapeamento reverso: etapa -> grupo (com normalização de nomes)
     etapa_para_grupo = {}
     for grupo_nome, etapas_lista in GRUPOS.items():
         for etapa in etapas_lista:
-            etapa_para_grupo[etapa] = grupo_nome
+            # Normalizar: remover espaços extras e pontos finais
+            etapa_normalizada = etapa.strip().rstrip('.')
+            etapa_para_grupo[etapa_normalizada] = grupo_nome
+    
+    print("\n=== DEBUG: MAPEAMENTO ETAPA -> GRUPO ===")
+    print(f"Total de etapas mapeadas: {len(etapa_para_grupo)}")
+    # Mostrar apenas etapas relacionadas a TER, LIMP, INFRA, PAV
+    for etapa, grupo in sorted(etapa_para_grupo.items()):
+        if any(x in etapa for x in ['TER', 'LIMP', 'INFRA', 'PAV']):
+            print(f"  '{etapa}' -> {grupo}")
     
     # Aplicar o mapeamento ao dataframe
     def atribuir_grupo(row):
         # Se já tem grupo definido e não é vazio/NaN, manter
         if pd.notna(row['GRUPO']) and str(row['GRUPO']).strip() != '' and str(row['GRUPO']) != 'Não especificado':
             return row['GRUPO']
-        # Tentar encontrar grupo no mapeamento
+        # Tentar encontrar grupo no mapeamento (normalizando o nome da etapa)
         etapa = row['Etapa']
-        if etapa in etapa_para_grupo:
-            return etapa_para_grupo[etapa]
+        etapa_normalizada = str(etapa).strip().rstrip('.')
+        if etapa_normalizada in etapa_para_grupo:
+            return etapa_para_grupo[etapa_normalizada]
         # Se não encontrou, deixar como "Não especificado"
         return "Não especificado"
     
     df_gantt['GRUPO'] = df_gantt.apply(atribuir_grupo, axis=1)
+    
+    print("\n=== DEBUG: GRUPOS APÓS ATRIBUIÇÃO ===")
+    etapas_com_grupo = df_gantt[['Etapa', 'GRUPO']].drop_duplicates()
+    for _, row in etapas_com_grupo.iterrows():
+        etapa = row['Etapa']
+        grupo = row['GRUPO']
+        if any(x in str(etapa) for x in ['TER', 'LIMP', 'INFRA', 'PAV']):
+            print(f"  Etapa: '{etapa}' -> Grupo: '{grupo}'")
+    print("=" * 80)
     
     # Agrupar por SETOR, Empreendimento e Etapa
     df_gantt_agg = df_gantt.groupby(['SETOR', 'Empreendimento', 'Etapa']).agg(
