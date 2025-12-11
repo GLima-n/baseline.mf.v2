@@ -7204,15 +7204,26 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     console.log('=== APLICANDO FILTROS E REDESENHANDO ===');
                     
                     // 1. LER SETOR SELECIONADO
-                    const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
+                    const setorSelecionado = document.getElementById('filter-setor-{project["id"]}').value;
                     
                     // 2. LER OUTROS FILTROS
-                    const selEmp = document.getElementById('filter-project-{project["id"]}').value;
+                    const empSelecionado = document.getElementById('filter-project-{project["id"]}').value;
                     
-                    // *** ATUALIZADO: Obter etapas, grupos e macroetapas selecionados do Virtual Select ***
-                    let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : [];
-                    let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : [];
-                    let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : [];
+                    // CORREÇÃO: Se Virtual Select ainda não foi iniciado (ex: carregamento inicial), assumir 'Todos'
+                    // para que nada seja filtrado indevidamente.
+                    let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : ['Todos'];
+                    // Se getValue retornar algo vazio/nulo (mas vsEtapa existe), garantir array vazio
+                    if (!etapasSelecionadas) etapasSelecionadas = [];
+                    // Mas para inicialização (vsEtapa undefined), usamos ['Todos'].
+                    
+                    let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : ['Todos'];
+                    if (!gruposSelecionados) gruposSelecionados = [];
+
+                    let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : ['Todos'];
+                    if (!macroetapasSelecionadas) macroetapasSelecionadas = [];
+                    
+                    const apenasNaoConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
+                    const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
                     console.log('=== DEBUG FILTROS ===');
                     console.log('Setor atual:', currentSector);
@@ -7811,9 +7822,20 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // Event listeners
+            let filtersInitialized = false;
+
             document.getElementById('filter-btn-{project["id"]}').addEventListener('click', () => {{
-                document.getElementById('filter-menu-{project["id"]}').classList.toggle('is-open');
+                const menu = document.getElementById('filter-menu-{project["id"]}');
+                menu.classList.toggle('is-open');
                 document.getElementById('baseline-selector-{project["id"]}').classList.remove('is-open');
+                
+                // *** CORREÇÃO: Inicializar filtros apenas quando visíveis (para garantir layout correto) ***
+                if (menu.classList.contains('is-open') && !filtersInitialized) {{
+                    renderStageCheckboxes(initialSectorName);
+                    renderGroupCheckboxes(initialSectorName);
+                    renderMacroetapasCheckboxes(initialSectorName);
+                    filtersInitialized = true;
+                }}
             }});
             
             document.getElementById('baseline-btn-{project["id"]}').addEventListener('click', () => {{
@@ -7957,9 +7979,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             }}
             
             // Inicializar filtros de etapas, grupos e macroetapas para o setor atual
-            renderStageCheckboxes(initialSectorName);
-            renderGroupCheckboxes(initialSectorName);
-            renderMacroetapasCheckboxes(initialSectorName);
+            // REMOVIDO: Inicialização agora ocorre ao abrir o menu (lazy load) para garantir display correto.
+            // renderStageCheckboxes(initialSectorName);
+            // renderGroupCheckboxes(initialSectorName);
+            // renderMacroetapasCheckboxes(initialSectorName);
             
             // Renderizar inicial com filtros aplicados
             // Pequeno delay para garantir que Virtual Selects estão completamente inicializados
