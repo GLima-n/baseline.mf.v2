@@ -7033,6 +7033,23 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Variável para armazenar o tipo de visualização selecionado
             let savedVisualizationType = 'Ambos';
             
+            // *** CONFIGURAÇÃO UNIFICADA DO VIRTUAL SELECT (Idêntico ao Por Projeto) ***
+            const vsConfig = {{
+                multiple: true,
+                search: true,
+                optionsCount: 6,
+                showResetButton: true,
+                resetButtonText: 'Limpar',
+                selectAllText: 'Selecionar Todos',
+                allOptionsSelectedText: 'Todos',
+                optionsSelectedText: 'selecionados',
+                searchPlaceholderText: 'Buscar...',
+                optionHeight: '30px',
+                popupDropboxBreakpoint: '3000px',
+                noOptionsText: 'Nenhuma opção encontrada',
+                noSearchResultsText: 'Nenhum resultado encontrado',
+            }};
+            
             // *** Variável Global para Virtual Select ***
             let vsEtapa;
             let vsGrupo;
@@ -7055,18 +7072,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsEtapa = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-etapa-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione etapas',
                     noOptionsText: 'Nenhuma etapa disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas',
-                    optionsCount: 6,
-                    popupDropboxBreakpoint: '3000px',
                     zIndex: 9999,
                 }});
                 
@@ -7091,18 +7102,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsGrupo = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-grupo-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione grupos',
                     noOptionsText: 'Nenhum grupo disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todos',
-                    allOptionsSelectedText: 'Todos selecionados',
-                    optionsCount: 6,
-                    popupDropboxBreakpoint: '3000px',
                     zIndex: 9999,
                 }});
                 
@@ -7127,18 +7132,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsMacroetapas = VirtualSelect.init({{
+                    ...vsConfig,
                     ele: '#filter-macroetapa-{project["id"]}',
                     options: options,
-                    multiple: true,
-                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione macroetapas',
                     noOptionsText: 'Nenhuma macroetapa disponível',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas',
-                    optionsCount: 6,
-                    popupDropboxBreakpoint: '3000px',
                     zIndex: 9999,
                 }});
                 
