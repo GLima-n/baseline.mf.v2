@@ -7459,6 +7459,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     let barPrevisto = null;
                     let barReal = null;
                     
+                    // DEBUG: Verificar dados de previsto para PULMÃO
+                    if (task.setor === 'PULMÃO') {{
+                        console.log(`DEBUG JS [{task.setor}] ${{task.name}}: start_previsto=${{task.start_previsto}}, end_previsto=${{task.end_previsto}}, tipoVis=${{tipoVisualizacao}}`);
+                    }}
+                    
                     // Barra Prevista (só criar se visualização for "Previsto" ou "Ambos")
                     if ((tipoVisualizacao === 'Previsto' || tipoVisualizacao === 'Ambos') && task.start_previsto && task.end_previsto) {{
                         const startDate = new Date(task.start_previsto);
