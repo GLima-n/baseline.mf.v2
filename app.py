@@ -7175,6 +7175,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     let gruposSelecionados = vsGrupo ? vsGrupo.getValue() : [];
                     let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : [];
                     
+                    console.log('=== DEBUG FILTROS ===');
+                    console.log('Setor atual:', currentSector);
+                    console.log('Etapas selecionadas:', etapasSelecionadas.length, etapasSelecionadas);
+                    console.log('Grupos selecionados:', gruposSelecionados.length, gruposSelecionados);
+                    console.log('Macroetapas selecionadas:', macroetapasSelecionadas.length, macroetapasSelecionadas);
+                    console.log('Macroetapas disponíveis no setor:', macroetapasPorSetor[currentSector]);
+                    console.log('==================');
+                    
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
