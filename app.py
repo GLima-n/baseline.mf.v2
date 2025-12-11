@@ -6767,34 +6767,38 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 min-height: 30px;
             }}
             
-            /* Tornar dropdown flutuante - tentativa com várias classes */
-            .floating-filter-menu .vscomp-dropbox-container {{
-                position: absolute !important;
-                z-index: 10000 !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-                border-radius: 4px !important;
-            }}
             
-            /* Alternativas de classes do Virtual Select */
-            .vscomp-ele .vscomp-dropbox-container {{
-                position: absolute !important;
-                z-index: 10000 !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            /* *** INÍCIO: Arredondar Dropdown Virtual Select *** */
+            .floating-filter-menu .vscomp-dropbox {{
+                border-radius: 8px; /* Controla o arredondamento dos cantos do dropdown */
+                overflow: hidden;   /* Necessário para que o conteúdo interno não "vaze" pelos cantos arredondados */
+                box-shadow: 0 5px 15px rgba(0,0,0,0.2); /* Sombra para melhor visualização (opcional) */
+                border: 1px solid #ccc; /* Borda sutil (opcional) */
             }}
-            
-            .vscomp-wrapper .vscomp-dropbox-container {{
-                position: absolute !important;
-                z-index: 10000 !important;
+
+            /* Opcional: Arredondar também o campo de busca interno, se ele ficar visível no topo */
+            .floating-filter-menu .vscomp-search-wrapper {{
+            /* Remove o arredondamento padrão se houver, para não conflitar com o container */
+            border-radius: 0;
             }}
-            
-            /* Forçar dropdown a não usar inline positioning */
-            div[id^="filter-etapa"] .vscomp-dropbox-container,
-            div[id^="filter-grupo"] .vscomp-dropbox-container,
-            div[id^="filter-macroetapa"] .vscomp-dropbox-container {{
-                position: absolute !important;
-                z-index: 10000 !important;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
-                border-radius: 4px !important;
+
+            /* Opcional: Garantir que a lista de opções não ultrapasse */
+            .floating-filter-menu .vscomp-options-container {{
+                /* Geralmente não precisa de arredondamento próprio se o overflow:hidden funcionar */
+            }}
+            .floating-filter-menu .vscomp-toggle-button .vscomp-value-tag .vscomp-clear-button {{
+                display: inline-flex;    /* Usa flex para alinhar o ícone interno */
+                align-items: center;     /* Alinha verticalmente o ícone */
+                justify-content: center; /* Alinha horizontalmente o ícone */
+                vertical-align: middle;  /* Ajuda no alinhamento com o texto adjacente */
+                margin-left: 4px;        /* Espaçamento à esquerda (ajuste conforme necessário) */
+                padding: 0;            /* Remove padding interno se houver */
+                position: static;        /* Garante que não use posicionamento absoluto/relativo que possa quebrar o fluxo */
+                transform: none;         /* Remove qualquer translação que possa estar desalinhando */
+            }}
+
+            /* Opcional: Se o próprio ícone 'X' (geralmente uma tag <i>) precisar de ajuste */
+            .floating-filter-menu .vscomp-toggle-button .vscomp-value-tag .vscomp-clear-button i {{
             }}
             
             .floating-filter-menu .vscomp-options {{
