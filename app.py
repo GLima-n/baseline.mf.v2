@@ -7222,8 +7222,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     let macroetapasSelecionadas = vsMacroetapas ? vsMacroetapas.getValue() : ['Todos'];
                     if (!macroetapasSelecionadas) macroetapasSelecionadas = [];
                     
-                    const apenasNaoConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
-                    const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
+
                     
                     console.log('=== DEBUG FILTROS ===');
                     console.log('Setor atual:', currentSector);
