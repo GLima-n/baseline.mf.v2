@@ -6313,6 +6313,27 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             print(f"  - '{etapa}'")
     print("=" * 80)
     
+    # *** NOVO: Atribuir GRUPO baseado no dicionário GRUPOS para etapas que não têm grupo ***
+    # Criar mapeamento reverso: etapa -> grupo
+    etapa_para_grupo = {}
+    for grupo_nome, etapas_lista in GRUPOS.items():
+        for etapa in etapas_lista:
+            etapa_para_grupo[etapa] = grupo_nome
+    
+    # Aplicar o mapeamento ao dataframe
+    def atribuir_grupo(row):
+        # Se já tem grupo definido e não é vazio/NaN, manter
+        if pd.notna(row['GRUPO']) and str(row['GRUPO']).strip() != '' and str(row['GRUPO']) != 'Não especificado':
+            return row['GRUPO']
+        # Tentar encontrar grupo no mapeamento
+        etapa = row['Etapa']
+        if etapa in etapa_para_grupo:
+            return etapa_para_grupo[etapa]
+        # Se não encontrou, deixar como "Não especificado"
+        return "Não especificado"
+    
+    df_gantt['GRUPO'] = df_gantt.apply(atribuir_grupo, axis=1)
+    
     # Agrupar por SETOR, Empreendimento e Etapa
     df_gantt_agg = df_gantt.groupby(['SETOR', 'Empreendimento', 'Etapa']).agg(
         Inicio_Prevista=('Inicio_Prevista', 'min'),
