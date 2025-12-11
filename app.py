@@ -7059,8 +7059,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     options: options,
                     multiple: true,
                     search: true,
-                    selectedValue: options.map(o => o.value)
+                    selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
+                    placeholder: 'Selecione etapas',
+                    noOptionsText: 'Nenhuma etapa disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
+                
+                console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
             }}
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Grupos ***
@@ -7085,8 +7092,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     options: options,
                     multiple: true,
                     search: true,
-                    selectedValue: options.map(o => o.value)  // Todos selecionados por padrão
+                    selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
+                    placeholder: 'Selecione grupos',
+                    noOptionsText: 'Nenhum grupo disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todos',
+                    allOptionsSelectedText: 'Todos selecionados'
                 }});
+                
+                console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
             }}
             
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Macroetapas ***
@@ -7111,8 +7125,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     options: options,
                     multiple: true,
                     search: true,
-                    selectedValue: options.map(o => o.value)  // Todos selecionados por padrão
+                    selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
+                    placeholder: 'Selecione macroetapas',
+                    noOptionsText: 'Nenhuma macroetapa disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
+                
+                console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
             }}
 
             // *** FUNÇÃO AUXILIAR: Atualizar Título do Projeto ***
