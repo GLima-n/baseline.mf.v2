@@ -6493,20 +6493,36 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         etapas_por_setor_dict[setor_nome] = etapas_data
     
     
-    # *** MODIFICADO: Usar chaves do dicionário GRUPOS como opções de filtro ***
-    # Em vez de tentar extrair grupos dos dados, usamos os grupos definidos
-    grupos_disponiveis = sorted(list(GRUPOS.keys()))
+    # *** NOVO: Determinar quais grupos do dicionário GRUPOS têm etapas presentes em cada setor ***
+    grupos_por_setor_dict = {}
+    for setor_nome in all_sector_names:
+        etapas_do_setor = set(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['Etapa'].unique())
+        grupos_presentes = set()
+        
+        # Para cada grupo no dicionário GRUPOS
+        for grupo_nome, etapas_do_grupo in GRUPOS.items():
+            # Normalizar etapas do grupo (remover pontos finais)
+            etapas_normalizadas_grupo = set(e.strip().rstrip('.') for e in etapas_do_grupo)
+            etapas_normalizadas_setor = set(e.strip().rstrip('.') for e in etapas_do_setor)
+            
+            # Se alguma etapa do grupo está presente no setor, incluir o grupo
+            if etapas_normalizadas_grupo.intersection(etapas_normalizadas_setor):
+                grupos_presentes.add(grupo_nome)
+        
+        grupos_por_setor_dict[setor_nome] = sorted(list(grupos_presentes))
     
     # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
     etapas_iniciais_html = [e['nome'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
+    grupos_iniciais_html = grupos_por_setor_dict.get(setor_selecionado_inicialmente, [])
         
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
-        "etapas": etapas_iniciais_html, # Apenas etapas do setor inicial
+        "etapas": etapas_iniciais_html,
         "etapas_por_setor": etapas_por_setor_dict,
-        "grupos": grupos_disponiveis, # Lista de grupos do dicionário GRUPOS
-        "mapeamento_grupos": GRUPOS  # Passar o mapeamento completo para o JavaScript
+        "grupos": grupos_iniciais_html,
+        "grupos_por_setor": grupos_por_setor_dict,
+        "mapeamento_grupos": GRUPOS
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6825,6 +6841,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <body>
         <script id="all-data-by-sector" type="application/json">{json.dumps(all_data_by_sector_js)}</script>
         <script id="etapas-by-sector" type="application/json">{json.dumps(etapas_por_setor_dict)}</script>
+        <script id="grupos-por-setor" type="application/json">{json.dumps(grupos_por_setor_dict)}</script>
         <script id="mapeamento-grupos" type="application/json">{json.dumps(GRUPOS)}</script>
         
         <div class="gantt-container" id="gantt-container-{project['id']}">
@@ -6974,6 +6991,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
             const etapasBySector = JSON.parse(document.getElementById('etapas-by-sector').textContent);
+            const gruposPorSetor = JSON.parse(document.getElementById('grupos-por-setor').textContent);
             const mapeamentoGrupos = JSON.parse(document.getElementById('mapeamento-grupos').textContent);
             
             // *** NOVAS VARIÁVEIS GLOBAIS ***
@@ -7016,11 +7034,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Grupos ***
             function renderGroupCheckboxes(sectorName) {{
-                // Usar apenas os grupos definidos no dicionário GRUPOS
-                const gruposDisponiveis = Object.keys(mapeamentoGrupos).sort();
+                // Usar apenas os grupos que têm etapas presentes neste setor
+                const gruposDoSetor = gruposPorSetor[sectorName] || [];
                 
                 // Converter para formato do Virtual Select
-                const options = gruposDisponiveis.map(grupo => ({{
+                const options = gruposDoSetor.map(grupo => ({{
                     label: grupo,
                     value: grupo
                 }}));
