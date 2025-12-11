@@ -7233,7 +7233,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     }}
                     
                     // *** MODIFICADO: Filtro de grupos usando mapeamento ***
-                    if (gruposSelecionados.length > 0) {{
+                    // Só aplicar se NÃO todos os grupos disponíveis estão selecionados
+                    const gruposDisponiveis = gruposPorSetor[currentSector] || [];
+                    const todosGruposSelecionados = gruposSelecionados.length === gruposDisponiveis.length && gruposDisponiveis.length > 0;
+                    
+                    if (gruposSelecionados.length > 0 && !todosGruposSelecionados) {{
                         const countAntes = filteredTasks.length;
                         filteredTasks = filteredTasks.filter(task => {{
                             // Verificar se a etapa da task pertence a algum dos grupos selecionados
@@ -7245,13 +7249,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                                 // Normalizar etapas do grupo também
                                 const etapasNormalizadas = etapasDoGrupo.map(e => e.trim().replace(/\.+$/, ''));
                                 if (etapasNormalizadas.includes(etapaNormalizada)) {{
-                                    return true; // Task pertence a um dos grupos selecionados
+                                    return true; // Task pertence a um grupo selecionado
                                 }}
                             }}
                             return false; // Task não pertence a nenhum grupo selecionado
                         }});
                         console.log(`📉 Filtro Grupos: ${{countAntes}} -> ${{filteredTasks.length}}`);
+                    }} else if (todosGruposSelecionados) {{
+                        console.log('⏭️ Filtro Grupos ignorado: todos os grupos disponíveis selecionados');
                     }}
+                    
                     
                     // *** NOVO: Filtro de macroetapas ***
                     // Só aplicar se o setor TEM macroetapas disponíveis E não todas estão selecionadas
