@@ -7878,6 +7878,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             renderGroupCheckboxes(initialSectorName);
             renderMacroetapasCheckboxes(initialSectorName);
             
+            // Listener para mudança de setor (redesenhar automaticamente)
+            document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
+                console.log('Setor mudou via dropdown, aplicando filtros automaticamente...');
+                setTimeout(() => {{
+                    applyFiltersAndRedraw();
+                }}, 150);
+            }});
+            
             // Renderizar inicial com filtros aplicados
             applyFiltersAndRedraw();
         </script>
