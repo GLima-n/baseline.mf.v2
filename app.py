@@ -7215,7 +7215,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     }}
                     
                     // *** NOVO: Filtro de macroetapas ***
-                    if (macroetapasSelecionadas.length > 0) {{
+                    // Só aplicar se NÃO todas as macroetapas disponíveis estão selecionadas
+                    const macroetapasDisponiveis = macroetapasPorSetor[currentSector] || [];
+                    const todasMacroetapasSelecionadas = macroetapasSelecionadas.length === macroetapasDisponiveis.length && macroetapasDisponiveis.length > 0;
+                    
+                    if (macroetapasSelecionadas.length > 0 && !todasMacroetapasSelecionadas) {{
                         const countAntes = filteredTasks.length;
                         filteredTasks = filteredTasks.filter(task => {{
                             // Verificar se a etapa da task começa com alguma das macroetapas selecionadas
