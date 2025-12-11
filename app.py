@@ -6767,8 +6767,30 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 min-height: 30px;
             }}
             
-            /* Tornar dropdown flutuante */
+            /* Tornar dropdown flutuante - tentativa com várias classes */
             .floating-filter-menu .vscomp-dropbox-container {{
+                position: absolute !important;
+                z-index: 10000 !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+                border-radius: 4px !important;
+            }}
+            
+            /* Alternativas de classes do Virtual Select */
+            .vscomp-ele .vscomp-dropbox-container {{
+                position: absolute !important;
+                z-index: 10000 !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+            }}
+            
+            .vscomp-wrapper .vscomp-dropbox-container {{
+                position: absolute !important;
+                z-index: 10000 !important;
+            }}
+            
+            /* Forçar dropdown a não usar inline positioning */
+            div[id^="filter-etapa"] .vscomp-dropbox-container,
+            div[id^="filter-grupo"] .vscomp-dropbox-container,
+            div[id^="filter-macroetapa"] .vscomp-dropbox-container {{
                 position: absolute !important;
                 z-index: 10000 !important;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
