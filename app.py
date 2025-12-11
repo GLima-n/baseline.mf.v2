@@ -7029,7 +7029,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     console.log('=== APLICANDO FILTROS E REDESENHANDO ===');
                     
                     // 1. LER SETOR SELECIONADO
-                    const selSetor = document.getElementById('filter-setor-{project["id"]}).value;
+                    const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
                     
                     // 2. LER OUTROS FILTROS
                     const selEmp = document.getElementById('filter-project-{project["id"]}').value;
