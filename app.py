@@ -7064,7 +7064,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhuma etapa disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
+                    allOptionsSelectedText: 'Todas selecionadas',
+                    popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
                 console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7097,7 +7098,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhum grupo disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todos',
-                    allOptionsSelectedText: 'Todos selecionados'
+                    allOptionsSelectedText: 'Todos selecionados',
+                    popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
                 console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7130,7 +7132,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhuma macroetapa disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
+                    allOptionsSelectedText: 'Todas selecionadas',
+                    popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
