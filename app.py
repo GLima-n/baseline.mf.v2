@@ -6313,46 +6313,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             print(f"  - '{etapa}'")
     print("=" * 80)
     
-    # *** NOVO: Atribuir GRUPO baseado no dicionário GRUPOS para etapas que não têm grupo ***
-    # Criar mapeamento reverso: etapa -> grupo (com normalização de nomes)
-    etapa_para_grupo = {}
-    for grupo_nome, etapas_lista in GRUPOS.items():
-        for etapa in etapas_lista:
-            # Normalizar: remover espaços extras e pontos finais
-            etapa_normalizada = etapa.strip().rstrip('.')
-            etapa_para_grupo[etapa_normalizada] = grupo_nome
-    
-    print("\n=== DEBUG: MAPEAMENTO ETAPA -> GRUPO ===")
-    print(f"Total de etapas mapeadas: {len(etapa_para_grupo)}")
-    # Mostrar apenas etapas relacionadas a TER, LIMP, INFRA, PAV
-    for etapa, grupo in sorted(etapa_para_grupo.items()):
-        if any(x in etapa for x in ['TER', 'LIMP', 'INFRA', 'PAV']):
-            print(f"  '{etapa}' -> {grupo}")
-    
-    # Aplicar o mapeamento ao dataframe
-    def atribuir_grupo(row):
-        # Se já tem grupo definido e não é vazio/NaN, manter
-        if pd.notna(row['GRUPO']) and str(row['GRUPO']).strip() != '' and str(row['GRUPO']) != 'Não especificado':
-            return row['GRUPO']
-        # Tentar encontrar grupo no mapeamento (normalizando o nome da etapa)
-        etapa = row['Etapa']
-        etapa_normalizada = str(etapa).strip().rstrip('.')
-        if etapa_normalizada in etapa_para_grupo:
-            return etapa_para_grupo[etapa_normalizada]
-        # Se não encontrou, deixar como "Não especificado"
-        return "Não especificado"
-    
-    df_gantt['GRUPO'] = df_gantt.apply(atribuir_grupo, axis=1)
-    
-    print("\n=== DEBUG: GRUPOS APÓS ATRIBUIÇÃO ===")
-    etapas_com_grupo = df_gantt[['Etapa', 'GRUPO']].drop_duplicates()
-    for _, row in etapas_com_grupo.iterrows():
-        etapa = row['Etapa']
-        grupo = row['GRUPO']
-        if any(x in str(etapa) for x in ['TER', 'LIMP', 'INFRA', 'PAV']):
-            print(f"  Etapa: '{etapa}' -> Grupo: '{grupo}'")
-    print("=" * 80)
-    
     # Agrupar por SETOR, Empreendimento e Etapa
     df_gantt_agg = df_gantt.groupby(['SETOR', 'Empreendimento', 'Etapa']).agg(
         Inicio_Prevista=('Inicio_Prevista', 'min'),
@@ -6532,23 +6492,21 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             })
         etapas_por_setor_dict[setor_nome] = etapas_data
     
-    # *** NOVO: Mapear grupos por setor para filtro dinâmico ***
-    grupos_por_setor_dict = {}
-    for setor_nome in all_sector_names:
-        grupos_do_setor = sorted(list(df_gantt_agg[df_gantt_agg['SETOR'] == setor_nome]['GRUPO'].unique()))
-        grupos_por_setor_dict[setor_nome] = grupos_do_setor
-        
+    
+    # *** MODIFICADO: Usar chaves do dicionário GRUPOS como opções de filtro ***
+    # Em vez de tentar extrair grupos dos dados, usamos os grupos definidos
+    grupos_disponiveis = sorted(list(GRUPOS.keys()))
+    
     # Definir etapas iniciais para HTML renderizado pelo Python (evita flicker com etapas erradas)
     etapas_iniciais_html = [e['nome'] for e in etapas_por_setor_dict.get(setor_selecionado_inicialmente, [])]
-    grupos_iniciais_html = grupos_por_setor_dict.get(setor_selecionado_inicialmente, [])
         
     filter_options = {
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
         "etapas": etapas_iniciais_html, # Apenas etapas do setor inicial
         "etapas_por_setor": etapas_por_setor_dict,
-        "grupos": grupos_iniciais_html, # Apenas grupos do setor inicial
-        "grupos_por_setor": grupos_por_setor_dict
+        "grupos": grupos_disponiveis, # Lista de grupos do dicionário GRUPOS
+        "mapeamento_grupos": GRUPOS  # Passar o mapeamento completo para o JavaScript
     }
     
     tasks_base_data_inicial = all_data_by_sector_js.get(setor_selecionado_inicialmente, [])
@@ -6867,7 +6825,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <body>
         <script id="all-data-by-sector" type="application/json">{json.dumps(all_data_by_sector_js)}</script>
         <script id="etapas-by-sector" type="application/json">{json.dumps(etapas_por_setor_dict)}</script>
-        <script id="grupos-by-sector" type="application/json">{json.dumps(grupos_por_setor_dict)}</script>
+        <script id="mapeamento-grupos" type="application/json">{json.dumps(GRUPOS)}</script>
         
         <div class="gantt-container" id="gantt-container-{project['id']}">
             <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
@@ -7016,7 +6974,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
             const etapasBySector = JSON.parse(document.getElementById('etapas-by-sector').textContent);
-            const gruposBySector = JSON.parse(document.getElementById('grupos-by-sector').textContent);
+            const mapeamentoGrupos = JSON.parse(document.getElementById('mapeamento-grupos').textContent);
             
             // *** NOVAS VARIÁVEIS GLOBAIS ***
             const initialSectorName = "{setor_selecionado_inicialmente}";
@@ -7058,10 +7016,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Grupos ***
             function renderGroupCheckboxes(sectorName) {{
-                const grupos = gruposBySector[sectorName] || [];
+                // Usar apenas os grupos definidos no dicionário GRUPOS
+                const gruposDisponiveis = Object.keys(mapeamentoGrupos).sort();
                 
                 // Converter para formato do Virtual Select
-                const options = grupos.map(grupo => ({{
+                const options = gruposDisponiveis.map(grupo => ({{
                     label: grupo,
                     value: grupo
                 }}));
@@ -7162,12 +7121,23 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
                     }}
                     
-                    // *** NOVO: Filtro de grupos ***
+                    // *** MODIFICADO: Filtro de grupos usando mapeamento ***
                     if (gruposSelecionados.length > 0) {{
                         const countAntes = filteredTasks.length;
                         filteredTasks = filteredTasks.filter(task => {{
-                            const match = gruposSelecionados.includes(task.grupo);
-                            return match;
+                            // Verificar se a etapa da task pertence a algum dos grupos selecionados
+                            // Normalizar nome da etapa (remover pontos finais)
+                            const etapaNormalizada = task.etapa.trim().replace(/\.+$/, '');
+                            
+                            for (const grupoSelecionado of gruposSelecionados) {{
+                                const etapasDoGrupo = mapeamentoGrupos[grupoSelecionado] || [];
+                                // Normalizar etapas do grupo também
+                                const etapasNormalizadas = etapasDoGrupo.map(e => e.trim().replace(/\.+$/, ''));
+                                if (etapasNormalizadas.includes(etapaNormalizada)) {{
+                                    return true; // Task pertence a um dos grupos selecionados
+                                }}
+                            }}
+                            return false; // Task não pertence a nenhum grupo selecionado
                         }});
                         console.log(`📉 Filtro Grupos: ${{countAntes}} -> ${{filteredTasks.length}}`);
                     }}
