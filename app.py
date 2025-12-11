@@ -6578,6 +6578,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
+        
         <style>
             * {{ margin: 0; padding: 0; box-sizing: border-box; }}
             html, body {{ width: 100%; height: 100%; font-family: 'Segoe UI', sans-serif; background-color: #f5f5f5; color: #333; overflow: hidden; }}
@@ -6709,65 +6711,23 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 background-color: #1a202c;
             }}
             
-            /* Estilos para o container de checkboxes de etapas */
-            .filter-group .etapas-multiselect-container {{
-                max-height: 150px;
-                overflow-y: auto;
+            /* Estilos para Virtual Select nos filtros */
+            .floating-filter-menu .vscomp-toggle-button {{
                 border: 1px solid #cbd5e0;
                 border-radius: 4px;
-                padding: 8px;
-                background: white;
-            }}
-            
-            /* Scrollbar customizado para o container de etapas */
-            .filter-group .etapas-multiselect-container::-webkit-scrollbar {{
-                width: 6px;
-            }}
-            .filter-group .etapas-multiselect-container::-webkit-scrollbar-track {{
-                background: #f1f1f1;
-                border-radius: 3px;
-            }}
-            .filter-group .etapas-multiselect-container::-webkit-scrollbar-thumb {{
-                background: #cbd5e0;
-                border-radius: 3px;
-            }}
-            .filter-group .etapas-multiselect-container::-webkit-scrollbar-thumb:hover {{
-                background: #a0aec0;
-            }}
-            
-            /* Estilos para labels de checkbox de etapas */
-            .filter-group .etapas-multiselect-container label {{
-                display: flex;
-                align-items: center;
-                cursor: pointer;
-                padding: 4px 0;
-                transition: background-color 0.15s ease;
-                border-radius: 3px;
-                margin: 0;
-                text-transform: none;
-            }}
-            .filter-group .etapas-multiselect-container label:hover {{
-                background-color: #f7fafc;
-            }}
-            
-            /* Checkbox "Todas as Etapas" */
-            .filter-group .etapas-multiselect-container \u003e div:first-child {{
-                margin-bottom: 8px;
-                border-bottom: 1px solid #e2e8f0;
-                padding-bottom: 6px;
-            }}
-            .filter-group .etapas-multiselect-container \u003e div:first-child label {{
-                font-weight: 600;
-            }}
-            
-            /* Checkboxes individuais */
-            .filter-group .etapas-multiselect-container input[type="checkbox"] {{
-                margin-right: 6px;
-                cursor: pointer;
-            }}
-            .filter-group .etapas-multiselect-container span {{
+                padding: 6px 8px;
                 font-size: 13px;
-                color: #2d3748;
+                min-height: 30px;
+            }}
+            .floating-filter-menu .vscomp-options {{
+                font-size: 13px;
+            }}
+            .floating-filter-menu .vscomp-option {{
+                min-height: 30px;
+            }}
+            .floating-filter-menu .vscomp-search-input {{
+                height: 30px;
+                font-size: 13px;
             }}
             .baseline-selector {{
                 display: none;
@@ -6902,21 +6862,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     </select>
                 </div>
                 <div class="filter-group">
-                    <label>Etapas</label>
-                    <div class="etapas-multiselect-container">
-                        <div>
-                            <label style="display: flex; align-items: center; cursor: pointer; font-weight: 600;">
-                                <input type="checkbox" id="filter-etapas-all-{project['id']}" checked style="margin-right: 6px;">
-                                <span>Todas as Etapas</span>
-                            </label>
-                        </div>
-                        {"".join([f'''
-                        <label style="display: flex; align-items: center; cursor: pointer; padding: 4px 0;">
-                            <input type="checkbox" class="filter-etapa-checkbox" data-etapa="{etapa.replace('"', '&quot;')}" checked style="margin-right: 6px;">
-                            <span style="font-size: 13px;">{etapa}</span>
-                        </label>
-                        ''' for etapa in filter_options['etapas']])}
-                    </div>
+                    <label for="filter-etapa-{project['id']}">Etapa</label>
+                    <div id="filter-etapa-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <div class="filter-group-checkbox">
@@ -7009,6 +6956,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             <div class="tooltip" id="tooltip"></div>
         </div>
         
+        <script src="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.js"></script>
+        
         <script>
             // Dados de todos os setores
             const allDataBySector = JSON.parse(document.getElementById('all-data-by-sector').textContent);
@@ -7022,57 +6971,41 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             
             // Variável para armazenar o tipo de visualização selecionado
             let savedVisualizationType = 'Ambos';
+            
+            // *** Variável Global para Virtual Select ***
+            let vsEtapa;
 
-            // *** FUNÇÃO AUXILIAR: Renderizar Checkboxes de Etapas ***
+            // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
-                const container = document.querySelector('.etapas-multiselect-container');
-                if (!container) return;
-                
                 const etapas = etapasBySector[sectorName] || [];
                 
-                let html = `
-                    <div>
-                        <label>
-                            <input type="checkbox" id="filter-etapas-all-{project['id']}" checked>
-                            <span>Todas as Etapas</span>
-                        </label>
-                    </div>
-                `;
+                // Converter para formato do Virtual Select
+                const options = etapas.map(etapa => ({{
+                    label: etapa.nome,
+                    value: etapa.nome
+                }}));
                 
-                etapas.forEach(etapa => {{
-                    // Escapar aspas duplas para não quebrar o atributo HTML
-                    const etapaNomeSafe = etapa.nome.replace(/"/g, '&quot;');
-                    html += `
-                    <label>
-                        <input type="checkbox" class="filter-etapa-checkbox" data-etapa="${{etapaNomeSafe}}" checked>
-                        <span>${{etapa.nome}}</span>
-                    </label>
-                    `;
-                }});
-                
-                container.innerHTML = html;
-                
-                // Reatribuir Event Listeners
-                const checkboxAll = document.getElementById('filter-etapas-all-{project["id"]}');
-                const etapaCheckboxes = container.querySelectorAll('.filter-etapa-checkbox');
-                
-                if (checkboxAll) {{
-                    checkboxAll.addEventListener('change', function() {{
-                        etapaCheckboxes.forEach(cb => {{
-                            cb.checked = this.checked;
-                        }});
-                    }});
+                // Destruir instância anterior se existir
+                if (vsEtapa) {{
+                    vsEtapa.destroy();
                 }}
                 
-                etapaCheckboxes.forEach(cb => {{
-                    cb.addEventListener('change', function() {{
-                        const allChecked = Array.from(etapaCheckboxes).every(c => c.checked);
-                        const someChecked = Array.from(etapaCheckboxes).some(c => c.checked);
-                        if (checkboxAll) {{
-                            checkboxAll.checked = allChecked;
-                            checkboxAll.indeterminate = someChecked && !allChecked;
-                        }}
-                    }});
+                // Inicializar Virtual Select
+                vsEtapa = VirtualSelect.init({{
+                    ele: '#filter-etapa-{project["id"]}',
+                    options: options,
+                    multiple: true,
+                    search: true,
+                    placeholder: 'Selecione etapas...',
+                    noOptionsText: 'Nenhuma etapa encontrada',
+                    noSearchResultsText: 'Nenhum resultado',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar Todas',
+                    allOptionsSelectedText: 'Todas selecionadas',
+                    optionsSelectedText: 'selecionadas',
+                    maxValues: 0,
+                    showValueAsTags: true,
+                    selectedValue: options.map(o => o.value)  // Todas selecionadas por padrão
                 }});
             }}
 
@@ -7105,12 +7038,14 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     console.log('=== APLICANDO FILTROS E REDESENHANDO ===');
                     
                     // 1. LER SETOR SELECIONADO
-                    const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
+                    const selSetor = document.getElementById('filter-setor-{project["id"]}).value;
                     
                     // 2. LER OUTROS FILTROS
                     const selEmp = document.getElementById('filter-project-{project["id"]}').value;
-                    let etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox:checked');
-                    let etapasSelecionadas = Array.from(etapaCheckboxes).map(cb => cb.dataset.etapa);
+                    
+                    // *** ATUALIZADO: Obter etapas selecionadas do Virtual Select ***
+                    let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : [];
+                    
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
@@ -7220,32 +7155,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Event listener APENAS para botão "Aplicar Filtros"
             document.getElementById('filter-apply-btn-{project["id"]}')?.addEventListener('click', applyFiltersAndRedraw);
             
-            // Event listeners para o filtro multiselect de etapas
-            // Checkbox "Todas as Etapas"
-            const checkboxAll = document.getElementById('filter-etapas-all-{project["id"]}');
-            if (checkboxAll) {{
-                checkboxAll.addEventListener('change', function() {{
-                    const checkboxes = document.querySelectorAll('.filter-etapa-checkbox');
-                    checkboxes.forEach(cb => {{
-                        cb.checked = this.checked;
-                    }});
-                }});
-            }}
-            
-            // Checkboxes individuais de etapas
-            const etapaCheckboxes = document.querySelectorAll('.filter-etapa-checkbox');
-            etapaCheckboxes.forEach(cb => {{
-                cb.addEventListener('change', function() {{
-                    // Atualizar checkbox "Todas" baseado no estado dos individuais
-                    const allChecked = Array.from(etapaCheckboxes).every(checkbox => checkbox.checked);
-                    const someChecked = Array.from(etapaCheckboxes).some(checkbox => checkbox.checked);
-                    
-                    if (checkboxAll) {{
-                        checkboxAll.checked = allChecked;
-                        checkboxAll.indeterminate = someChecked && !allChecked;
-                    }}
-                }});
-            }});
+            // *** REMOVIDO: Event listeners de checkboxes - agora usa Virtual Select ***
 
             
             // Função para aplicar baseline em um empreendimento
