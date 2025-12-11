@@ -7176,16 +7176,20 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         renderMacroetapasCheckboxes(currentSector);
                         
                         // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
-                        // atualizamos a lista de etapas selecionadas para incluir todas as novas etapas.
+                        // atualizamos TODAS as listas de selecionadas para incluir as novas opções.
                         const novasEtapas = etapasBySector[currentSector] || [];
                         etapasSelecionadas = novasEtapas.map(e => e.nome);
-                        console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
                         
-                        // Forçar redesenho após pequeno delay para garantir que Virtual Selects foram inicializados
-                        setTimeout(() => {{
-                            applyFiltersAndRedraw();
-                        }}, 100);
-                        return; // Sair da função pois o setTimeout vai chamar de novo
+                        const novosGrupos = gruposPorSetor[currentSector] || [];
+                        gruposSelecionados = novosGrupos;
+                        
+                        const novasMacroetapas = macroetapasPorSetor[currentSector] || [];
+                        macroetapasSelecionadas = novasMacroetapas;
+                        
+                        console.log('🔄 Filtros atualizados para o setor:', currentSector);
+                        console.log('  - Etapas:', etapasSelecionadas.length);
+                        console.log('  - Grupos:', gruposSelecionados.length);
+                        console.log('  - Macroetapas:', macroetapasSelecionadas.length);
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
@@ -7877,14 +7881,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             renderStageCheckboxes(initialSectorName);
             renderGroupCheckboxes(initialSectorName);
             renderMacroetapasCheckboxes(initialSectorName);
-            
-            // Listener para mudança de setor (redesenhar automaticamente)
-            document.getElementById('filter-setor-{project["id"]}').addEventListener('change', function() {{
-                console.log('Setor mudou via dropdown, aplicando filtros automaticamente...');
-                setTimeout(() => {{
-                    applyFiltersAndRedraw();
-                }}, 150);
-            }});
             
             // Renderizar inicial com filtros aplicados
             applyFiltersAndRedraw();
