@@ -6624,7 +6624,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
         
         <style>
@@ -7064,7 +7064,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhuma etapa disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
+                    allOptionsSelectedText: 'Todas selecionadas',
+                    optionsCount: 6,
+                    popupDropboxBreakpoint: '3000px',
+                    zIndex: 9999,
                 }});
                 
                 console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7097,7 +7100,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhum grupo disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todos',
-                    allOptionsSelectedText: 'Todos selecionados'
+                    allOptionsSelectedText: 'Todos selecionados',
+                    optionsCount: 6,
+                    popupDropboxBreakpoint: '3000px',
+                    zIndex: 9999,
                 }});
                 
                 console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7130,7 +7136,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     noOptionsText: 'Nenhuma macroetapa disponível',
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
-                    allOptionsSelectedText: 'Todas selecionadas'
+                    allOptionsSelectedText: 'Todas selecionadas',
+                    optionsCount: 6,
+                    popupDropboxBreakpoint: '3000px',
+                    zIndex: 9999,
                 }});
                 
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
