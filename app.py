@@ -7235,15 +7235,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
-                    console.log('Setor:', selSetor);
-                    console.log('Empreendimento:', selEmp);
+
+                    console.log('Setor:', setorSelecionado);
+                    console.log('Empreendimento:', empSelecionado);
                     console.log('Visualização:', selVis);
                     console.log('Mostrar apenas não concluídas:', selConcluidas);
                     console.log('Etapas selecionadas:', etapasSelecionadas.length);
                     
                     // 3. ATUALIZAR DADOS BASE SE SETOR MUDOU
-                    if (selSetor !== currentSector) {{
-                        currentSector = selSetor;
+                    if (setorSelecionado !== currentSector) {{
+                        currentSector = setorSelecionado;
                         allTasks_baseData = JSON.parse(JSON.stringify(allDataBySector[currentSector] || []));
                         console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
                         updateProjectTitle(currentSector);
@@ -7277,8 +7278,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     let filteredTasks = baseTasks;
                     
                     // Filtro de empreendimento
-                    if (selEmp !== 'Todos') {{
-                        filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
+                    if (empSelecionado !== 'Todos') {{
+                        filteredTasks = filteredTasks.filter(t => t.empreendimento === empSelecionado);
                     }}
                     
                     // *** MODIFICADO: Filtro de grupos usando mapeamento ***
