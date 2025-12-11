@@ -6996,16 +6996,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     options: options,
                     multiple: true,
                     search: true,
-                    placeholder: 'Selecione etapas...',
-                    noOptionsText: 'Nenhuma etapa encontrada',
-                    noSearchResultsText: 'Nenhum resultado',
-                    searchPlaceholderText: 'Buscar...',
-                    selectAllText: 'Selecionar Todas',
-                    allOptionsSelectedText: 'Todas selecionadas',
-                    optionsSelectedText: 'selecionadas',
-                    maxValues: 0,
-                    showValueAsTags: true,
-                    selectedValue: options.map(o => o.value)  // Todas selecionadas por padrão
+                    selectedValue: options.map(o => o.value)
                 }});
             }}
 
