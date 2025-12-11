@@ -7461,7 +7461,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     
                     // DEBUG: Verificar dados de previsto para PULMÃO
                     if (task.setor === 'PULMÃO') {{
-                        console.log(`DEBUG JS [{task.setor}] ${{task.name}}: start_previsto=${{task.start_previsto}}, end_previsto=${{task.end_previsto}}, tipoVis=${{tipoVisualizacao}}`);
+                        console.log('DEBUG JS [' + task.setor + '] ' + task.name + ': start_previsto=' + task.start_previsto + ', end_previsto=' + task.end_previsto + ', tipoVis=' + tipoVisualizacao);
                     }}
                     
                     // Barra Prevista (só criar se visualização for "Previsto" ou "Ambos")
