@@ -6349,6 +6349,10 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             end_real_original = row.get("Termino_Real")
             progress = row.get("% concluído", 0)
             
+            # DEBUG: Verificar se datas previstas existem para PULMÃO
+            if setor == "PULMÃO":
+                print(f"DEBUG [{setor}] {empreendimento} - {etapa}: Inicio_Prevista={start_date}, Termino_Prevista={end_date}")
+            
             if pd.isna(start_date): start_date = datetime.now()
             if pd.isna(end_date): end_date = start_date + timedelta(days=30)
             end_real_visual = end_real_original
