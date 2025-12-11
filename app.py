@@ -7065,6 +7065,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
                     allOptionsSelectedText: 'Todas selecionadas',
+                    dropboxWrapper: 'body',  // Anexar dropdown ao body para flutuar
                     popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
@@ -7099,6 +7100,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todos',
                     allOptionsSelectedText: 'Todos selecionados',
+                    dropboxWrapper: 'body',  // Anexar dropdown ao body para flutuar
                     popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
@@ -7133,6 +7135,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     searchPlaceholderText: 'Buscar...',
                     selectAllText: 'Selecionar todas',
                     allOptionsSelectedText: 'Todas selecionadas',
+                    dropboxWrapper: 'body',  // Anexar dropdown ao body para flutuar
                     popupDropboxBreakpoint: 0  // Sempre usar dropdown flutuante
                 }});
                 
