@@ -7094,7 +7094,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         console.log(`✅ Mudando para setor: ${{currentSector}}. Tasks carregadas: ${{allTasks_baseData.length}}`);
                         updateProjectTitle(currentSector);
                         
-                        // *** NOVO: Atualizar checkboxes de etapa para o novo setor ***
+                        // *** NOVO: Atualizar filtros de etapas E grupos para o novo setor ***
                         renderStageCheckboxes(currentSector);
                         renderGroupCheckboxes(currentSector);
                         
@@ -7103,11 +7103,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         const novasEtapas = etapasBySector[currentSector] || [];
                         etapasSelecionadas = novasEtapas.map(e => e.nome);
                         console.log('🔄 Filtro de etapas atualizado para o novo setor. Total:', etapasSelecionadas.length);
-                        
-                        // Atualizar grupos selecionados
-                        const novosGrupos = gruposBySector[currentSector] || [];
-                        gruposSelecionados = novosGrupos;
-                        console.log('🔄 Filtro de grupos atualizado para o novo setor. Total:', gruposSelecionados.length);
                     }}
                     
                     // 4. COMEÇAR COM DADOS BASE DO SETOR ATUAL
