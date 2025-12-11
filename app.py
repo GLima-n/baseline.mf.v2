@@ -6766,6 +6766,15 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 font-size: 13px;
                 min-height: 30px;
             }}
+            
+            /* Tornar dropdown flutuante */
+            .floating-filter-menu .vscomp-dropbox-container {{
+                position: absolute !important;
+                z-index: 10000 !important;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+                border-radius: 4px !important;
+            }}
+            
             .floating-filter-menu .vscomp-options {{
                 font-size: 13px;
             }}
