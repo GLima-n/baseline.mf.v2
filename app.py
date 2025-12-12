@@ -1851,15 +1851,17 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         font-size: 14px;
                         font-weight: 600;
                         color: #4a5568;
-                        margin-right: 6px;
+                        margin-left: -8px;
+                        margin-right: 2px;
                         flex-shrink: 0;
                         padding: 0;
-                        transition: transform 0.2s ease;
+                        transition: all 0.2s ease;
                     }}
                     .expand-collapse-btn:hover {{
                         color: #2d3748;
                         background-color: rgba(0,0,0,0.05);
                         border-radius: 3px;
+                        transform: scale(1.05);
                     }}
                     .subtask-row {{ 
                         display: none;
