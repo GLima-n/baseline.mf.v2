@@ -5800,6 +5800,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     if (vsEmpreendimento) {{
                         vsEmpreendimento.setOptions(empreendimentoOptions);
                         vsEmpreendimento.setValue(["Todos"]);
+                        
+                        // Forçar re-render do VirtualSelect
+                        vsEmpreendimento.enable();
                     }}
                     
                     console.log('Opções de empreendimento no consolidado atualizadas. Total:', filteredEmps.length);
