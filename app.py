@@ -4157,7 +4157,22 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // *** FUNÇÃO applyFiltersAndRedraw ATUALIZADA ***
                     function applyFiltersAndRedraw() {{
                         try {{
-                            const selProjectIndex = parseInt(document.getElementById('filter-project-{project["id"]}').value, 10);
+                            const selProjectElement = document.getElementById('filter-project-{project["id"]}');
+                            
+                            // Validar se o select tem opções
+                            if (!selProjectElement || selProjectElement.options.length === 0) {{
+                                console.warn('⚠️ Select de empreendimento está vazio. Não é possível aplicar filtros.');
+                                alert('Nenhum empreendimento disponível com as UGBs selecionadas. Ajuste o filtro de UGB.');
+                                return;
+                            }}
+                            
+                            const selProjectIndex = parseInt(selProjectElement.value, 10);
+                            
+                            // Validar se o índice é válido
+                            if (isNaN(selProjectIndex)) {{
+                                console.warn('⚠️ Índice de projeto inválido:', selProjectElement.value);
+                                return;
+                            }}
                             
                             // *** LEITURA CORRIGIDA dos Virtual Select ***
                             // Nota: UGB não é lido aqui pois apenas filtra opções de empreendimento, não tarefas
@@ -4171,6 +4186,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
 
                             console.log('Filtros aplicados:', {{
+                                projeto: selProjectIndex,
                                 setor: selSetorArray,
                                 grupo: selGrupoArray,
                                 etapa: selEtapaArray,
