@@ -1848,24 +1848,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 14px;
-                        font-weight: 600;
+                        font-size: 12px;
                         color: #4a5568;
-                        margin-left: -22px;
-                        margin-right: 0px;
-                        flex-shrink: 0;
-                        padding: 0;
-                        transition: all 0.2s ease;
-                    }}
-                    .expand-collapse-btn:hover {{
-                        color: #2d3748;
-                        background-color: rgba(0,0,0,0.05);
-                        border-radius: 3px;
-                        transform: scale(1.05);
+                        margin-right: 5px;
                     }}
                     .subtask-row {{ 
                         display: none;
                         background-color: #f8fafc;
+                        padding-left: 40px;
                     }}
                     .subtask-row.visible {{ display: grid; }}
                     .gantt-subtask-row {{ 
@@ -3526,7 +3516,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                                 const subtaskRowClass = globalRowIndex % 2 !== 0 ? 'odd-row' : '';
                                                 const visibleClass = task.expanded ? 'visible' : '';
                                                 html += `<div class="sidebar-row subtask-row ${{subtaskRowClass}} ${{visibleClass}}" data-parent="${{task.name}}">`;
-                                                html += `<div class=\"sidebar-cell task-name-cell\" style=\"padding-left: 30px;\" title=\"${{subetapa.numero_etapa}}. ${{subetapa.name}}\">${{subetapa.numero_etapa}}. ${{subetapa.name}}</div>`;
+                                                html += `<div class="sidebar-cell task-name-cell" title="${{subetapa.numero_etapa}}. • ${{subetapa.name}}">${{subetapa.numero_etapa}}. • ${{subetapa.name}}</div>`;
                                                 html += `<div class="sidebar-cell">${{subetapa.inicio_previsto}}</div>`;
                                                 html += `<div class="sidebar-cell">${{subetapa.termino_previsto}}</div>`;
                                                 html += `<div class="sidebar-cell">${{subetapa.duracao_prev_meses}}</div>`;
