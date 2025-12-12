@@ -4063,7 +4063,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         // Prepara opções e inicializa Virtual Select para UGB
                         // Validação de segurança: garantir que ugbs existe
-                        const ugbOptions = (filterOptions.ugbs || ["Todas"]).map(u => ({ label: u, value: u }));
+                        const ugbOptions = (filterOptions.ugbs || ["Todas"]).map(u => ({{ label: u, value: u }}));
                         vsUgb = VirtualSelect.init({{
                             ...vsConfig,
                             ele: '#filter-ugb-{project["id"]}',
