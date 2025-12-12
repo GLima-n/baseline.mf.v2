@@ -4064,12 +4064,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     function populateFilters() {{
                         if (filtersPopulated) return;
 
-                        // Popula o select normal de Projeto
-                        const selProject = document.getElementById('filter-project-{project["id"]}');
-                        allProjectsData.forEach((proj, index) => {{
-                            const isSelected = (index === initialProjectIndex) ? 'selected' : '';
-                            selProject.innerHTML += '<option value="' + index + '" ' + isSelected + '>' + proj.name + '</option>';
-                        }});
+                        // Nota: Select de projeto agora é populado por updateEmpreendimentoOptions()
+                        // após inicializar vsUgb, para garantir consistência com filtro UGB
 
                         // Configurações comuns para Virtual Select
                         const vsConfig = {{
@@ -4103,6 +4099,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         document.querySelector('#filter-ugb-{project["id"]}').addEventListener('change', function() {{
                             updateEmpreendimentoOptions();
                         }});
+                        
+                        // Popular select de empreendimento inicialmente
+                        updateEmpreendimentoOptions();
 
                         // Prepara opções e inicializa Virtual Select para Setor
                         const setorOptions = filterOptions.setores.map(s => ({{ label: s, value: s }}));
