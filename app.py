@@ -5797,13 +5797,31 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // Atualizar opções do VirtualSelect de empreendimento
                     const empreendimentoOptions = ["Todos"].concat(filteredEmps).map(e => ({{ label: e, value: e }}));
+                    
+                    // Destruir e recriar o VirtualSelect para forçar re-render
                     if (vsEmpreendimento) {{
-                        vsEmpreendimento.setOptions(empreendimentoOptions);
-                        vsEmpreendimento.setValue(["Todos"]);
-                        
-                        // Forçar re-render do VirtualSelect
-                        vsEmpreendimento.enable();
+                        vsEmpreendimento.destroy();
                     }}
+                    
+                    vsEmpreendimento = VirtualSelect.init({{
+                        multiple: true,
+                        search: true,
+                        optionsCount: 6,
+                        showResetButton: true,
+                        resetButtonText: 'Limpar',
+                        selectAllText: 'Selecionar Todos',
+                        allOptionsSelectedText: 'Todos',
+                        optionsSelectedText: 'selecionados',
+                        searchPlaceholderText: 'Buscar...',
+                        optionHeight: '30px',
+                        popupDropboxBreakpoint: '3000px',
+                        noOptionsText: 'Nenhuma opção encontrada',
+                        noSearchResultsText: 'Nenhum resultado encontrado',
+                        ele: '#filter-empreendimento-{project["id"]}',
+                        options: empreendimentoOptions,
+                        placeholder: "Selecionar Empreendimento(s)",
+                        selectedValue: ["Todos"]
+                    }});
                     
                     console.log('Opções de empreendimento no consolidado atualizadas. Total:', filteredEmps.length);
                     console.log('Empreendimentos:', filteredEmps);
