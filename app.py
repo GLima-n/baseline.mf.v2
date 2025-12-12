@@ -1440,6 +1440,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             Inicio_Real=('Inicio_Real', 'min'),
             Termino_Real=('Termino_Real', 'max'),
             **{'% concluído': ('% concluído', 'max')},
+            UGB=('UGB', 'first'),  # ← ADICIONADO: preservar UGB
             SETOR=('SETOR', 'first')
         ).reset_index()
         
