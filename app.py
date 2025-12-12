@@ -8632,18 +8632,12 @@ with st.spinner("Carregando e processando dados..."):
             
             ugb_options = get_unique_values(df_data, "UGB")
             
-            # Inicializar session_state para UGB se não existir
+            # Inicializar selected_ugb com todas as UGBs para manter compatibilidade com filter_dataframe
             if 'selected_ugb' not in st.session_state:
-                st.session_state.selected_ugb = ugb_options  # Todos selecionados por padrão
+                st.session_state.selected_ugb = ugb_options
             
-            # Usar o valor da session_state no multiselect
-            selected_ugb = simple_multiselect_dropdown(
-                "UGB",
-                options=ugb_options,
-                key="ugb_multiselect"
-            )
-            
-            # Atualizar session_state com a seleção atual
+            # UGB automaticamente selecionado (todas as opções) - filtro removido da sidebar
+           selected_ugb = ugb_options  # Todas as UGBs sempre selecionadas
             st.session_state.selected_ugb = selected_ugb
             
             # Botão centralizado
