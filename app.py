@@ -7228,6 +7228,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             const macroetapasPorSetor = JSON.parse(document.getElementById('macroetapas-por-setor').textContent);
             const mapeamentoGrupos = JSON.parse(document.getElementById('mapeamento-grupos').textContent);
             
+            // Opções de filtros
+            const filterOptions = {json.dumps(filter_options)};
+            
             // *** NOVAS VARIÁVEIS GLOBAIS ***
             const initialSectorName = "{setor_selecionado_inicialmente}";
             let currentSector = initialSectorName;
