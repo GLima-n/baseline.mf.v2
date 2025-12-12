@@ -8682,22 +8682,28 @@ with st.spinner("Carregando e processando dados..."):
             # --- TRÊS BOTÕES SEPARADOS PARA NAVEGAÇÃO ---
             st.markdown("Gráficos Gantt:")
             
+            # Por Projeto - destacado se ativo
             st.button(
                 "Por Projeto", 
                 on_click=set_project_view, 
-                use_container_width=True
+                use_container_width=True,
+                type="primary" if not st.session_state.consolidated_view and not st.session_state.sector_view else "secondary"
             )
             
+            # Por Etapa (Consolidado) - destacado se ativo
             st.button(
                 "Por Etapa", 
                 on_click=set_consolidated_view, 
-                use_container_width=True
+                use_container_width=True,
+                type="primary" if st.session_state.consolidated_view else "secondary"
             )
             
+            # Por Setor - destacado se ativo
             st.button(
                 "Por Setor", 
                 on_click=set_sector_view, 
-                use_container_width=True
+                use_container_width=True,
+                type="primary" if st.session_state.sector_view else "secondary"
             )
             
             # Mensagens centralizadas
