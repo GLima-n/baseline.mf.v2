@@ -804,6 +804,16 @@ def converter_dados_para_gantt(df):
             elif progress < 100 and pd.notna(start_real) and pd.notna(end_real_original) and (end_real_original < hoje):
                 status_color_class = 'status-yellow'  # Em andamento, mas data real já passou
 
+            # --- CORREÇÃO: Buscar UGB do DataFrame original, não do row ---
+            # O row pode não ter a coluna UGB após todas as transformações
+            # Buscar UGB do empreendimento no DataFrame original
+            ugb_value = "N/D"
+            if "UGB" in df_emp.columns:
+                # Pegar a primeira UGB não-nula do empreendimento
+                ugb_series = df_emp["UGB"].dropna()
+                if not ugb_series.empty:
+                    ugb_value = str(ugb_series.iloc[0])
+            
             task = {
                 "id": f"t{i}", "name": etapa_nome_completo, "numero_etapa": i + 1,
                 "start_previsto": start_date.strftime("%Y-%m-%d") if pd.notna(start_date) and start_date is not None else None,
@@ -811,7 +821,7 @@ def converter_dados_para_gantt(df):
                 "start_real": pd.to_datetime(start_real).strftime("%Y-%m-%d") if pd.notna(start_real) else None,
                 "end_real": pd.to_datetime(end_real_visual).strftime("%Y-%m-%d") if pd.notna(end_real_visual) else None,
                 "end_real_original_raw": pd.to_datetime(end_real_original).strftime("%Y-%m-%d") if pd.notna(end_real_original) else None,
-                "ugb": row.get("UGB", "N/D"),
+                "ugb": ugb_value,
                 "setor": row.get("SETOR", "Não especificado"),
                 "grupo": grupo,
                 "progress": int(progress),
