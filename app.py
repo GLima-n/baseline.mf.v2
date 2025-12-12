@@ -6730,7 +6730,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     grupos_iniciais_html = grupos_por_setor_dict.get(setor_selecionado_inicialmente, [])
     macroetapas_iniciais_html = macroetapas_por_setor_dict.get(setor_selecionado_inicialmente, [])
         
+        
+    # Obter UGBs únicas dos dados
+    ugbs_disponiveis = sorted(df["UGB"].dropna().unique().tolist()) if not df.empty and "UGB" in df.columns else []
+    
     filter_options = {
+        "ugbs": ["Todas"] + ugbs_disponiveis,
         "empreendimentos": ["Todos"] + empreendimentos_no_df,
         "setores_disponiveis": sorted(all_sector_names),
         "etapas": etapas_iniciais_html,
@@ -7097,6 +7102,12 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         {"".join([f'<option value="{s}" {"selected" if s == setor_selecionado_inicialmente else ""}>{setor_icons.get(s, "")} {s}</option>' for s in sorted(all_sector_names)])}
                     </select>
                 </div>
+                
+                <div class="filter-group">
+                    <label for="filter-ugb-setor-{project['id']}">UGB</label>
+                    <div id="filter-ugb-setor-{project['id']}"></div>
+                </div>
+                
                 <div class="filter-group">
                     <label for="filter-project-{project['id']}">Empreendimento</label>
                     <select id="filter-project-{project['id']}">
