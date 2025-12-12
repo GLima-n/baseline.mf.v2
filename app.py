@@ -2516,6 +2516,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     const filterOptions = {json.dumps(filter_options)};
+                    
+                    // Debug: verificar se ugbs está presente
+                    console.log('filterOptions:', filterOptions);
+                    if (!filterOptions.ugbs) {{
+                        console.warn('⚠️ filterOptions.ugbs está undefined! Usando fallback.');
+                    }}
 
                     let allTasks_baseData = {json.dumps(tasks_base_data)};
 
@@ -4056,7 +4062,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }};
 
                         // Prepara opções e inicializa Virtual Select para UGB
-                        const ugbOptions = filterOptions.ugbs.map(u => ({ label: u, value: u }));
+                        // Validação de segurança: garantir que ugbs existe
+                        const ugbOptions = (filterOptions.ugbs || ["Todas"]).map(u => ({ label: u, value: u }));
                         vsUgb = VirtualSelect.init({{
                             ...vsConfig,
                             ele: '#filter-ugb-{project["id"]}',
