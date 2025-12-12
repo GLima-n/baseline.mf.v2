@@ -1647,7 +1647,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .sidebar-cell {{ display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4a5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; border: none; }}
                     .header-cell {{ text-align: center; }}
                     .header-cell.task-name-cell {{ text-align: left; }}
-                    .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; padding-left: 25px; }}
+                    .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
                     
                     /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
                     /* Novos estilos para seletor de baseline - Alinhado com menu de filtros */
@@ -5172,6 +5172,18 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                             linear-gradient(90deg, transparent 48%, #9ca3af 48%, #9ca3af 52%, transparent 52%),
                             linear-gradient(90deg, transparent 56%, #9ca3af 56%, #9ca3af 60%, transparent 60%),
                             linear-gradient(90deg, transparent 64%, #9ca3af 64%, #9ca3af 68%, transparent 68%);
+                    }}
+                    
+                    .sidebar-row {{ 
+                        display: grid;
+                        grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr;
+                        border-bottom: 1px solid #eff2f5;
+                        height: 30px;
+                        padding: 0 10px;
+                        background-color: white;
+                        transition: all 0.2s ease-in-out;
+                        position: relative;
+                        cursor: pointer;
                     }}
                     
                     .baseline-row select.baseline-dropdown-emp {{
