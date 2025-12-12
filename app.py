@@ -4034,6 +4034,33 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         }}
                     }}
                     
+                    // Função para atualizar opções de empreendimento baseado nas UGBs selecionadas
+                    function updateEmpreendimentoOptions() {{
+                        const selUgbArray = vsUgb ? vsUgb.getValue() || [] : [];
+                        const selProject = document.getElementById('filter-project-{project["id"]}');
+                        
+                        // Limpar opções atuais
+                        selProject.innerHTML = '';
+                        
+                        // Filtrar projetos por UGB
+                        let filteredProjects = allProjectsData;
+                        if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                            filteredProjects = allProjectsData.filter(proj => {{
+                                // Verificar se o projeto tem tasks com UGB selecionada
+                                return proj.tasks.some(task => selUgbArray.includes(task.ugb));
+                            }});
+                        }}
+                        
+                        // Repovoar select de empreendimento com projetos filtrados
+                        filteredProjects.forEach((proj, index) => {{
+                            const originalIndex = allProjectsData.indexOf(proj);
+                            const isSelected = (originalIndex === currentProjectIndex) ? 'selected' : '';
+                            selProject.innerHTML += '<option value="' + originalIndex + '" ' + isSelected + '>' + proj.name + '</option>';
+                        }});
+                        
+                        console.log('Opções de empreendimento atualizadas. Total:', filteredProjects.length);
+                    }}
+                    
                     function populateFilters() {{
                         if (filtersPopulated) return;
 
@@ -4070,6 +4097,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             options: ugbOptions,
                             placeholder: "Selecionar UGB(s)",
                             selectedValue: ["Todas"]
+                        }});
+                        
+                        // Listener para atualizar opções de empreendimento quando UGB mudar
+                        document.querySelector('#filter-ugb-{project["id"]}').addEventListener('change', function() {{
+                            updateEmpreendimentoOptions();
                         }});
 
                         // Prepara opções e inicializa Virtual Select para Setor
@@ -4129,7 +4161,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selProjectIndex = parseInt(document.getElementById('filter-project-{project["id"]}').value, 10);
                             
                             // *** LEITURA CORRIGIDA dos Virtual Select ***
-                            const selUgbArray = vsUgb ? vsUgb.getValue() || [] : [];
+                            // Nota: UGB não é lido aqui pois apenas filtra opções de empreendimento, não tarefas
                             const selSetorArray = vsSetor ? vsSetor.getValue() || [] : [];
                             const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : [];
                             const selEtapaArray = vsEtapa ? vsEtapa.getValue() || [] : [];
@@ -4140,7 +4172,6 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
 
                             console.log('Filtros aplicados:', {{
-                                ugb: selUgbArray,
                                 setor: selSetorArray,
                                 grupo: selGrupoArray,
                                 etapa: selEtapaArray,
@@ -4189,11 +4220,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             let filteredTasks = baseTasks;
 
                             // *** LÓGICA DE FILTRO CORRIGIDA ***
-                            // Filtro por UGB
-                            if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
-                                filteredTasks = filteredTasks.filter(t => selUgbArray.includes(t.ugb));
-                                console.log('Após filtro UGB:', filteredTasks.length);
-                            }}
+                            // Nota: Filtro de UGB não filtra tarefas, apenas opções de empreendimento
                             
                             // Filtro por Setor
                             if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
