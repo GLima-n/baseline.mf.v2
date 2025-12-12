@@ -4036,8 +4036,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     
                     // Função para atualizar opções de empreendimento baseado nas UGBs selecionadas
                     function updateEmpreendimentoOptions() {{
+                        console.log('🔄 updateEmpreendimentoOptions() chamada');
+                        
                         const selUgbArray = vsUgb ? vsUgb.getValue() || [] : [];
+                        console.log('📋 UGBs selecionadas:', selUgbArray);
+                        
                         const selProject = document.getElementById('filter-project-{project["id"]}');
+                        
+                        // Debug: mostrar todos os projetos e suas UGBs
+                        console.log('📊 Total de projetos disponíveis:', allProjectsData.length);
+                        allProjectsData.forEach((proj, idx) => {{
+                            const ugbsDoProjeto = [...new Set(proj.tasks.map(t => t.ugb).filter(u => u))];
+                            console.log(`  Projeto ${{idx}}: ${{proj.name}} - UGBs: [${{ugbsDoProjeto.join(', ')}}]`);
+                        }});
                         
                         // Limpar opções atuais
                         selProject.innerHTML = '';
@@ -4045,10 +4056,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Filtrar projetos por UGB
                         let filteredProjects = allProjectsData;
                         if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                            console.log('🔍 Filtrando por UGBs:', selUgbArray);
                             filteredProjects = allProjectsData.filter(proj => {{
                                 // Verificar se o projeto tem tasks com UGB selecionada
-                                return proj.tasks.some(task => selUgbArray.includes(task.ugb));
+                                const hasMatchingUgb = proj.tasks.some(task => {{
+                                    const match = selUgbArray.includes(task.ugb);
+                                    if (match) {{
+                                        console.log(`    ✓ Match: ${{proj.name}} tem task com UGB=${{task.ugb}}`);
+                                    }}
+                                    return match;
+                                }});
+                                return hasMatchingUgb;
                             }});
+                            console.log('✅ Projetos após filtro:', filteredProjects.length);
+                        }} else {{
+                            console.log('📌 Mostrando todos os projetos (UGB = Todas ou vazio)');
                         }}
                         
                         // Repovoar select de empreendimento com projetos filtrados
@@ -4058,7 +4080,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             selProject.innerHTML += '<option value="' + originalIndex + '" ' + isSelected + '>' + proj.name + '</option>';
                         }});
                         
-                        console.log('Opções de empreendimento atualizadas. Total:', filteredProjects.length);
+                        console.log('✅ Opções de empreendimento atualizadas. Total:', filteredProjects.length);
                     }}
                     
                     function populateFilters() {{
