@@ -7462,7 +7462,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     const selVis = document.querySelector('input[name="filter-vis-{project["id"]}"]:checked').value;
                     
                     console.log('Setor:', selSetor);
-                    console.log('Empreendimento:', selEmp);
+                    console.log('Empreendimento:', selEmpArray);
                     console.log('Visualização:', selVis);
                     console.log('Mostrar apenas não concluídas:', selConcluidas);
                     console.log('Etapas selecionadas:', etapasSelecionadas.length);
