@@ -1643,11 +1643,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .toggle-sidebar-btn:hover {{ background: rgba(255,255,255,0.4); }}
                     .sidebar-grid-header-wrapper {{ display: grid; grid-template-columns: 30px 1fr; color: #d1d5db; font-size: 9px; font-weight: 600; text-transform: uppercase; height: 30px; align-items: center; }}
                     .sidebar-grid-header {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; padding: 0 10px; align-items: center; }}
-                    .sidebar-row {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; }}
+                    .sidebar-row {{ display: grid; grid-template-columns: 2.5fr 0.9fr 0.9fr 0.6fr 0.9fr 0.9fr 0.6fr 0.5fr 0.6fr 0.6fr; border-bottom: 1px solid #eff2f5; height: 30px; padding: 0 10px; background-color: white; transition: all 0.2s ease-in-out; position: relative; }}
                     .sidebar-cell {{ display: flex; align-items: center; justify-content: center; font-size: 11px; color: #4a5568; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 8px; border: none; }}
                     .header-cell {{ text-align: center; }}
                     .header-cell.task-name-cell {{ text-align: left; }}
-                    .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; }}
+                    .gantt-sidebar-content {{ background-color: #f8f9fa; flex: 1; overflow-y: auto; overflow-x: hidden; padding-left: 25px; }}
                     
                     /* --- CSS DEFINITIVO PARA FULLSCREEN --- */
                     /* Novos estilos para seletor de baseline - Alinhado com menu de filtros */
@@ -1843,23 +1843,26 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         background: none;
                         border: none;
                         cursor: pointer;
-                        width: 20px;
-                        height: 20px;
+                        width: 18px;
+                        height: 18px;
                         display: flex;
                         align-items: center;
                         justify-content: center;
-                        font-size: 14px;
-                        font-weight: 600;
+                        font-size: 12px;
+                        font-weight: 700;
                         color: #4a5568;
-                        margin-right: 6px;
-                        flex-shrink: 0;
                         padding: 0;
-                        transition: transform 0.2s ease;
+                        position: absolute;
+                        left: -22px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        transition: all 0.2s ease;
+                        border-radius: 3px;
                     }}
                     .expand-collapse-btn:hover {{
                         color: #2d3748;
-                        background-color: rgba(0,0,0,0.05);
-                        border-radius: 3px;
+                        background-color: rgba(0,0,0,0.08);
+                        transform: translateY(-50%) scale(1.1);
                     }}
                     .subtask-row {{ 
                         display: none;
@@ -3494,15 +3497,13 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     
                                     html += `<div class="sidebar-row ${{mainTaskClass}} ${{rowClass}}" data-task="${{task.name}}">`;
                                     
-                                    // Coluna do botão de expandir/recolher
+                                    // Botão de expandir/recolher fica fora do grid, posicionado absolutamente
                                     if (hasSubtasks) {{
-                                        html += `<div class="sidebar-cell task-name-cell" style="display: flex; align-items: center;">`;
                                         html += `<button class="expand-collapse-btn" data-task="${{task.name}}">${{task.expanded ? '-' : '+'}}</button>`;
-                                        html += `<span title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</span>`;
-                                        html += `</div>`;
-                                    }} else {{
-                                        html += `<div class="sidebar-cell task-name-cell" title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</div>`;
                                     }}
+                                    
+                                    // Nome da etapa sempre no mesmo formato (com ou sem botão)
+                                    html += `<div class="sidebar-cell task-name-cell" title="${{task.numero_etapa}}. ${{task.name}}">${{task.numero_etapa}}. ${{task.name}}</div>`;
                                     
                                     html += `<div class="sidebar-cell">${{task.inicio_previsto}}</div>`;
                                     html += `<div class="sidebar-cell">${{task.termino_previsto}}</div>`;
