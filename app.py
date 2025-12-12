@@ -7110,10 +7110,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 <div class="filter-group">
                     <label for="filter-project-{project['id']}">Empreendimento</label>
-                    <select id="filter-project-{project['id']}">
-                        <option value="Todos">Todos</option>
-                        {"".join([f'<option value="{emp}">{emp}</option>' for emp in empreendimentos_no_df])}
-                    </select>
+                    <div id="filter-project-{project['id']}"></div>
                 </div>
                 <div class="filter-group">
                     <label for="filter-grupo-{project['id']}">Grupo</label>
@@ -7245,6 +7242,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let vsGrupo;
             let vsMacroetapas;
             let vsUgbSetor; // NOVO: Filtro de UGB
+            let vsEmpreendimentoSetor; // NOVO: Filtro de Empreendimento
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
@@ -7391,14 +7389,24 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         .map(t => t.empreendimento))];
                 }}
                 
-                // Atualizar select normal de empreendimento
-                const selProject = document.getElementById('filter-project-{project["id"]}');
-                if (selProject) {{
-                    selProject.innerHTML = '<option value="Todos">Todos</option>';
-                    filteredEmps.forEach(emp => {{
-                        selProject.innerHTML += `<option value="${{emp}}">${{emp}}</option>`;
-                    }});
+                // Destruir e recriar VirtualSelect de empreendimento
+                if (vsEmpreendimentoSetor) {{
+                    vsEmpreendimentoSetor.destroy();
                 }}
+                
+                const empreendimentoOptions = ["Todos"].concat(filteredEmps).map(e => ({{ label: e, value: e }}));
+                vsEmpreendimentoSetor = VirtualSelect.init({{
+                    ele: '#filter-project-{project["id"]}',
+                    options: empreendimentoOptions,
+                    multiple: true,
+                    search: true,
+                    selectedValue: ["Todos"],
+                    placeholder: 'Selecionar Empreendimento(s)',
+                    noOptionsText: 'Nenhum empreendimento disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todos',
+                    allOptionsSelectedText: 'Todos selecionados'
+                }});
                 
                 console.log('Opções de empreendimento atualizadas no setor. Total:', filteredEmps.length);
             }}
@@ -7435,7 +7443,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     const selSetor = document.getElementById('filter-setor-{project["id"]}').value;
                     
                     // 2. LER OUTROS FILTROS
-                    const selEmp = document.getElementById('filter-project-{project["id"]}').value;
+                    const selEmpArray = vsEmpreendimentoSetor ? vsEmpreendimentoSetor.getValue() || [] : ["Todos"];
                     
                     // *** ATUALIZADO: Obter etapas, grupos e macroetapas selecionados do Virtual Select ***
                     let etapasSelecionadas = vsEtapa ? vsEtapa.getValue() : [];
@@ -7495,9 +7503,9 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                     // 5. APLICAR FILTROS SECUNDÁRIOS
                     let filteredTasks = baseTasks;
                     
-                    // Filtro de empreendimento
-                    if (selEmp !== 'Todos') {{
-                        filteredTasks = filteredTasks.filter(t => t.empreendimento === selEmp);
+                    // Filtro de empreendimento (multiseleção)
+                    if (selEmpArray.length > 0 && !selEmpArray.includes('Todos')) {{
+                        filteredTasks = filteredTasks.filter(t => selEmpArray.includes(t.empreendimento));
                     }}
                     
                     // *** MODIFICADO: Filtro de grupos usando mapeamento ***
