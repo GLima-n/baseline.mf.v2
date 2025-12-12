@@ -6624,7 +6624,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+        
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/virtual-select-plugin@1.0.39/dist/virtual-select.min.css">
         
         <style>
@@ -7033,23 +7033,6 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             // Variável para armazenar o tipo de visualização selecionado
             let savedVisualizationType = 'Ambos';
             
-            // *** CONFIGURAÇÃO UNIFICADA DO VIRTUAL SELECT (Idêntico ao Por Projeto) ***
-            const vsConfig = {{
-                multiple: true,
-                search: true,
-                optionsCount: 6,
-                showResetButton: true,
-                resetButtonText: 'Limpar',
-                selectAllText: 'Selecionar Todos',
-                allOptionsSelectedText: 'Todos',
-                optionsSelectedText: 'selecionados',
-                searchPlaceholderText: 'Buscar...',
-                optionHeight: '30px',
-                popupDropboxBreakpoint: '3000px',
-                noOptionsText: 'Nenhuma opção encontrada',
-                noSearchResultsText: 'Nenhum resultado encontrado',
-            }};
-            
             // *** Variável Global para Virtual Select ***
             let vsEtapa;
             let vsGrupo;
@@ -7072,13 +7055,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsEtapa = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-etapa-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione etapas',
                     noOptionsText: 'Nenhuma etapa disponível',
-                    zIndex: 9999,
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Etapa renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7102,13 +7088,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsGrupo = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-grupo-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione grupos',
                     noOptionsText: 'Nenhum grupo disponível',
-                    zIndex: 9999,
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todos',
+                    allOptionsSelectedText: 'Todos selecionados'
                 }});
                 
                 console.log(`🔄 Virtual Select Grupo renderizado: ${{options.length}} opções, todas selecionadas`);
@@ -7132,13 +7121,16 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 
                 // Inicializar Virtual Select
                 vsMacroetapas = VirtualSelect.init({{
-                    ...vsConfig,
                     ele: '#filter-macroetapa-{project["id"]}',
                     options: options,
+                    multiple: true,
+                    search: true,
                     selectedValue: options.map(o => o.value),  // TODAS selecionadas por padrão
                     placeholder: 'Selecione macroetapas',
                     noOptionsText: 'Nenhuma macroetapa disponível',
-                    zIndex: 9999,
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
                 }});
                 
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
