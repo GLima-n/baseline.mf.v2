@@ -5861,14 +5861,19 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // }}
 
                     // *** 4. FILTRO DE EMPREENDIMENTO (Renomeado) ***
-                    // Nota: Agora populado por updateEmpreendimentoOptionsConsolidado()
+                    // Inicializar com todas as opções primeiro
+                    const empreendimentoOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
+                    console.log('Inicializando vsEmpreendimento com opções:', empreendimentoOptions);
+                    
                     vsEmpreendimento = VirtualSelect.init({{ // Renomeado de vsEtapa
                         ...vsConfig,
                         ele: '#filter-empreendimento-{project["id"]}', // ID Modificado
-                        options: [], // Inicialmente vazio
+                        options: empreendimentoOptions,
                         placeholder: "Selecionar Empreendimento(s)",
                         selectedValue: ["Todos"]
                     }});
+                    
+                    console.log('vsEmpreendimento inicializado:', vsEmpreendimento ? 'OK' : 'FALHOU');
 
                     // *** 5. RESTO DOS FILTROS (Idêntico) ***
                     const visRadio = document.querySelector('input[name="filter-vis-{project['id']}"][value="' + tipoVisualizacao + '"]');
@@ -5884,9 +5889,6 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     updatePulmaoInputVisibility();
 
                     filtersPopulated = true;
-                    
-                    // Popular empreendimentos inicialmente
-                    updateEmpreendimentoOptionsConsolidado();
                 }}
 
                 // *** FUNÇÃO updateProjectTitle (Nova/Modificada) ***
