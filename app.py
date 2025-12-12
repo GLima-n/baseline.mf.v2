@@ -811,6 +811,7 @@ def converter_dados_para_gantt(df):
                 "start_real": pd.to_datetime(start_real).strftime("%Y-%m-%d") if pd.notna(start_real) else None,
                 "end_real": pd.to_datetime(end_real_visual).strftime("%Y-%m-%d") if pd.notna(end_real_visual) else None,
                 "end_real_original_raw": pd.to_datetime(end_real_original).strftime("%Y-%m-%d") if pd.notna(end_real_original) else None,
+                "ugb": row.get("UGB", "N/D"),
                 "setor": row.get("SETOR", "Não especificado"),
                 "grupo": grupo,
                 "progress": int(progress),
@@ -1462,7 +1463,11 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             return
 
         # --- Prepara opções de filtro ---
+        # Obter UGBs únicas dos dados
+        ugbs_disponiveis = sorted(df["UGB"].dropna().unique().tolist()) if not df.empty and "UGB" in df.columns else []
+        
         filter_options = {
+            "ugbs": ["Todas"] + ugbs_disponiveis,
             "setores": ["Todos"] + sorted(list(SETOR.keys())),
             "grupos": ["Todos"] + sorted(list(GRUPOS.keys())),
             "etapas": ["Todas"] + ORDEM_ETAPAS_NOME_COMPLETO
@@ -2111,6 +2116,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     </div>
                     <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                         <div class="filter-group">
+                            <label for="filter-ugb-{project['id']}">UGB</label>
+                            <div id="filter-ugb-{project['id']}"></div>
+                        </div>
+                        <div class="filter-group">
                             <label for="filter-project-{project['id']}">Empreendimento</label>
                             <select id="filter-project-{project['id']}"></select>
                         </div>
@@ -2517,7 +2526,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     let filtersPopulated = false;
 
                     // *** Variáveis Globais para Virtual Select ***
-                    let vsSetor, vsGrupo, vsEtapa;
+                    let vsUgb, vsSetor, vsGrupo, vsEtapa;
                     // *** FIM: Variáveis Globais para Virtual Select ***
                     
                     // *** RASTREAMENTO DE BASELINE ATIVA ***
@@ -3952,6 +3961,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         document.getElementById('filter-project-{project["id"]}').value = initialProjectIndex;
                         
                         // *** CORREÇÃO: Reset Virtual Select ***
+                        if(vsUgb) vsUgb.setValue(["Todas"]);
                         if(vsSetor) vsSetor.setValue(["Todos"]);
                         if(vsGrupo) vsGrupo.setValue(["Todos"]);
                         if(vsEtapa) vsEtapa.setValue(["Todas"]);
@@ -4045,6 +4055,16 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             noSearchResultsText: 'Nenhum resultado encontrado',
                         }};
 
+                        // Prepara opções e inicializa Virtual Select para UGB
+                        const ugbOptions = filterOptions.ugbs.map(u => ({ label: u, value: u }));
+                        vsUgb = VirtualSelect.init({{
+                            ...vsConfig,
+                            ele: '#filter-ugb-{project["id"]}',
+                            options: ugbOptions,
+                            placeholder: "Selecionar UGB(s)",
+                            selectedValue: ["Todas"]
+                        }});
+
                         // Prepara opções e inicializa Virtual Select para Setor
                         const setorOptions = filterOptions.setores.map(s => ({{ label: s, value: s }}));
                         vsSetor = VirtualSelect.init({{
@@ -4102,6 +4122,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selProjectIndex = parseInt(document.getElementById('filter-project-{project["id"]}').value, 10);
                             
                             // *** LEITURA CORRIGIDA dos Virtual Select ***
+                            const selUgbArray = vsUgb ? vsUgb.getValue() || [] : [];
                             const selSetorArray = vsSetor ? vsSetor.getValue() || [] : [];
                             const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : [];
                             const selEtapaArray = vsEtapa ? vsEtapa.getValue() || [] : [];
@@ -4112,6 +4133,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selPulmaoMeses = parseInt(document.getElementById('filter-pulmao-meses-{project["id"]}').value, 10) || 0;
 
                             console.log('Filtros aplicados:', {{
+                                ugb: selUgbArray,
                                 setor: selSetorArray,
                                 grupo: selGrupoArray,
                                 etapa: selEtapaArray,
@@ -4160,6 +4182,12 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                             let filteredTasks = baseTasks;
 
                             // *** LÓGICA DE FILTRO CORRIGIDA ***
+                            // Filtro por UGB
+                            if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                                filteredTasks = filteredTasks.filter(t => selUgbArray.includes(t.ugb));
+                                console.log('Após filtro UGB:', filteredTasks.length);
+                            }}
+                            
                             // Filtro por Setor
                             if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
                                 filteredTasks = filteredTasks.filter(t => selSetorArray.includes(t.setor));
