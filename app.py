@@ -8637,7 +8637,7 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.selected_ugb = ugb_options
             
             # UGB automaticamente selecionado (todas as opções) - filtro removido da sidebar
-           selected_ugb = ugb_options  # Todas as UGBs sempre selecionadas
+            selected_ugb = ugb_options  # Todas as UGBs sempre selecionadas
             st.session_state.selected_ugb = selected_ugb
             
             # Botão centralizado
