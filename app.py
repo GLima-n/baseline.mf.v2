@@ -5191,14 +5191,14 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                     
                     <div class="filter-group">
-                        <label for="filter-ugb-consolidado-{project['id']}">UGB</label>
-                        <div id="filter-ugb-consolidado-{project['id']}"></div>
-                    </div>
-                    
-                    <div class="filter-group">
                         <label for="filter-etapa-consolidada-{project['id']}">Etapa (Visão Atual)</label>
                         <select id="filter-etapa-consolidada-{project['id']}">
                             </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="filter-ugb-consolidado-{project['id']}">UGB</label>
+                        <div id="filter-ugb-consolidado-{project['id']}"></div>
                     </div>
 
                     <div class="filter-group">
@@ -5775,6 +5775,31 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                  }}
 
+                // Função para atualizar opções de empreendimento baseado nas UGBs selecionadas
+                function updateEmpreendimentoOptionsConsolidado() {{
+                    const selUgbArray = vsUgbConsolidado ? vsUgbConsolidado.getValue() || [] : [];
+                    
+                    // Obter tarefas da etapa atual
+                    let tasksAtual = projectData[0].tasks;
+                    
+                    // Filtrar empreendimentos por UGB
+                    let filteredEmps = [...new Set(tasksAtual.map(t => t.name))];
+                    if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                        filteredEmps = [...new Set(tasksAtual
+                            .filter(t => selUgbArray.includes(t.ugb))
+                            .map(t => t.name))];
+                    }}
+                    
+                    // Atualizar opções do VirtualSelect de empreendimento
+                    const empreendimentoOptions = ["Todos"].concat(filteredEmps).map(e => ({{ label: e, value: e }}));
+                    if (vsEmpreendimento) {{
+                        vsEmpreendimento.setOptions(empreendimentoOptions);
+                        vsEmpreendimento.setValue(["Todos"]);
+                    }}
+                    
+                    console.log('Opções de empreendimento no consolidado atualizadas. Total:', filteredEmps.length);
+                }}
+
                 // *** FUNÇÃO populateFilters MODIFICADA ***
                 function populateFilters() {{
                     if (filtersPopulated) return;
@@ -5811,6 +5836,11 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         placeholder: "Selecionar UGB(s)",
                         selectedValue: ["Todas"]
                     }});
+                    
+                    // Listener para atualizar opções de empreendimento quando UGB mudar
+                    document.querySelector('#filter-ugb-consolidado-{project["id"]}').addEventListener('change', function() {{
+                        updateEmpreendimentoOptionsConsolidado();
+                    }});
 
                     // *** 2. FILTRO DE SETOR (REMOVIDO) ***
                     // if (filterOptions.setores) {{
@@ -5825,11 +5855,11 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     // }}
 
                     // *** 4. FILTRO DE EMPREENDIMENTO (Renomeado) ***
-                    const empreendimentoOptions = filterOptions.empreendimentos.map(e => ({{ label: e, value: e }}));
+                    // Nota: Agora populado por updateEmpreendimentoOptionsConsolidado()
                     vsEmpreendimento = VirtualSelect.init({{ // Renomeado de vsEtapa
                         ...vsConfig,
                         ele: '#filter-empreendimento-{project["id"]}', // ID Modificado
-                        options: empreendimentoOptions,
+                        options: [], // Inicialmente vazio
                         placeholder: "Selecionar Empreendimento(s)",
                         selectedValue: ["Todos"]
                     }});
@@ -5848,6 +5878,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     updatePulmaoInputVisibility();
 
                     filtersPopulated = true;
+                    
+                    // Popular empreendimentos inicialmente
+                    updateEmpreendimentoOptionsConsolidado();
                 }}
 
                 // *** FUNÇÃO updateProjectTitle (Nova/Modificada) ***
@@ -5867,9 +5900,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const selEtapaNome = selEtapaConsolidada.value;
                         
                         // *** 2. LER OUTROS FILTROS ***
-                        const selUgbArray = vsUgbConsolidado ? vsUgbConsolidado.getValue() || [] : [];
-                        // const selSetorArray = vsSetor ? vsSetor.getValue() || [] : []; // REMOVIDO
-                        // const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : []; // REMOVIDO
+                        // Nota: UGB não é lido aqui pois apenas filtra opções de empreendimento, não tarefas
                         const selEmpreendimentoArray = vsEmpreendimento ? vsEmpreendimento.getValue() || [] : []; // Renomeado
                         
                         const selConcluidas = document.getElementById('filter-concluidas-{project["id"]}').checked;
@@ -5901,11 +5932,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // *** 5. APLICAR FILTROS SECUNDÁRIOS ***
                         let filteredTasks = baseTasks;
 
-                        // Filtro por UGB
-                        if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
-                            filteredTasks = filteredTasks.filter(t => selUgbArray.includes(t.ugb));
-                            console.log('Após filtro UGB no consolidado:', filteredTasks.length);
-                        }}
+                        // Nota: Filtro de UGB não filtra tarefas, apenas opções de empreendimento
 
                         // if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
                         //     filteredTasks = filteredTasks.filter(t => selSetorArray.includes(t.setor));
