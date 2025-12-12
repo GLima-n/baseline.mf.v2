@@ -1851,8 +1851,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         font-size: 14px;
                         font-weight: 600;
                         color: #4a5568;
-                        margin-left: -8px;
-                        margin-right: 2px;
+                        margin-left: -22px;
+                        margin-right: 0px;
                         flex-shrink: 0;
                         padding: 0;
                         transition: all 0.2s ease;
