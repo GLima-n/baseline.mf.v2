@@ -8596,26 +8596,6 @@ with st.spinner("Carregando e processando dados..."):
                     pass
         
             st.markdown("---")
-            # Título centralizado
-            st.markdown("""
-            <div style='
-                margin: 1px 0 -70px 0; 
-                padding: 12px 16px;
-                border-radius: 6px;
-                height: 60px;
-                display: flex;
-                justify-content: flex-start;
-                align-items: center;
-            '>
-                <h4 style='
-                    color: #707070; 
-                    margin: 0; 
-                    font-weight: 600;
-                    font-size: 18px;
-                    text-align: left;
-                '>Filtros:</h4>
-            </div>
-            """, unsafe_allow_html=True)
             
             # Filtro UGB centralizado
             st.markdown("""
