@@ -7631,11 +7631,11 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 // Atualizar título do projeto
                 updateProjectTitle(novoSetor);
                 
-                // Atualizar filtros de Etapas
-                renderEtapasCheckboxes(novoSetor);
+                // Atualizar filtros de Etapas (CORRIGIDO: nome correto da função)
+                renderStageCheckboxes(novoSetor);
                 
-                // Atualizar filtros de Grupos
-                renderGruposCheckboxes(novoSetor);
+                // Atualizar filtros de Grupos (CORRIGIDO: nome correto da função)
+                renderGroupCheckboxes(novoSetor);
                 
                 // Atualizar filtros de Macroetapas
                 renderMacroetapasCheckboxes(novoSetor);
