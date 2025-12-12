@@ -7241,6 +7241,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             let vsEtapa;
             let vsGrupo;
             let vsMacroetapas;
+            let vsUgbSetor; // NOVO: Filtro de UGB
 
             // *** FUNÇÃO AUXILIAR: Inicializar Virtual Select de Etapas ***
             function renderStageCheckboxes(sectorName) {{
