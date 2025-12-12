@@ -5779,8 +5779,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 function updateEmpreendimentoOptionsConsolidado() {{
                     const selUgbArray = vsUgbConsolidado ? vsUgbConsolidado.getValue() || [] : [];
                     
-                    // Obter tarefas da etapa atual
-                    let tasksAtual = projectData[0].tasks;
+                    // Obter tarefas da etapa atual (usar allTasks_baseData que é a fonte correta)
+                    let tasksAtual = allTasks_baseData || [];
+                    
+                    if (!tasksAtual || tasksAtual.length === 0) {{
+                        console.warn('Nenhuma task disponível para filtrar empreendimentos');
+                        return;
+                    }}
                     
                     // Filtrar empreendimentos por UGB
                     let filteredEmps = [...new Set(tasksAtual.map(t => t.name))];
@@ -5798,6 +5803,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     }}
                     
                     console.log('Opções de empreendimento no consolidado atualizadas. Total:', filteredEmps.length);
+                    console.log('Empreendimentos:', filteredEmps);
                 }}
 
                 // *** FUNÇÃO populateFilters MODIFICADA ***
