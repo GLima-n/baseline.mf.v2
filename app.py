@@ -7944,7 +7944,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                             
                             const label = document.createElement('div');
                             label.className = 'bar-label';
-                            label.textContent = `${{task.progress}}%`;
+                            label.textContent = `${{task.empreendimento}} - ${{task.etapa}} (${{task.progress}}%)`;
                             barReal.appendChild(label);
                             
                             // Tooltip
