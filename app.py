@@ -4721,7 +4721,11 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
     empreendimentos_no_df = sorted(list(df_gantt_agg["Empreendimento"].unique()))
     
+    # Obter UGBs únicas dos dados
+    ugbs_disponiveis = sorted(df["UGB"].dropna().unique().tolist()) if not df.empty and "UGB" in df.columns else []
+    
     filter_options = {
+        "ugbs": ["Todas"] + ugbs_disponiveis,
         "empreendimentos": ["Todos"] + empreendimentos_no_df, # Renomeado
         "etapas_consolidadas": sorted(all_stage_names_full) # Novo (sem "Todos")
     }
@@ -5187,6 +5191,11 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 <div class="floating-filter-menu" id="filter-menu-{project['id']}">
                     
                     <div class="filter-group">
+                        <label for="filter-ugb-consolidado-{project['id']}">UGB</label>
+                        <div id="filter-ugb-consolidado-{project['id']}"></div>
+                    </div>
+                    
+                    <div class="filter-group">
                         <label for="filter-etapa-consolidada-{project['id']}">Etapa (Visão Atual)</label>
                         <select id="filter-etapa-consolidada-{project['id']}">
                             </select>
@@ -5349,6 +5358,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                 // *** Variáveis Globais para Filtros ***
                 // let vsSetor, vsGrupo; // REMOVIDO
+                let vsUgbConsolidado; // NOVO: Filtro de UGB
                 let vsEmpreendimento; 
                 let selEtapaConsolidada; // Novo <select>
 
@@ -5792,6 +5802,16 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         noSearchResultsText: 'Nenhum resultado encontrado',
                     }};
 
+                    // *** NOVO: FILTRO DE UGB ***
+                    const ugbOptions = (filterOptions.ugbs || ["Todas"]).map(u => ({{ label: u, value: u }}));
+                    vsUgbConsolidado = VirtualSelect.init({{
+                        ...vsConfig,
+                        ele: '#filter-ugb-consolidado-{project["id"]}',
+                        options: ugbOptions,
+                        placeholder: "Selecionar UGB(s)",
+                        selectedValue: ["Todas"]
+                    }});
+
                     // *** 2. FILTRO DE SETOR (REMOVIDO) ***
                     // if (filterOptions.setores) {{
                     //     const setorOptions = filterOptions.setores.map(s => ({{ label: s, value: s }}));
@@ -5847,6 +5867,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const selEtapaNome = selEtapaConsolidada.value;
                         
                         // *** 2. LER OUTROS FILTROS ***
+                        const selUgbArray = vsUgbConsolidado ? vsUgbConsolidado.getValue() || [] : [];
                         // const selSetorArray = vsSetor ? vsSetor.getValue() || [] : []; // REMOVIDO
                         // const selGrupoArray = vsGrupo ? vsGrupo.getValue() || [] : []; // REMOVIDO
                         const selEmpreendimentoArray = vsEmpreendimento ? vsEmpreendimento.getValue() || [] : []; // Renomeado
@@ -5879,6 +5900,12 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         // *** 5. APLICAR FILTROS SECUNDÁRIOS ***
                         let filteredTasks = baseTasks;
+
+                        // Filtro por UGB
+                        if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                            filteredTasks = filteredTasks.filter(t => selUgbArray.includes(t.ugb));
+                            console.log('Após filtro UGB no consolidado:', filteredTasks.length);
+                        }}
 
                         // if (selSetorArray.length > 0 && !selSetorArray.includes('Todos')) {{
                         //     filteredTasks = filteredTasks.filter(t => selSetorArray.includes(t.setor));
