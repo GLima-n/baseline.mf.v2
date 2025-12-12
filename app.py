@@ -8186,6 +8186,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             renderStageCheckboxes(initialSectorName);
             renderGroupCheckboxes(initialSectorName);
             renderMacroetapasCheckboxes(initialSectorName);
+            initUGBFilter();
             
             // Renderizar inicial com filtros aplicados
             // Pequeno delay para garantir que Virtual Selects estão completamente inicializados
