@@ -7341,6 +7341,65 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 console.log(`🔄 Virtual Select Macroetapas renderizado: ${{options.length}} opções, todas selecionadas`);
             }}
 
+            // *** FUNÇÃO: Inicializar Virtual Select de UGB ***
+            function initUGBFilter() {{
+                const ugbOptions = (filterOptions.ugbs || ["Todas"]).map(u => ({{ label: u, value: u }}));
+                
+                if (vsUgbSetor) {{
+                    vsUgbSetor.destroy();
+                }}
+                
+                vsUgbSetor = VirtualSelect.init({{
+                    ele: '#filter-ugb-setor-{project["id"]}',
+                    options: ugbOptions,
+                    multiple: true,
+                    search: true,
+                    selectedValue: ["Todas"],
+                    placeholder: 'Selecionar UGB(s)',
+                    noOptionsText: 'Nenhuma UGB disponível',
+                    searchPlaceholderText: 'Buscar...',
+                    selectAllText: 'Selecionar todas',
+                    allOptionsSelectedText: 'Todas selecionadas'
+                }});
+                
+                // Listener para atualizar empreendimentos
+                document.querySelector('#filter-ugb-setor-{project["id"]}').addEventListener('change', function() {{
+                    updateEmpreendimentoOptionsSetor();
+                }});
+                
+                console.log('🔄 Virtual Select UGB renderizado');
+            }}
+
+            // *** FUNÇÃO: Atualizar opções de empreendimento baseado em UGB ***
+            function updateEmpreendimentoOptionsSetor() {{
+                const selUgbArray = vsUgbSetor ? vsUgbSetor.getValue() || [] : [];
+                let tasksAtual = allTasks_baseData || [];
+                
+                if (!tasksAtual || tasksAtual.length === 0) {{
+                    console.warn('Nenhuma task disponível para filtrar empreendimentos');
+                    return;
+                }}
+                
+                // Filtrar empreendimentos por UGB
+                let filteredEmps = [...new Set(tasksAtual.map(t => t.empreendimento))];
+                if (selUgbArray.length > 0 && !selUgbArray.includes('Todas')) {{
+                    filteredEmps = [...new Set(tasksAtual
+                        .filter(t => selUgbArray.includes(t.ugb))
+                        .map(t => t.empreendimento))];
+                }}
+                
+                // Atualizar select normal de empreendimento
+                const selProject = document.getElementById('filter-project-{project["id"]}');
+                if (selProject) {{
+                    selProject.innerHTML = '<option value="Todos">Todos</option>';
+                    filteredEmps.forEach(emp => {{
+                        selProject.innerHTML += `<option value="${{emp}}">${{emp}}</option>`;
+                    }});
+                }}
+                
+                console.log('Opções de empreendimento atualizadas no setor. Total:', filteredEmps.length);
+            }}
+
             // *** FUNÇÃO AUXILIAR: Atualizar Título do Projeto ***
             function updateProjectTitle(newSectorName) {{
                 const projectTitle = document.querySelector('#gantt-sidebar-wrapper-{project["id"]} .project-title-row span');
@@ -7408,6 +7467,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         renderStageCheckboxes(currentSector);
                         renderGroupCheckboxes(currentSector);
                         renderMacroetapasCheckboxes(currentSector);
+                        initUGBFilter(); // NOVO: Inicializar filtro de UGB
                         
                         // Como os checkboxes foram recriados (e todos vêm checked por padrão na função render),
                         // atualizamos TODAS as listas de selecionadas para incluir as novas opções.
