@@ -3426,7 +3426,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         updateBaselineDropdownForProject(projectData[0].name);
                         
                         // ⭐ APLICAR ESTADO INICIAL DO FILTRO DE PULMÃO
-                        const initialBaseline = '{f"{baseline_name}" if baseline_name else "P0-(padrão)"}';
+                        const dropdown = document.getElementById('baseline-dropdown-{project["id"]}');
+                        const initialBaseline = dropdown ? dropdown.value : 'P0-(padrão)';
                         updatePulmaoFilterVisibility(initialBaseline);
                     }}
 
