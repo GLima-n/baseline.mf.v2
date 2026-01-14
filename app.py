@@ -1439,7 +1439,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
             Termino_Prevista=('Termino_Prevista', 'max'),
             Inicio_Real=('Inicio_Real', 'min'),
             Termino_Real=('Termino_Real', 'max'),
-            **{'% concluído': ('% concluído', 'max')},
+            **{'% concluído': ('% concluído', 'mean')},
             UGB=('UGB', 'first'),  # ← ADICIONADO: preservar UGB
             SETOR=('SETOR', 'first')
         ).reset_index()
@@ -4576,7 +4576,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         Termino_Prevista=('Termino_Prevista', 'max'),
         Inicio_Real=('Inicio_Real', 'min'),
         Termino_Real=('Termino_Real', 'max'),
-        **{'% concluído': ('% concluído', 'max')},
+        **{'% concluído': ('% concluído', 'mean')},
         SETOR=('SETOR', 'first'),
         UGB=('UGB', 'first')
     ).reset_index()
@@ -4616,7 +4616,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 if pd.notna(end_real_original) and pd.notna(end_date):
                     if end_real_original <= end_date: status_color_class = 'status-green'
                     else: status_color_class = 'status-red'
-            elif progress < 100 and pd.notna(end_date) and (end_date < hoje): status_color_class = 'status-yellow'
+            elif progress < 100 and pd.notna(end_real_original) and (end_real_original < hoje): status_color_class = 'status-yellow'
 
             task = {
                 "id": f"t{j}_{i}", # ID único
@@ -6512,7 +6512,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
         Termino_Prevista=('Termino_Prevista', 'max'),
         Inicio_Real=('Inicio_Real', 'min'),
         Termino_Real=('Termino_Real', 'max'),
-        **{'% concluído': ('% concluído', 'max')},
+        **{'% concluído': ('% concluído', 'mean')},
         UGB=('UGB', 'first'),
         GRUPO=('GRUPO', 'first')
     ).reset_index()
@@ -6565,7 +6565,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 if pd.notna(end_real_original) and pd.notna(end_date):
                     if end_real_original <= end_date: status_color_class = 'status-green'
                     else: status_color_class = 'status-red'
-            elif progress < 100 and pd.notna(end_date) and (end_date < hoje): 
+            elif progress < 100 and pd.notna(end_real_original) and (end_real_original < hoje): 
                 status_color_class = 'status-yellow'
             
             task = {
