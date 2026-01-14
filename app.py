@@ -5404,43 +5404,43 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         console.log("Etapa sem alteração, retornando tasks originais.");
                         return tasks; // Não altera datas
                     
-                    } else if (etapas_pulmao.includes(stageName)) {
+                    }} else if (etapas_pulmao.includes(stageName)) {{
                         console.log("Etapa Pulmão: movendo apenas início PREVISTO.");
                         // Para etapas de pulmão, move apenas o Início PREVISTO
-                        tasks.forEach(task => {
+                        tasks.forEach(task => {{
                             // ⭐ NOVO: Verifica se baseline é P0 antes de aplicar pulmão
-                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {
+                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {{
                                 task.start_previsto = addMonths(task.start_previsto, offsetMeses);
                                 // DATAS REAIS PERMANECEM INALTERADAS
                                 task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                                console.log(`  ✅ Pulmão aplicado em ${task.name} (P0)`);
-                            } else {
-                                console.log(`  ⏸️ Pulmão ignorado em ${task.name} (baseline: ${task.baseline_ativa})`);
-                            }
+                                console.log(`  ✅ Pulmão aplicado em ${{task.name}} (P0)`);
+                            }} else {{
+                                console.log(`  ⏸️ Pulmão ignorado em ${{task.name}} (baseline: ${{task.baseline_ativa}})`);
+                            }}
                             // Não mexe no 'end_date' real
-                        });
+                        }});
                     
-                    } else {
+                    }} else {{
                         console.log("Etapa Padrão: movendo apenas PREVISTO.");
                         // Para todas as outras etapas, move apenas Início e Fim PREVISTOS
-                        tasks.forEach(task => {
+                        tasks.forEach(task => {{
                             // ⭐ NOVO: Verifica se baseline é P0 antes de aplicar pulmão
-                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {
+                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {{
                                 task.start_previsto = addMonths(task.start_previsto, offsetMeses);
                                 task.end_previsto = addMonths(task.end_previsto, offsetMeses);
                                 // DATAS REAIS PERMANECEM INALTERADAS
 
                                 task.inicio_previsto = formatDateDisplay(task.start_previsto);
                                 task.termino_previsto = formatDateDisplay(task.end_previsto);
-                                console.log(`  ✅ Pulmão aplicado em ${task.name} (P0)`);
-                            } else {
-                                console.log(`  ⏸️ Pulmão ignorado em ${task.name} (baseline: ${task.baseline_ativa})`);
-                            }
+                                console.log(`  ✅ Pulmão aplicado em ${{task.name}} (P0)`);
+                            }} else {{
+                                console.log(`  ⏸️ Pulmão ignorado em ${{task.name}} (baseline: ${{task.baseline_ativa}})`);
+                            }}
                             // Datas reais mantêm seus valores originais
-                        });
-                    }
+                        }});
+                    }}
                     return tasks;
-                }
+                }}
 
                 // *** FUNÇÃO CORRIGIDA: applyInitialPulmaoState ***
                 function applyInitialPulmaoState() {{
