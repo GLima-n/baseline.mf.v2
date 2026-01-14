@@ -1523,7 +1523,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         baseline_options_por_empreendimento = {}
 
         # Carregar baselines para todos os empreendimentos nos dados
-        todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
+        # ⭐ NOVO: Ordenar por data meta (DEMANDA MÍNIMA)
+        todos_empreendimentos = criar_ordenacao_empreendimentos(df) if not df.empty else []
         for emp in todos_empreendimentos:
             # Obter opções de baseline para este empreendimento
             emp_baseline_options = get_baseline_options(emp)
@@ -1544,8 +1545,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
         empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
         baseline_options = baseline_options_por_empreendimento.get(empreendimento_atual, []) if empreendimento_atual != "Múltiplos" else []
         
-        # Obter todos os empreendimentos disponíveis nos dados filtrados
-        todos_empreendimentos = df["Empreendimento"].unique().tolist() if not df.empty else []
+        # Obter todos os empreendimentos disponíveis nos dados filtrados  
+        # ⭐ NOVO: Ordenar por data meta (DEMANDA MÍNIMA)
+        todos_empreendimentos = criar_ordenacao_empreendimentos(df) if not df.empty else []
         
         # Determinar empreendimento atual baseado no filtro ou no primeiro da lista
         empreendimento_atual = todos_empreendimentos[0] if len(todos_empreendimentos) == 1 else "Múltiplos"
