@@ -6199,25 +6199,27 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 
                                 // Recalcular VT
                                 if (task.end_real_original_raw && task.end_previsto) {{
-                            const endReal = parseDate(task.end_real_original_raw);
-                            const endPrev = parseDate(task.end_previsto);
-                            if (endReal && endPrev) {{
-                                const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
-                                task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                                    const endReal = parseDate(task.end_real_original_raw);
+                                    const endPrev = parseDate(task.end_previsto);
+                                    if (endReal && endPrev) {{
+                                        const diffDays = Math.round((endReal - endPrev) / (1000 * 60 * 60 * 24));
+                                        task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
+                                    }}
+                                }}
+                                
+                                console.log(`✅ Baseline aplicada para ${{empreendimento}}: ${{baselineName}}`);
+                            }} else {{
+                                // Baseline não tem dados para esta etapa
+                                task.start_previsto = null;
+                                task.end_previsto = null;
+                                task.inicio_previsto = "N/D";
+                                task.termino_previsto = "N/D";
+                                task.duracao_prev_meses = "-";
+                                task.vt_text = "-";
+                                
+                                console.log(`⚠️ Baseline ${{baselineName}} não tem dados para ${{empreendimento}}`);
                             }}
                         }}
-                        
-                        console.log(`✅ Baseline aplicada para ${{empreendimento}}: ${{baselineName}}`);
-                    }} else {{
-                        // Baseline não tem dados para esta etapa
-                        task.start_previsto = null;
-                        task.end_previsto = null;
-                        task.inicio_previsto = "N/D";
-                        task.termino_previsto = "N/D";
-                        task.duracao_prev_meses = "-";
-                        task.vt_text = "-";
-                        
-                        console.log(`⚠️ Baseline ${{baselineName}} não tem dados para ${{empreendimento}}`);
                     }}
                     
                     // Re-renderizar o gráfico
