@@ -5448,6 +5448,12 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         const offsetMeses = -initialPulmaoMeses;
                         let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
                         
+                        // ⭐ NOVO: Sincronizar baseline_ativa com estado inicial
+                        baseTasks.forEach(task => {{
+                            const selectedBaseline = baselinesPorEmpreendimento[task.name];
+                            task.baseline_ativa = selectedBaseline || 'P0-(padrão)';
+                        }});
+                        
                         // Passa o nome da etapa inicial - APENAS DATAS PREVISTAS SERÃO MODIFICADAS
                         const tasksProcessadas = aplicarLogicaPulmaoConsolidado(baseTasks, offsetMeses, initialStageName);
                         
@@ -5991,6 +5997,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         // Começar com os dados da etapa (já atualizados ou não)
                         let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
 
+                        // ⭐ NOVO: Sincronizar baseline_ativa com estado selecionado
+                        baseTasks.forEach(task => {{
+                            const selectedBaseline = baselinesPorEmpreendimento[task.name];
+                            task.baseline_ativa = selectedBaseline || 'P0-(padrão)';
+                        }});
+                        console.log('🔄 baseline_ativa sincronizado com seleções do usuário');
+
                         // *** 4. APLICAR LÓGICA DE PULMÃO (CORRIGIDO) ***
                         if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
                             const offsetMeses = -selPulmaoMeses;
@@ -6136,49 +6149,56 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 function applyBaselineForEmp(empreendimento, baselineName) {{
                     console.log(`🔄 Aplicando baseline "${{baselineName}}" para: ${{empreendimento}}`);
                     
+                    // ⭐ NOVO: Atualizar estado de rastreamento
+                    baselinesPorEmpreendimento[empreendimento] = baselineName;
+                    console.log('📊 Estado atualizado:', baselinesPorEmpreendimento);
+                    
                     const tasks = projectData[0].tasks;
                     if (!tasks || tasks.length === 0) {{
                         console.warn('Nenhuma task disponível');
                         return;
                     }}
                     
-                    // Atualizar estado
-                    baselinesPorEmpreendimento[empreendimento] = baselineName;
-                    
-                    // Encontrar a task deste empreendimento
                     const task = tasks.find(t => t.name === empreendimento);
-                    
                     if (!task) {{
-                        console.warn(`Task não encontrada para empreendimento: ${{empreendimento}}`);
+                        console.warn(`Empreendimento "${{empreendimento}}" não encontrado`);
                         return;
                     }}
                     
-                    if (!task.baselines || !task.baselines[baselineName]) {{
-                        console.warn(`Task ${{task.name}} não tem baseline ${{baselineName}}`);
-                        return;
-                    }}
+                    // ⭐ NOVO: Atualizar baseline_ativa do task
+                    task.baseline_ativa = baselineName;
                     
-                    const baselineData = task.baselines[baselineName];
-                    
-                    if (baselineData.start !== null && baselineData.end !== null) {{
-                        // Atualizar datas previstas
-                        task.start_previsto = baselineData.start;
-                        task.end_previsto = baselineData.end;
-                        
-                        // Recalcular campos de exibição
-                        task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                        task.termino_previsto = formatDateDisplay(task.end_previsto);
-                        
-                        // Recalcular duração
-                        const startDate = parseDate(task.start_previsto);
-                        const endDate = parseDate(task.end_previsto);
-                        if (startDate && endDate) {{
-                            const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
-                            task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                    // Se for P0, restaurar dados originais
+                    if (baselineName === "P0-(padrão)") {{
+                        const originalTask = allTasks_baseData.find(t => t.name === empreendimento);
+                        if (originalTask) {{
+                            task.start_previsto = originalTask.start_previsto;
+                            task.end_previsto = originalTask.end_previsto;
+                            task.inicio_previsto = originalTask.inicio_previsto;
+                            task.termino_previsto = originalTask.termino_previsto;
+                            task.duracao_prev_meses = originalTask.duracao_prev_meses;
                         }}
-                        
-                        // Recalcular VT (Variação de Término)
-                        if (task.end_real_original_raw && task.end_previsto) {{
+                    }} else {{
+                        // Aplicar baseline específica
+                        if (task.baselines && task.baselines[baselineName]) {{
+                            const baselineData = task.baselines[baselineName];
+                            
+                            if (baselineData.start !== null && baselineData.end !== null) {{
+                                task.start_previsto = baselineData.start;
+                                task.end_previsto = baselineData.end;
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                
+                                // Recalcular duração
+                                const startDate = parseDate(task.start_previsto);
+                                const endDate = parseDate(task.end_previsto);
+                                if (startDate && endDate) {{
+                                    const diffDays = (endDate - startDate) / (1000 * 60 * 60 * 24);
+                                    task.duracao_prev_meses = (diffDays / 30.4375).toFixed(1).replace('.', ',');
+                                }}
+                                
+                                // Recalcular VT
+                                if (task.end_real_original_raw && task.end_previsto) {{
                             const endReal = parseDate(task.end_real_original_raw);
                             const endPrev = parseDate(task.end_previsto);
                             if (endReal && endPrev) {{
