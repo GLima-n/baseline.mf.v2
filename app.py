@@ -4562,7 +4562,8 @@ def converter_dados_para_gantt_consolidado(df, etapa_selecionada):
                 "duracao_real_meses": f"{dur_real_meses:.1f}".replace('.', ',') if dur_real_meses is not None else "-",
                 "vt_text": f"{int(vt):+d}d" if pd.notna(vt) else "-",
                 "vd_text": f"{int(vd):+d}d" if pd.notna(vd) else "-",
-                "status_color_class": status_color_class
+                "status_color_class": status_color_class,
+                "baseline_ativa": "P0-(padrão)"  # ⭐ NOVO: rastreia baseline de cada empreendimento
             }
             tasks.append(task)
 
@@ -5403,31 +5404,43 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                         console.log("Etapa sem alteração, retornando tasks originais.");
                         return tasks; // Não altera datas
                     
-                    }} else if (etapas_pulmao.includes(stageName)) {{
+                    } else if (etapas_pulmao.includes(stageName)) {
                         console.log("Etapa Pulmão: movendo apenas início PREVISTO.");
                         // Para etapas de pulmão, move apenas o Início PREVISTO
-                        tasks.forEach(task => {{
-                            task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                            // DATAS REAIS PERMANECEM INALTERADAS
-                            task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                        tasks.forEach(task => {
+                            // ⭐ NOVO: Verifica se baseline é P0 antes de aplicar pulmão
+                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {
+                                task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                // DATAS REAIS PERMANECEM INALTERADAS
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                console.log(`  ✅ Pulmão aplicado em ${task.name} (P0)`);
+                            } else {
+                                console.log(`  ⏸️ Pulmão ignorado em ${task.name} (baseline: ${task.baseline_ativa})`);
+                            }
                             // Não mexe no 'end_date' real
-                        }});
+                        });
                     
-                    }} else {{
+                    } else {
                         console.log("Etapa Padrão: movendo apenas PREVISTO.");
                         // Para todas as outras etapas, move apenas Início e Fim PREVISTOS
-                        tasks.forEach(task => {{
-                            task.start_previsto = addMonths(task.start_previsto, offsetMeses);
-                            task.end_previsto = addMonths(task.end_previsto, offsetMeses);
-                            // DATAS REAIS PERMANECEM INALTERADAS
+                        tasks.forEach(task => {
+                            // ⭐ NOVO: Verifica se baseline é P0 antes de aplicar pulmão
+                            if (!task.baseline_ativa || task.baseline_ativa === 'P0-(padrão)') {
+                                task.start_previsto = addMonths(task.start_previsto, offsetMeses);
+                                task.end_previsto = addMonths(task.end_previsto, offsetMeses);
+                                // DATAS REAIS PERMANECEM INALTERADAS
 
-                            task.inicio_previsto = formatDateDisplay(task.start_previsto);
-                            task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                task.inicio_previsto = formatDateDisplay(task.start_previsto);
+                                task.termino_previsto = formatDateDisplay(task.end_previsto);
+                                console.log(`  ✅ Pulmão aplicado em ${task.name} (P0)`);
+                            } else {
+                                console.log(`  ⏸️ Pulmão ignorado em ${task.name} (baseline: ${task.baseline_ativa})`);
+                            }
                             // Datas reais mantêm seus valores originais
-                        }});
-                    }}
+                        });
+                    }
                     return tasks;
-                }}
+                }
 
                 // *** FUNÇÃO CORRIGIDA: applyInitialPulmaoState ***
                 function applyInitialPulmaoState() {{
@@ -6065,6 +6078,9 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                                                 task.vt_text = diffDays > 0 ? `+${{diffDays}}d` : diffDays < 0 ? `${{diffDays}}d` : '0d';
                                             }}
                                         }}
+                                        
+                                        // ⭐ ATUALIZAR baseline_ativa do task
+                                        task.baseline_ativa = selectedBaseline;
                                     }}
                                 }}
                             }}
