@@ -2167,7 +2167,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 <label for="filter-vis-real-{project['id']}">Real</label>
                             </div>
                         </div>
-                        <div class="filter-group">
+                        <div class="filter-group" id="pulmao-filter-group-{project['id']}" style="display: {'none' if baseline_name and baseline_name != 'P0-(padrão)' else 'block'};">
                             <label>Simulação Pulmão</label>
                             <div class="filter-group-radio">
                                 <input type="radio" id="filter-pulmao-sem-{project['id']}" name="filter-pulmao-{project['id']}" value="Sem Pulmão">
@@ -3919,6 +3919,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     function toggleSidebar() {{ 
                         document.getElementById('gantt-sidebar-wrapper-{project["id"]}').classList.toggle('collapsed'); 
+                    }}
+
+                    // Função para mostrar/esconder o filtro de pulmão baseado na baseline ativa
+                    function updatePulmaoFilterVisibility(baselineName) {{
+                        const pulmaoFilterGroup = document.getElementById('pulmao-filter-group-{project["id"]}');
+                        if (pulmaoFilterGroup) {{
+                            // Esconde pulmão se há baseline ativa (diferente de P0)
+                            if (baselineName && baselineName !== 'P0-(padrão)') {{
+                                pulmaoFilterGroup.style.display = 'none';
+                            }} else {{
+                                pulmaoFilterGroup.style.display = 'block';
+                            }}
+                        }}
                     }}
 
                     function updatePulmaoInputVisibility() {{
