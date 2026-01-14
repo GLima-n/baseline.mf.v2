@@ -6047,32 +6047,14 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                             const selectedBaseline = baselinesPorEmpreendimento[emp];
                             
                             if (selectedBaseline && selectedBaseline !== "P0-(padrão)") {{
-                                // Aplicar baseline sem re-renderizar (será feito no final)
+                                // ⭐ Aplicar baseline SEM PULMÃO (pulmão só afeta P0!)
                                 if (task.baselines && task.baselines[selectedBaseline]) {{
                                     const baselineData = task.baselines[selectedBaseline];
                                     
                                     if (baselineData.start !== null && baselineData.end !== null) {{
-                                        // Aplicar dados da baseline
-                                        let startPrevisto = baselineData.start;
-                                        let endPrevisto = baselineData.end;
-                                        
-                                        // *** APLICAR PULMÃO SE NECESSÁRIO ***
-                                        if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
-                                            const offsetMeses = -selPulmaoMeses;
-                                            const startDate = parseDate(startPrevisto);
-                                            const endDate = parseDate(endPrevisto);
-                                            
-                                            if (startDate && endDate) {{
-                                                startDate.setMonth(startDate.getMonth() + offsetMeses);
-                                                endDate.setMonth(endDate.getMonth() + offsetMeses);
-                                                
-                                                startPrevisto = startDate.toISOString().split('T')[0];
-                                                endPrevisto = endDate.toISOString().split('T')[0];
-                                            }}
-                                        }}
-                                        
-                                        task.start_previsto = startPrevisto;
-                                        task.end_previsto = endPrevisto;
+                                        // Aplicar dados da baseline DIRETAMENTE (sem pulmão)
+                                        task.start_previsto = baselineData.start;
+                                        task.end_previsto = baselineData.end;
                                         task.inicio_previsto = formatDateDisplay(task.start_previsto);
                                         task.termino_previsto = formatDateDisplay(task.end_previsto);
                                         
