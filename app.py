@@ -2247,6 +2247,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                     let projectData = {json.dumps([project])};
 
+                    // ⭐ Lista ordenada de empreendimentos por meta
+                    const empreendimentosOrdenados = {json.dumps(todos_empreendimentos)};
+
                     // Datas originais (Python)
                     const dataMinStr = '{data_min_proj.strftime("%Y-%m-%d")}';
                     const dataMaxStr = '{data_max_proj.strftime("%Y-%m-%d")}';
