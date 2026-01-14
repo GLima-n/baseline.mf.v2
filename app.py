@@ -4015,6 +4015,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
 
                         updatePulmaoInputVisibility();
 
+                        // ⭐ ATUALIZAR VISIBILIDADE DO FILTRO DE PULMÃO (volta para P0)
+                        updatePulmaoFilterVisibility('P0-(padrão)');
+
                         renderHeader();
                         renderMonthDividers();
                         renderSidebar();
@@ -4263,6 +4266,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                 // *** ATUALIZAR BASELINE PARA O NOVO EMPREENDIMENTO ***
                                 const newProjectName = newProject.name;
                                 updateBaselineDropdownForProject(newProjectName);
+                                
+                                // ⭐ ATUALIZAR VISIBILIDADE DO FILTRO DE PULMÃO (baseline reseta para P0)
+                                updatePulmaoFilterVisibility('P0-(padrão)');
                             }}
 
                             let baseTasks = JSON.parse(JSON.stringify(allTasks_baseData));
