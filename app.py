@@ -2515,6 +2515,9 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // Redesenhar gráfico
                         try {{
+                            // ⭐ ATUALIZAR VISIBILIDADE DO FILTRO DE PULMÃO
+                            updatePulmaoFilterVisibility(baselineName);
+                            
                             renderChart();
                             renderSidebar();
                         }} catch (e) {{
@@ -3421,6 +3424,10 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         
                         // Inicializar monitoramento do dropdown de baseline
                         updateBaselineDropdownForProject(projectData[0].name);
+                        
+                        // ⭐ APLICAR ESTADO INICIAL DO FILTRO DE PULMÃO
+                        const initialBaseline = '{f"{baseline_name}" if baseline_name else "P0-(padrão)"}';
+                        updatePulmaoFilterVisibility(initialBaseline);
                     }}
 
                     function applyInitialPulmaoState() {{
