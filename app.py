@@ -6003,12 +6003,25 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                             task.baseline_ativa = selectedBaseline || 'P0-(padrão)';
                         }});
                         console.log('🔄 baseline_ativa sincronizado com seleções do usuário');
+                        console.log('📋 Estado de baselines:', baselinesPorEmpreendimento);
 
                         // *** 4. APLICAR LÓGICA DE PULMÃO (CORRIGIDO) ***
                         if (selPulmao === 'Com Pulmão' && selPulmaoMeses > 0) {{
+                            console.log(`🎯 ANTES do pulmão - Primeira task:`, baseTasks[0] ? {{
+                                name: baseTasks[0].name,
+                                baseline_ativa: baseTasks[0].baseline_ativa,
+                                start_previsto: baseTasks[0].start_previsto
+                            }} : 'nenhuma');
+                            
                             const offsetMeses = -selPulmaoMeses;
                             // Passa o nome da etapa atual para a lógica - APENAS PREVISTO AFETADO
                             baseTasks = aplicarLogicaPulmaoConsolidado(baseTasks, offsetMeses, currentStageName);
+                            
+                            console.log(`🎯 DEPOIS do pulmão - Primeira task:`, baseTasks[0] ? {{
+                                name: baseTasks[0].name,
+                                baseline_ativa: baseTasks[0].baseline_ativa,
+                                start_previsto: baseTasks[0].start_previsto
+                            }} : 'nenhuma');
                         }}
 
                         // *** 5. APLICAR FILTROS SECUNDÁRIOS ***
