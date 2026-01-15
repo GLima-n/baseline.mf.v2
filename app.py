@@ -8591,7 +8591,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                         bars.forEach(b => b.classList.add('focus-mode'));
                         focusBtn.style.background = '#e6f2ff';
                     }} else {{
-                        bars.forEach(b => { b.classList.remove('focus-mode', 'focused') });
+                        bars.forEach(b => {{ b.classList.remove('focus-mode', 'focused'); }});
                         focusBtn.style.background = 'white';
                     }}
                     menu.style.display = 'none';
