@@ -3662,10 +3662,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                     }}
                                     if (barPrevisto && barReal) {{
                                         const s_prev = parseDate(task.start_previsto), e_prev = parseDate(task.end_previsto), s_real = parseDate(task.start_real), e_real = parseDate(task.end_real_original_raw || task.end_real);
-                                        if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{ 
-                                            barPrevisto.style.zIndex = '8'; 
-                                            barReal.style.zIndex = '7'; 
-                                        }}
+
                                         renderOverlapBar(task, row);
                                     }}
                                     chartBody.appendChild(row);
