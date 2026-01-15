@@ -1939,8 +1939,8 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
                     .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
                     .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
-                    .gantt-bar.previsto {{ z-index: 7; }}
-                    .gantt-bar.real {{ z-index: 8; }}
+                    .gantt-bar.previsto {{ z-index: 7 !important; }}
+                    .gantt-bar.real {{ z-index: 8 !important; }}
                     .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
                     .gantt-bar.real .bar-label {{ color: white; }}
                     .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
@@ -3699,10 +3699,7 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                                                 }}
                                                 if (subBarPrevisto && subBarReal) {{
                                                     const s_prev = parseDate(subetapa.start_previsto), e_prev = parseDate(subetapa.end_previsto), s_real = parseDate(subetapa.start_real), e_real = parseDate(subetapa.end_real_original_raw || subetapa.end_real);
-                                                    if (s_prev && e_prev && s_real && e_real && s_real <= s_prev && e_real >= e_prev) {{ 
-                                                        subBarPrevisto.style.zIndex = '8'; 
-                                                        subBarReal.style.zIndex = '7'; 
-                                                    }}
+
                                                     renderOverlapBar(subetapa, subtaskRow);
                                                 }}
                                                 chartBody.appendChild(subtaskRow);
@@ -4892,8 +4889,8 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
                 .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
                 .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
-                .gantt-bar.previsto {{ z-index: 7; }}
-                .gantt-bar.real {{ z-index: 8; }}
+                .gantt-bar.previsto {{ z-index: 7 !important; }}
+                .gantt-bar.real {{ z-index: 8 !important; }}
                 .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
                 .gantt-bar.real .bar-label {{ color: white; }}
                 .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
@@ -6927,8 +6924,8 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             .gantt-bar {{ position: absolute; height: 14px; top: 8px; border-radius: 3px; cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; padding: 0 5px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
             .gantt-bar-overlap {{ position: absolute; height: 14px; top: 8px; background-image: linear-gradient(45deg, rgba(0, 0, 0, 0.25) 25%, transparent 25%, transparent 50%, rgba(0, 0, 0, 0.25) 50%, rgba(0, 0, 0, 0.25) 75%, transparent 75%, transparent); background-size: 8px 8px; z-index: 9; pointer-events: none; border-radius: 3px; }}
             .gantt-bar:hover {{ transform: translateY(-1px) scale(1.01); box-shadow: 0 4px 8px rgba(0,0,0,0.2); z-index: 10 !important; }}
-            .gantt-bar.previsto {{ z-index: 7; }}
-            .gantt-bar.real {{ z-index: 8; }}
+            .gantt-bar.previsto {{ z-index: 7 !important; }}
+            .gantt-bar.real {{ z-index: 8 !important; }}
             .bar-label {{ font-size: 8px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,0.4); }}
             .gantt-bar.real .bar-label {{ color: white; }}
             .gantt-bar.previsto .bar-label {{ color: #6C6C6C; }}
