@@ -10338,54 +10338,50 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # Criar cabeçalho da tabela usando colunas
-                        st.markdown('<div style="margin-top: 10px; margin-bottom: 5px;">', unsafe_allow_html=True)
-                        
-                        # Cabeçalho
-                        header_cols = st.columns([0.25, 0.20, 0.40, 0.15])
-                        with header_cols[0]:
-                            st.markdown('<div class="table-header">DATA</div>', unsafe_allow_html=True)
-                        with header_cols[1]:
-                            st.markdown('<div class="table-header">LINHA DE BASE</div>', unsafe_allow_html=True)
-                        with header_cols[2]:
-                            st.markdown('<div class="table-header">CRIADO POR</div>', unsafe_allow_html=True)
-                        with header_cols[3]:
-                            st.markdown('<div class="table-header">APAGAR</div>', unsafe_allow_html=True)
-                        
-                        st.markdown('<hr style="margin: 5px 0; border: none; border-top: 2px solid #dee2e6;">', unsafe_allow_html=True)
-                        
-                        # Linhas da tabela
+                        # Construir HTML da tabela (3 colunas apenas)
+                        table_rows = ""
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
                             baseline_info = emp_baselines[version_name]
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
                             version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            # Cor de fundo alternada
-                            bg_color = "#ffffff" if i % 2 == 0 else "#f8f9fa"
+                            table_rows += f"""
+<tr>
+    <td class="baseline-date">{data_criacao}</td>
+    <td class="baseline-version">{version_display}</td>
+    <td class="baseline-email">{created_by}</td>
+</tr>"""
+                        
+                        # Criar layout com tabela e botões lado a lado
+                        col_table, col_buttons = st.columns([0.85, 0.15])
+                        
+                        with col_table:
+                            table_html = f"""
+<table class="baseline-table">
+    <thead>
+        <tr>
+            <th style="width: 29.41%">Data</th>
+            <th style="width: 23.53%">Linha de Base</th>
+            <th style="width: 47.06%">Criado por</th>
+        </tr>
+    </thead>
+    <tbody>{table_rows}
+    </tbody>
+</table>"""
+                            st.markdown(table_html, unsafe_allow_html=True)
+                        
+                        with col_buttons:
+                            # Cabeçalho para alinhar
+                            st.markdown('<div style="height: 44px; display: flex; align-items: center; justify-content: center; background-color: #f1f3f5; font-weight: 600; font-size: 13px; color: #495057; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #dee2e6;">APAGAR</div>', unsafe_allow_html=True)
                             
-                            row_cols = st.columns([0.25, 0.20, 0.40, 0.15])
-                            
-                            with row_cols[0]:
-                                st.markdown(
-                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef;">{data_criacao}</div>', 
-                                    unsafe_allow_html=True
-                                )
-                            
-                            with row_cols[1]:
-                                st.markdown(
-                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #0066cc;">{version_display}</div>', 
-                                    unsafe_allow_html=True
-                                )
-                            
-                            with row_cols[2]:
-                                st.markdown(
-                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef; color: #6c757d; font-size: 13px;">{created_by}</div>', 
-                                    unsafe_allow_html=True
-                                )
-                            
-                            with row_cols[3]:
-                                st.markdown(f'<div style="padding: 4px; background-color: {bg_color}; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                            # Botões alinhados com as linhas
+                            for i, (_, version_name, _) in enumerate(baseline_list):
+                                version_display = version_name.split('-')[0] if '-' in version_name else version_name
+                                
+                                # Container para o botão com altura fixa para alinhar com a linha da tabela
+                                st.markdown('<div style="height: 49px; display: flex; align-items: center; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                                
                                 if st.button(
                                     "🗑",
                                     key=f"delete_{empreendimento}_{i}",
@@ -10400,9 +10396,8 @@ with st.spinner("Carregando e processando dados..."):
                                         st.rerun()
                                     else:
                                         st.error("Erro ao excluir")
+                                
                                 st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        st.markdown('</div>', unsafe_allow_html=True)
                         
                     else:
                         st.markdown('<div class="no-baselines">Nenhuma baseline criada ainda</div>', unsafe_allow_html=True)
