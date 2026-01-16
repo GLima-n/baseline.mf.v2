@@ -10267,6 +10267,17 @@ with st.spinner("Carregando e processando dados..."):
                     border: 1px dashed #dee2e6;
                 }
                 
+                .table-header {
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #495057;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    text-align: center;
+                    padding: 10px;
+                    background-color: #f1f3f5;
+                }
+                
                 .delete-btn-container {
                     text-align: center;
                 }
@@ -10327,53 +10338,54 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # Construir linhas da tabela com botões integrados
-                        table_rows = []
+                        # Criar cabeçalho da tabela usando colunas
+                        st.markdown('<div style="margin-top: 10px; margin-bottom: 5px;">', unsafe_allow_html=True)
+                        
+                        # Cabeçalho
+                        header_cols = st.columns([0.25, 0.20, 0.40, 0.15])
+                        with header_cols[0]:
+                            st.markdown('<div class="table-header">DATA</div>', unsafe_allow_html=True)
+                        with header_cols[1]:
+                            st.markdown('<div class="table-header">LINHA DE BASE</div>', unsafe_allow_html=True)
+                        with header_cols[2]:
+                            st.markdown('<div class="table-header">CRIADO POR</div>', unsafe_allow_html=True)
+                        with header_cols[3]:
+                            st.markdown('<div class="table-header">APAGAR</div>', unsafe_allow_html=True)
+                        
+                        st.markdown('<hr style="margin: 5px 0; border: none; border-top: 2px solid #dee2e6;">', unsafe_allow_html=True)
+                        
+                        # Linhas da tabela
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
                             baseline_info = emp_baselines[version_name]
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
                             version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            # Criar uma linha com placeholder para o botão
-                            row_html = f"""
-<tr>
-    <td class="baseline-date">{data_criacao}</td>
-    <td class="baseline-version">{version_display}</td>
-    <td class="baseline-email">{created_by}</td>
-    <td class="baseline-action">BUTTON_PLACEHOLDER_{i}</td>
-</tr>"""
-                            table_rows.append((row_html, version_name, i))
-                        
-                        # Construir tabela HTML completa
-                        table_html = f"""
-<table class="baseline-table">
-    <thead>
-        <tr>
-            <th style="width: 25%; text-align: center;">Data</th>
-            <th style="width: 20%; text-align: center;">Linha de Base</th>
-            <th style="width: 40%; text-align: center;">Criado por</th>
-            <th style="width: 15%; text-align: center;">Apagar</th>
-        </tr>
-    </thead>
-    <tbody>
-        {''.join([row[0] for row in table_rows])}
-    </tbody>
-</table>"""
-                        
-                        # Renderizar tabela HTML
-                        st.markdown(table_html, unsafe_allow_html=True)
-                        
-                        # Renderizar botões dentro das células (usando columns escondidas)
-                        st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
-                        
-                        for idx, (_, version_name, i) in enumerate(table_rows):
-                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
+                            # Cor de fundo alternada
+                            bg_color = "#ffffff" if i % 2 == 0 else "#f8f9fa"
                             
-                            # Usar expander invisível ou container para posicionar botão
-                            col1, col2, col3, col4 = st.columns([0.25, 0.20, 0.40, 0.15])
+                            row_cols = st.columns([0.25, 0.20, 0.40, 0.15])
                             
-                            with col4:
+                            with row_cols[0]:
+                                st.markdown(
+                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef;">{data_criacao}</div>', 
+                                    unsafe_allow_html=True
+                                )
+                            
+                            with row_cols[1]:
+                                st.markdown(
+                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef; font-weight: 600; color: #0066cc;">{version_display}</div>', 
+                                    unsafe_allow_html=True
+                                )
+                            
+                            with row_cols[2]:
+                                st.markdown(
+                                    f'<div style="padding: 12px; text-align: center; background-color: {bg_color}; border-bottom: 1px solid #e9ecef; color: #6c757d; font-size: 13px;">{created_by}</div>', 
+                                    unsafe_allow_html=True
+                                )
+                            
+                            with row_cols[3]:
+                                st.markdown(f'<div style="padding: 4px; background-color: {bg_color}; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
                                 if st.button(
                                     "🗑",
                                     key=f"delete_{empreendimento}_{i}",
@@ -10388,6 +10400,7 @@ with st.spinner("Carregando e processando dados..."):
                                         st.rerun()
                                     else:
                                         st.error("Erro ao excluir")
+                                st.markdown('</div>', unsafe_allow_html=True)
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                         
