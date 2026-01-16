@@ -10211,11 +10211,31 @@ with st.spinner("Carregando e processando dados..."):
                         
                         st.markdown("---")
                         
-                        # Listar baselines em ordem reversa (mais recente primeiro)
-                        for i, version_name in enumerate(sorted(emp_baselines.keys(), reverse=True)):
-                            baseline_info = emp_baselines[version_name]
+                        # Criar lista ordenada por data (mais antigo primeiro)
+                        baseline_list = []
+                        for version_name, baseline_info in emp_baselines.items():
                             data_criacao = baseline_info.get('date', 'N/A')
-                            
+                            # Converter data para formato ordenável se possível
+                            try:
+                                # Tentar converter DD/MM/YYYY para objeto datetime
+                                if data_criacao != 'N/A' and '/' in data_criacao:
+                                    date_parts = data_criacao.split('/')
+                                    if len(date_parts) == 3:
+                                        # Criar datetime para ordenação
+                                        date_obj = datetime.strptime(data_criacao, "%d/%m/%Y")
+                                        baseline_list.append((date_obj, version_name, data_criacao))
+                                    else:
+                                        baseline_list.append((datetime.min, version_name, data_criacao))
+                                else:
+                                    baseline_list.append((datetime.min, version_name, data_criacao))
+                            except:
+                                baseline_list.append((datetime.min, version_name, data_criacao))
+                        
+                        # Ordenar por data (mais antigo primeiro)
+                        baseline_list.sort(key=lambda x: x[0])
+                        
+                        # Listar baselines em ordem crescente (mais antigo primeiro)
+                        for i, (_, version_name, data_criacao) in enumerate(baseline_list):
                             col1, col2, col3 = st.columns([2, 2, 1])
                             
                             with col1:
