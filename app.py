@@ -10375,22 +10375,30 @@ with st.spinner("Carregando e processando dados..."):
                             # Cabeçalho para alinhar
                             st.markdown('<div style="height: 44px; display: flex; align-items: center; justify-content: center; background-color: #f1f3f5; font-weight: 600; font-size: 13px; color: #495057; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #dee2e6;">APAGAR</div>', unsafe_allow_html=True)
                             
+                            # CSS global para comprimir botões
+                            st.markdown("""
+                            <style>
+                            .stButton {
+                                margin: 0 !important;
+                                padding: 0 !important;
+                            }
+                            .stButton > button {
+                                margin: 0 !important;
+                                padding: 8px 12px !important;
+                                height: 36px !important;
+                            }
+                            div[data-testid="column"] {
+                                padding: 0 !important;
+                            }
+                            </style>
+                            """, unsafe_allow_html=True)
+                            
                             # Botões alinhados com as linhas
                             for i, (_, version_name, _) in enumerate(baseline_list):
                                 version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                # Container para o botão com altura e padding ajustados
-                                st.markdown('<div style="height: 48px; display: flex; align-items: center; padding: 0; margin: 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
-                                
-                                # CSS para remover espaçamento extra do botão
-                                st.markdown("""
-                                <style>
-                                .stButton > button {
-                                    margin: 0 !important;
-                                    padding: 6px 12px !important;
-                                }
-                                </style>
-                                """, unsafe_allow_html=True)
+                                # Container mínimo com 1px de espaço
+                                st.markdown('<div style="height: 37px; display: flex; align-items: center; padding: 0; margin: 0 0 1px 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
                                 
                                 if st.button(
                                     "🗑",
