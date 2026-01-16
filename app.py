@@ -10144,7 +10144,7 @@ with st.spinner("Carregando e processando dados..."):
     # Tab3 - Linhas de Base (apenas para usuarios autorizados)
     if tab3 is not None:
         with tab3:
-            st.title("Gerenciamento de Linhas de Base")
+            st.markdown("## Gerenciamento de Linhas de Base")
             
             # === SELETOR DE UGB ===
             ugbs_disponiveis = sorted(df_data['UGB'].dropna().unique().tolist()) if not df_data.empty else []
@@ -10158,7 +10158,7 @@ with st.spinner("Carregando e processando dados..."):
                     key="baseline_ugb_selector"
                 )
                 
-                st.divider()
+                st.markdown("<br>", unsafe_allow_html=True)
                 
                 # Filtrar empreendimentos pela UGB selecionada
                 empreendimentos_na_ugb = df_data[
@@ -10168,19 +10168,117 @@ with st.spinner("Carregando e processando dados..."):
                 # Obter email do usuário
                 user_email = st.session_state.get('user_email', '')
                 
+                # CSS para tabelas profissionais
+                st.markdown("""
+                <style>
+                .baseline-container {
+                    background-color: #f8f9fa;
+                    border-radius: 8px;
+                    padding: 20px;
+                    margin-bottom: 20px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                
+                .baseline-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 15px;
+                    padding-bottom: 10px;
+                    border-bottom: 2px solid #dee2e6;
+                }
+                
+                .baseline-title {
+                    font-size: 18px;
+                    font-weight: 600;
+                    color: #2c3e50;
+                    margin: 0;
+                }
+                
+                .baseline-table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    background-color: white;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+                }
+                
+                .baseline-table thead {
+                    background-color: #f1f3f5;
+                }
+                
+                .baseline-table th {
+                    padding: 12px 15px;
+                    text-align: left;
+                    font-weight: 600;
+                    font-size: 13px;
+                    color: #495057;
+                    border-bottom: 2px solid #dee2e6;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .baseline-table td {
+                    padding: 12px 15px;
+                    border-bottom: 1px solid #e9ecef;
+                    color: #495057;
+                    font-size: 14px;
+                }
+                
+                .baseline-table tbody tr:hover {
+                    background-color: #f8f9fa;
+                }
+                
+                .baseline-table tbody tr:last-child td {
+                    border-bottom: none;
+                }
+                
+                .baseline-version {
+                    font-weight: 600;
+                    color: #0066cc;
+                }
+                
+                .baseline-email {
+                    color: #6c757d;
+                    font-size: 13px;
+                }
+                
+                .baseline-date {
+                    color: #495057;
+                }
+                
+                .no-baselines {
+                    text-align: center;
+                    padding: 30px;
+                    color: #6c757d;
+                    font-style: italic;
+                    background-color: white;
+                    border-radius: 6px;
+                    border: 1px dashed #dee2e6;
+                }
+                
+                .delete-btn-container {
+                    text-align: center;
+                }
+                </style>
+                """, unsafe_allow_html=True)
+                
                 # === SEÇÃO POR EMPREENDIMENTO ===
                 for empreendimento in sorted(empreendimentos_na_ugb):
-                    # Cabeçalho com nome do empreendimento e botão criar
+                    # Container do empreendimento
+                    st.markdown(f'<div class="baseline-container">', unsafe_allow_html=True)
+                    
+                    # Cabeçalho com nome e botão
                     col_header1, col_header2 = st.columns([3, 1])
                     
                     with col_header1:
-                        st.subheader(empreendimento)
+                        st.markdown(f'<h3 class="baseline-title">{empreendimento}</h3>', unsafe_allow_html=True)
                     
                     with col_header2:
                         if st.button(
-                            "Criar Nova", 
+                            "➕ Criar Nova", 
                             key=f"create_baseline_{empreendimento}",
-                            type="primary",
                             use_container_width=True
                         ):
                             try:
@@ -10200,82 +10298,128 @@ with st.spinner("Carregando e processando dados..."):
                     emp_baselines = baselines.get(empreendimento, {})
                     
                     if emp_baselines:
-                        # Criar cabeçalho da tabela
-                        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
-                        with col1:
-                            st.markdown("**Data**")
-                        with col2:
-                            st.markdown("**Linha de base**")
-                        with col3:
-                            st.markdown("**Criado por**")
-                        with col4:
-                            st.markdown("**Apagar**")
-                        
-                        st.markdown("---")
-                        
-                        # Criar lista ordenada por número da versão (P1, P2, P3...)
+                        # Criar lista ordenada por número da versão
                         baseline_list = []
                         for version_name, baseline_info in emp_baselines.items():
                             data_criacao = baseline_info.get('date', 'N/A')
                             
                             # Extrair número da versão para ordenação
                             try:
-                                # Pegar apenas a parte P1, P2, P3... (antes do hífen)
                                 version_number_str = version_name.split('-')[0] if '-' in version_name else version_name
-                                # Extrair o número (remover 'P')
                                 if version_number_str.startswith('P'):
                                     version_number = int(version_number_str[1:])
                                 else:
-                                    version_number = 9999  # Versões sem formato padrão vão para o final
+                                    version_number = 9999
                             except:
                                 version_number = 9999
                             
                             baseline_list.append((version_number, version_name, data_criacao))
                         
-                        # Ordenar por número da versão (P1, P2, P3...)
+                        # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # Listar baselines em ordem crescente (mais antigo primeiro)
+                        # Construir HTML da tabela
+                        table_html = """
+                        <table class="baseline-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%">Data</th>
+                                    <th style="width: 20%">Linha de Base</th>
+                                    <th style="width: 40%">Criado por</th>
+                                    <th style="width: 15%; text-align: center">Apagar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                        """
+                        
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
-                            # Obter informações da baseline
+                            # Obter informações
                             baseline_info = emp_baselines[version_name]
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
-                            
-                            # Extrair apenas o número da versão (P1, P2, P3...) sem a data
                             version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
+                            table_html += f"""
+                                <tr>
+                                    <td class="baseline-date">{data_criacao}</td>
+                                    <td class="baseline-version">{version_display}</td>
+                                    <td class="baseline-email">{created_by}</td>
+                                    <td class="delete-btn-container">
+                            """
                             
-                            with col1:
-                                st.write(data_criacao)
+                            # Fechar HTML temporariamente para inserir botão Streamlit
+                            table_html += "</td></tr>"
+                        
+                        table_html += """
+                            </tbody>
+                        </table>
+                        """
+                        
+                        # Renderizar tabela HTML
+                        st.markdown(table_html, unsafe_allow_html=True)
+                        
+                        # Renderizar botões de deletar abaixo da tabela em grid
+                        st.markdown('<div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">', unsafe_allow_html=True)
+                        
+                        for idx, (_, version_name, data_criacao) in enumerate(baseline_list):
+                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            with col2:
-                                st.write(version_display)
-                            
-                            with col3:
-                                st.write(created_by)
-                            
-                            with col4:
+                            col_btn1, col_btn2 = st.columns([1, 4])
+                            with col_btn1:
+                                # Botão customizado com SVG
+                                delete_btn_html = f"""
+                                <style>
+                                .delete-btn-{empreendimento}-{idx} {{
+                                    background-color: white;
+                                    border: 1px solid #dee2e6;
+                                    border-radius: 4px;
+                                    padding: 8px 12px;
+                                    cursor: pointer;
+                                    transition: all 0.2s;
+                                    width: 100%;
+                                    display: flex;
+                                    align-items: center;
+                                    justify-content: center;
+                                }}
+                                .delete-btn-{empreendimento}-{idx}:hover {{
+                                    background-color: #fee;
+                                    border-color: #dc3545;
+                                }}
+                                </style>
+                                <button class="delete-btn-{empreendimento}-{idx}" title="Deletar {version_display}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                        <line x1="10" y1="11" x2="10" y2="17"></line>
+                                        <line x1="14" y1="11" x2="14" y2="17"></line>
+                                    </svg>
+                                </button>
+                                """
+                                
                                 if st.button(
-                                    "x",
-                                    key=f"delete_{empreendimento}_{i}",
+                                    "Deletar",
+                                    key=f"delete_{empreendimento}_{idx}",
+                                    help=f"Deletar {version_display}",
                                     use_container_width=True
                                 ):
                                     if delete_baseline(empreendimento, version_name):
-                                        # Remover de unsent_baselines se existir
                                         if 'unsent_baselines' in st.session_state:
                                             if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
                                                 st.session_state.unsent_baselines[empreendimento].remove(version_name)
-                                        st.success("Excluída!")
+                                        st.success(f"✅ {version_display} excluída!")
                                         st.rerun()
                                     else:
                                         st.error("Erro ao excluir")
+                            with col_btn2:
+                                pass  # Espaçamento
+                        
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
                     else:
-                        st.info("Nenhuma baseline criada ainda")
+                        st.markdown('<div class="no-baselines">Nenhuma baseline criada ainda</div>', unsafe_allow_html=True)
                     
-                    # Divisor entre empreendimentos
-                    st.divider()
+                    # Fechar container
+                    st.markdown('</div>', unsafe_allow_html=True)
 
 def verificar_implementacao_baseline():
     """Verifica se todas as funcoes de baseline foram implementadas"""
