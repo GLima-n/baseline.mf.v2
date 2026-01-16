@@ -10201,12 +10201,14 @@ with st.spinner("Carregando e processando dados..."):
                     
                     if emp_baselines:
                         # Criar cabeçalho da tabela
-                        col1, col2, col3 = st.columns([2, 2, 1])
+                        col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
                         with col1:
                             st.markdown("**Data**")
                         with col2:
                             st.markdown("**Linha de base**")
                         with col3:
+                            st.markdown("**Criado por**")
+                        with col4:
                             st.markdown("**Apagar**")
                         
                         st.markdown("---")
@@ -10236,7 +10238,12 @@ with st.spinner("Carregando e processando dados..."):
                         
                         # Listar baselines em ordem crescente (mais antigo primeiro)
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
-                            col1, col2, col3 = st.columns([2, 2, 1])
+                            # Obter informações da baseline
+                            baseline_info = emp_baselines[version_name]
+                            baseline_data = baseline_info.get('data', {})
+                            created_by = baseline_data.get('created_by', 'N/A')
+                            
+                            col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
                             
                             with col1:
                                 st.write(data_criacao)
@@ -10245,6 +10252,9 @@ with st.spinner("Carregando e processando dados..."):
                                 st.write(version_name)
                             
                             with col3:
+                                st.write(created_by)
+                            
+                            with col4:
                                 if st.button(
                                     "x",
                                     key=f"delete_{empreendimento}_{i}",
