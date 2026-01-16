@@ -10213,27 +10213,26 @@ with st.spinner("Carregando e processando dados..."):
                         
                         st.markdown("---")
                         
-                        # Criar lista ordenada por data (mais antigo primeiro)
+                        # Criar lista ordenada por número da versão (P1, P2, P3...)
                         baseline_list = []
                         for version_name, baseline_info in emp_baselines.items():
                             data_criacao = baseline_info.get('date', 'N/A')
-                            # Converter data para formato ordenável se possível
+                            
+                            # Extrair número da versão para ordenação
                             try:
-                                # Tentar converter DD/MM/YYYY para objeto datetime
-                                if data_criacao != 'N/A' and '/' in data_criacao:
-                                    date_parts = data_criacao.split('/')
-                                    if len(date_parts) == 3:
-                                        # Criar datetime para ordenação
-                                        date_obj = datetime.strptime(data_criacao, "%d/%m/%Y")
-                                        baseline_list.append((date_obj, version_name, data_criacao))
-                                    else:
-                                        baseline_list.append((datetime.min, version_name, data_criacao))
+                                # Pegar apenas a parte P1, P2, P3... (antes do hífen)
+                                version_number_str = version_name.split('-')[0] if '-' in version_name else version_name
+                                # Extrair o número (remover 'P')
+                                if version_number_str.startswith('P'):
+                                    version_number = int(version_number_str[1:])
                                 else:
-                                    baseline_list.append((datetime.min, version_name, data_criacao))
+                                    version_number = 9999  # Versões sem formato padrão vão para o final
                             except:
-                                baseline_list.append((datetime.min, version_name, data_criacao))
+                                version_number = 9999
+                            
+                            baseline_list.append((version_number, version_name, data_criacao))
                         
-                        # Ordenar por data (mais antigo primeiro)
+                        # Ordenar por número da versão (P1, P2, P3...)
                         baseline_list.sort(key=lambda x: x[0])
                         
                         # Listar baselines em ordem crescente (mais antigo primeiro)
