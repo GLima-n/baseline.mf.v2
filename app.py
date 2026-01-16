@@ -10146,100 +10146,104 @@ with st.spinner("Carregando e processando dados..."):
         with tab3:
             st.title("Gerenciamento de Linhas de Base")
             
-            # Seleção de empreendimento
-            empreendimentos_baseline = df_data['Empreendimento'].unique().tolist() if not df_data.empty else []
+            # === SELETOR DE UGB ===
+            ugbs_disponiveis = sorted(df_data['UGB'].dropna().unique().tolist()) if not df_data.empty else []
             
-            if not empreendimentos_baseline:
-                st.warning("Nenhum empreendimento disponível")
+            if not ugbs_disponiveis:
+                st.warning("Nenhuma UGB disponível")
             else:
-                selected_empreendimento_baseline = st.selectbox(
-                    "Selecione o Empreendimento",
-                    empreendimentos_baseline,
-                    key="baseline_emp_tab3"
+                selected_ugb = st.selectbox(
+                    "UGB:",
+                    ugbs_disponiveis,
+                    key="baseline_ugb_selector"
                 )
                 
                 st.divider()
                 
-                # === CRIAR BASELINE ===
-                st.subheader("📝 Criar Nova Baseline")
+                # Filtrar empreendimentos pela UGB selecionada
+                empreendimentos_na_ugb = df_data[
+                    df_data['UGB'] == selected_ugb
+                ]['Empreendimento'].unique().tolist()
                 
+                # Obter email do usuário
                 user_email = st.session_state.get('user_email', '')
                 
-                col1, col2 = st.columns([3, 1])
-                
-                with col1:
-                    st.write(f"**Empreendimento:** {selected_empreendimento_baseline}")
-                    if user_email:
-                        st.write(f"**Responsável:** {user_email}")
-                
-                with col2:
-                    if st.button("Criar Baseline", use_container_width=True, type="primary", key="create_baseline_main"):
-                        try:
-                            version_name = take_gantt_baseline(
-                                df_data, 
-                                selected_empreendimento_baseline, 
-                                tipo_visualizacao,
-                                created_by=user_email if user_email else "usuario"
-                            )
-                            st.success(f"✅ Baseline {version_name} criada!")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Erro: {e}")
-                
-                st.divider()
-                
-                
-                # === LISTA DE BASELINES ===
-                st.subheader("📋 Baselines Existentes")
-                
-                baselines = load_baselines()
-                unsent_baselines = st.session_state.get('unsent_baselines', {})
-                emp_unsent = unsent_baselines.get(selected_empreendimento_baseline, [])
-                emp_baselines = baselines.get(selected_empreendimento_baseline, {})
-                
-                if emp_baselines:
-                    for i, version_name in enumerate(sorted(emp_baselines.keys(), reverse=True)):
-                        is_unsent = version_name in emp_unsent
-                        baseline_info = emp_baselines[version_name]
-                        data_criacao = baseline_info.get('date', 'N/A')
-                        baseline_data_info = baseline_info.get('data', {})
-                        created_by = baseline_data_info.get('created_by', 'N/A')
-                        
-                        col1, col2, col3 = st.columns([4, 2, 1])
-                        
-                        with col1:
-                            status = "🟡 Pendente" if is_unsent else "🟢 Enviada"
-                            st.write(f"**{version_name}** - {status}")
-                            st.caption(f"Criado por: {created_by} | Data: {data_criacao}")
-                        
-                        with col2:
-                            st.write("")  # Espaçamento
-                        
-                        with col3:
-                            if st.button("Excluir", key=f"del_{i}", use_container_width=True):
-                                if delete_baseline(selected_empreendimento_baseline, version_name):
-                                    if 'unsent_baselines' in st.session_state:
-                                        if version_name in st.session_state.unsent_baselines.get(selected_empreendimento_baseline, []):
-                                            st.session_state.unsent_baselines[selected_empreendimento_baseline].remove(version_name)
-                                    st.success("Excluída")
-                                    st.rerun()
-                                else:
-                                    st.error("Erro ao excluir")
-                        
-                        if i < len(emp_baselines) - 1:
-                            st.divider()
+                # === SEÇÃO POR EMPREENDIMENTO ===
+                for empreendimento in sorted(empreendimentos_na_ugb):
+                    # Cabeçalho com nome do empreendimento e botão criar
+                    col_header1, col_header2 = st.columns([3, 1])
                     
-                    # Estatísticas simples
+                    with col_header1:
+                        st.subheader(empreendimento)
+                    
+                    with col_header2:
+                        if st.button(
+                            "Criar Nova", 
+                            key=f"create_baseline_{empreendimento}",
+                            type="primary",
+                            use_container_width=True
+                        ):
+                            try:
+                                version_name = take_gantt_baseline(
+                                    df_data,
+                                    empreendimento,
+                                    tipo_visualizacao,
+                                    created_by=user_email if user_email else "usuario"
+                                )
+                                st.success(f"✅ Baseline {version_name} criada!")
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro: {e}")
+                    
+                    # Carregar baselines do empreendimento
+                    baselines = load_baselines()
+                    emp_baselines = baselines.get(empreendimento, {})
+                    
+                    if emp_baselines:
+                        # Criar cabeçalho da tabela
+                        col1, col2, col3 = st.columns([2, 2, 1])
+                        with col1:
+                            st.markdown("**Data**")
+                        with col2:
+                            st.markdown("**Linha de base**")
+                        with col3:
+                            st.markdown("**Apagar**")
+                        
+                        st.markdown("---")
+                        
+                        # Listar baselines em ordem reversa (mais recente primeiro)
+                        for i, version_name in enumerate(sorted(emp_baselines.keys(), reverse=True)):
+                            baseline_info = emp_baselines[version_name]
+                            data_criacao = baseline_info.get('date', 'N/A')
+                            
+                            col1, col2, col3 = st.columns([2, 2, 1])
+                            
+                            with col1:
+                                st.write(data_criacao)
+                            
+                            with col2:
+                                st.write(version_name)
+                            
+                            with col3:
+                                if st.button(
+                                    "x",
+                                    key=f"delete_{empreendimento}_{i}",
+                                    use_container_width=True
+                                ):
+                                    if delete_baseline(empreendimento, version_name):
+                                        # Remover de unsent_baselines se existir
+                                        if 'unsent_baselines' in st.session_state:
+                                            if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
+                                                st.session_state.unsent_baselines[empreendimento].remove(version_name)
+                                        st.success("Excluída!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Erro ao excluir")
+                    else:
+                        st.info("Nenhuma baseline criada ainda")
+                    
+                    # Divisor entre empreendimentos
                     st.divider()
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Total", len(emp_baselines))
-                    with col2:
-                        st.metric("Pendentes", len(emp_unsent))
-                    with col3:
-                        st.metric("Enviadas", len(emp_baselines) - len(emp_unsent))
-                else:
-                    st.info("Nenhuma baseline criada ainda")
 
 def verificar_implementacao_baseline():
     """Verifica se todas as funcoes de baseline foram implementadas"""
