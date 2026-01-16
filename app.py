@@ -10385,7 +10385,6 @@ with st.spinner("Carregando e processando dados..."):
                             .stButton > button {
                                 margin: 0 !important;
                                 padding: 8px 12px !important;
-                                height: 36px !important;
                             }
                             div[data-testid="column"] {
                                 padding: 0 !important;
@@ -10393,12 +10392,12 @@ with st.spinner("Carregando e processando dados..."):
                             </style>
                             """, unsafe_allow_html=True)
                             
-                            # Botões alinhados com as linhas
+                            # Botões alinhados com as linhas (altura = padding da tabela 12px top + 12px bottom + ~24px conteúdo = 48px)
                             for i, (_, version_name, _) in enumerate(baseline_list):
                                 version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                # Container mínimo com 1px de espaço
-                                st.markdown('<div style="height: 37px; display: flex; align-items: center; padding: 0; margin: 0 0 1px 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                                # Container com altura exata da linha da tabela (48px total)
+                                st.markdown('<div style="height: 48px; display: flex; align-items: center; padding: 0; margin: 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
                                 
                                 if st.button(
                                     "🗑",
