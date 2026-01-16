@@ -4966,14 +4966,30 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 .gantt-chart-content:hover::-webkit-scrollbar-thumb, .gantt-sidebar-content:hover::-webkit-scrollbar-thumb {{ background-color: #d1d5db; }}
                 .gantt-chart-content:hover::-webkit-scrollbar-thumb:hover, .gantt-sidebar-content:hover::-webkit-scrollbar-thumb:hover {{ background-color: #a8b2c1; }}
                 .gantt-toolbar {{
-                    position: absolute; top: 10px; right: 10px;
+                    position: absolute; top: 2px; right: 10px;
                     z-index: 100;
                     display: flex;
                     flex-direction: column;
                     gap: 5px;
                     background: rgba(45, 55, 72, 0.9); /* Cor de fundo escura para minimalismo */
                     border-radius: 6px;
-                    padding: 5px;
+                    padding: 1px 5px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    transition: all 0.3s ease;
+                }}
+                .gantt-toolbar.collapsed {{
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    pointer-events: none;
+                }}
+                .gantt-toolbar.collapsed .toolbar-btn:not(.toolbar-toggle-btn) {{
+                    display: none;
+                    opacity: 0;
+                    pointer-events: none;
+                }}
+                .gantt-toolbar.collapsed .toolbar-toggle-btn {{
+                    pointer-events: auto;
+                    background: rgba(45, 55, 72, 0.9);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 }}
                 .toolbar-btn {{
@@ -4994,6 +5010,15 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 .toolbar-btn:hover {{
                     background-color: rgba(255, 255, 255, 0.1);
                     box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+                }}
+                .toolbar-toggle-btn {{
+                    margin-bottom: 2px;
+                }}
+                .toolbar-toggle-btn svg {{
+                    transition: transform 0.3s ease;
+                }}
+                .gantt-toolbar.collapsed .toolbar-toggle-btn svg {{
+                    transform: rotate(180deg);
                 }}
                 .toolbar-btn.is-fullscreen {{
                     background-color: #3b82f6; /* Cor de destaque para o botão ativo */
@@ -5101,6 +5126,13 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
         <body>
             <div class="gantt-container" id="gantt-container-{project['id']}">
                     <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
+                        <button class="toolbar-btn toolbar-toggle-btn" id="toolbar-toggle-btn-{project["id"]}" title="Recolher Toolbar">
+                             <span>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="18 15 12 9 6 15"></polyline>
+                                </svg>
+                            </span>
+                        </button>
                         <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
                         <span>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -5811,6 +5843,20 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     if (applyBtn) applyBtn.addEventListener('click', () => applyFiltersAndRedraw());
 
                     if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => toggleFullscreen());
+
+                    const toolbarToggleBtn = document.getElementById('toolbar-toggle-btn-{project["id"]}');
+                    if (toolbarToggleBtn) {{
+                        toolbarToggleBtn.addEventListener('click', (e) => {{
+                            e.stopPropagation();
+                            const toolbar = document.getElementById('gantt-toolbar-{project["id"]}');
+                            if (toolbar) toolbar.classList.toggle('collapsed');
+                            
+                            // Se a toolbar estiver colapsada, fecha o menu de filtro se estiver aberto
+                            if (toolbar && toolbar.classList.contains('collapsed')) {{
+                                if (filterMenu) filterMenu.classList.remove('is-open');
+                            }}
+                        }});
+                    }}
 
                     // Adiciona listener para o botão de filtro
                     if (filterBtn) {{
