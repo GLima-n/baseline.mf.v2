@@ -1981,14 +1981,14 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         background-color: #a8b2c1;
                     }}
                     .gantt-toolbar {{
-                        position: absolute; top: 10px; right: 10px;
+                        position: absolute; top: 2px; right: 10px;
                         z-index: 100;
                         display: flex;
                         flex-direction: column;
                         gap: 5px;
                         background: rgba(45, 55, 72, 0.9); /* Cor de fundo escura para minimalismo */
                         border-radius: 6px;
-                        padding: 5px;
+                        padding: 1px 5px;
                         box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                         transition: all 0.3s ease;
                     }}
