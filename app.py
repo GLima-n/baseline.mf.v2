@@ -10379,8 +10379,18 @@ with st.spinner("Carregando e processando dados..."):
                             for i, (_, version_name, _) in enumerate(baseline_list):
                                 version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                # Container para o botão com altura fixa para alinhar com a linha da tabela
-                                st.markdown('<div style="height: 49px; display: flex; align-items: center; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                                # Container para o botão com altura e padding ajustados
+                                st.markdown('<div style="height: 48px; display: flex; align-items: center; padding: 0; margin: 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                                
+                                # CSS para remover espaçamento extra do botão
+                                st.markdown("""
+                                <style>
+                                .stButton > button {
+                                    margin: 0 !important;
+                                    padding: 6px 12px !important;
+                                }
+                                </style>
+                                """, unsafe_allow_html=True)
                                 
                                 if st.button(
                                     "🗑",
