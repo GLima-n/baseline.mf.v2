@@ -4978,19 +4978,36 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     transition: all 0.3s ease;
                 }}
                 .gantt-toolbar.collapsed {{
-                    background: transparent !important;
-                    box-shadow: none !important;
-                    pointer-events: none;
+                    background: transparent;
+                    box-shadow: none;
+                    pointer-events: none; /* Permite clicar através da área transparente */
                 }}
+                /* Esconde botões normais quando colapsado */
                 .gantt-toolbar.collapsed .toolbar-btn:not(.toolbar-toggle-btn) {{
                     display: none;
-                    opacity: 0;
-                    pointer-events: none;
                 }}
+                /* Estiliza o botão de toggle quando colapsado */
                 .gantt-toolbar.collapsed .toolbar-toggle-btn {{
+                    display: flex;
                     pointer-events: auto;
-                    background: rgba(45, 55, 72, 0.9);
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    background: rgba(255, 255, 255, 0.3);
+                    color: #4a5568;
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 4px;
+                    backdrop-filter: blur(2px);
+                }}
+                .gantt-toolbar.collapsed .toolbar-toggle-btn:hover {{
+                    background: rgba(255, 255, 255, 0.8);
+                    opacity: 1;
+                    transform: scale(1.1);
+                }}
+                /* Rotação do ícone ao colapsar */
+                .toolbar-toggle-btn svg {{
+                    transition: transform 0.3s ease;
+                }}
+                .gantt-toolbar.collapsed .toolbar-toggle-btn svg {{
+                    transform: rotate(180deg);
                 }}
                 .toolbar-btn {{
                     background: none;
@@ -5013,12 +5030,6 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                 }}
                 .toolbar-toggle-btn {{
                     margin-bottom: 2px;
-                }}
-                .toolbar-toggle-btn svg {{
-                    transition: transform 0.3s ease;
-                }}
-                .gantt-toolbar.collapsed .toolbar-toggle-btn svg {{
-                    transform: rotate(180deg);
                 }}
                 .toolbar-btn.is-fullscreen {{
                     background-color: #3b82f6; /* Cor de destaque para o botão ativo */
