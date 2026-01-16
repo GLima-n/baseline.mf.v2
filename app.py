@@ -10338,39 +10338,41 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # CSS para layout de Lista Moderna (Clean List)
+                        # CSS para simular tabela usando colunas
                         st.markdown("""
                         <style>
-                        /* Reset de gaps */
+                        /* Remover gap vertical padrão das colunas APENAS dentro do wrapper da tabela se possível, 
+                           mas como é global, vamos aplicar e assumir que é o desejado para tabelas densas */
                         [data-testid="column"] [data-testid="stVerticalBlock"] {
                             gap: 0px !important;
                             padding: 0px !important;
                         }
+                        
+                        /* Remover gap horizontal entre colunas */
                         div[data-testid="stHorizontalBlock"] {
                             gap: 0px !important;
                         }
                         
-                        /* Estilo das células */
+                        /* Estilo das células simuladas */
                         .sim-cell {
-                            padding: 0px 15px;
+                            padding: 0px 10px; /* Reduzido padding vertical */
                             display: flex;
                             align-items: center;
                             justify-content: center;
                             height: 50px;
-                            border-bottom: 1px solid #e9ecef; /* Apenas borda inferior */
+                            border-bottom: 1px solid #e9ecef;
                             font-size: 14px;
                             color: #495057;
-                            /* Sem bordas verticais para evitar desalinhamento visual */
+                            background-color: transparent; /* Transparente para pegar a cor da linha */
                         }
                         
-                        /* Header limpo */
                         .sim-header {
-                            background-color: #f8f9fa; /* Fundo mais suave */
+                            background-color: #f1f3f5;
                             font-weight: 600;
-                            font-size: 12px;
-                            color: #6c757d;
+                            font-size: 13px;
+                            color: #495057;
                             text-transform: uppercase;
-                            letter-spacing: 0.8px;
+                            letter-spacing: 0.5px;
                             border-bottom: 2px solid #dee2e6;
                             padding: 10px;
                             text-align: center;
@@ -10380,43 +10382,35 @@ with st.spinner("Carregando e processando dados..."):
                             justify-content: center;
                         }
                         
-                        /* Botão minimalista */
+                        /* Ajuste do botão */
                         .stButton {
                             height: 50px !important;
                             display: flex !important;
                             align-items: center !important;
                             justify-content: center !important;
+                            /* border-bottom removido */
                         }
                         
                         .stButton button {
-                            border: 1px solid transparent !important; /* Invisível por padrão */
-                            background-color: transparent !important;
-                            padding: 0px !important;
+                            border-color: #dee2e6 !important;
+                            padding: 0px 10px !important;
                             min-height: 0px !important;
                             height: 30px !important;
-                            width: 30px !important;
-                            border-radius: 4px !important;
-                            color: #868e96 !important;
-                            transition: all 0.2s;
-                        }
-
-                        .stButton button:hover {
-                            background-color: #fff5f5 !important;
-                            border-color: #ffc9c9 !important;
-                            color: #e03131 !important;
+                            line-height: normal !important;
+                            margin: 0 !important;
                         }
                         </style>
                         """, unsafe_allow_html=True)
 
-                        # Container Principal
+                        # Container wrapper para aplicar o gap: 0 do CSS acima
                         table_container = st.columns([1])[0]
                         with table_container:
                             # --- CABEÇALHO ---
                             h_col1, h_col2, h_col3, h_col4 = st.columns([0.25, 0.20, 0.40, 0.15])
-                            with h_col1: st.markdown('<div class="sim-header">DATA</div>', unsafe_allow_html=True)
-                            with h_col2: st.markdown('<div class="sim-header">LINHA DE BASE</div>', unsafe_allow_html=True)
-                            with h_col3: st.markdown('<div class="sim-header">CRIADO POR</div>', unsafe_allow_html=True)
-                            with h_col4: st.markdown('<div class="sim-header">AÇÃO</div>', unsafe_allow_html=True)
+                            with h_col1: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">DATA</div>', unsafe_allow_html=True)
+                            with h_col2: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">LINHA DE BASE</div>', unsafe_allow_html=True)
+                            with h_col3: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">CRIADO POR</div>', unsafe_allow_html=True)
+                            with h_col4: st.markdown('<div class="sim-header">APAGAR</div>', unsafe_allow_html=True)
                             
                             # --- LINHAS ---
                             for i, (_, version_name, data_criacao) in enumerate(baseline_list):
@@ -10425,33 +10419,36 @@ with st.spinner("Carregando e processando dados..."):
                                 created_by = baseline_data.get('created_by', 'N/A')
                                 version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                # Zebra suave
-                                bg_color = "#ffffff" if i % 2 == 0 else "#f8f9fa"
-                                bg_style = f'background-color: {bg_color};'
+                                # Cor de fundo alternada
+                                bg_color = "#f8f9fa" if i % 2 != 0 else "#ffffff"
                                 
-                                # Container da Linha
+                                # Container da Linha (fundo)
                                 row_container = st.container()
                                 with row_container:
+                                    # Aplicar background na linha inteira via CSS se possível, ou nas células.
+                                    # Como st.columns não tem background, aplicamos nas células.
+                                    bg_style = f'background-color: {bg_color};'
+                                    
                                     col1, col2, col3, col4 = st.columns([0.25, 0.20, 0.40, 0.15])
                                     
                                     with col1:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style}">{data_criacao}</div>', unsafe_allow_html=True)
+                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef;">{data_criacao}</div>', unsafe_allow_html=True)
                                     
                                     with col2:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style} font-weight: 500; color: #1c7ed6;">{version_display}</div>', unsafe_allow_html=True)
+                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef; font-weight: 600; color: #0066cc;">{version_display}</div>', unsafe_allow_html=True)
                                         
                                     with col3:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style} color: #868e96; font-size: 13px;">{created_by}</div>', unsafe_allow_html=True)
+                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef; font-size: 13px; color: #6c757d;">{created_by}</div>', unsafe_allow_html=True)
                                         
                                     with col4:
-                                        # Background da célula da ação
+                                        # Background div absoluto para cobrir a coluna do botão
                                         st.markdown(f'<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; {bg_style} z-index: 0; pointer-events: none; border-bottom: 1px solid #e9ecef;"></div>', unsafe_allow_html=True)
                                         
                                         if st.button(
                                             "🗑",
                                             key=f"delete_{empreendimento}_{i}",
                                             help=f"Deletar {version_display}",
-                                            use_container_width=False # Botão pequeno centralizado
+                                            use_container_width=True
                                         ):
                                             if delete_baseline(empreendimento, version_name):
                                                 if 'unsent_baselines' in st.session_state:
