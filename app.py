@@ -10210,7 +10210,7 @@ with st.spinner("Carregando e processando dados..."):
                 
                 .baseline-table th {
                     padding: 12px 15px;
-                    text-align: left;
+                    text-align: center;
                     font-weight: 600;
                     font-size: 13px;
                     color: #495057;
@@ -10224,6 +10224,7 @@ with st.spinner("Carregando e processando dados..."):
                     border-bottom: 1px solid #e9ecef;
                     color: #495057;
                     font-size: 14px;
+                    text-align: center;
                 }
                 
                 .baseline-table tbody tr:hover {
@@ -10237,15 +10238,23 @@ with st.spinner("Carregando e processando dados..."):
                 .baseline-version {
                     font-weight: 600;
                     color: #0066cc;
+                    text-align: center;
                 }
                 
                 .baseline-email {
                     color: #6c757d;
                     font-size: 13px;
+                    text-align: center;
                 }
                 
                 .baseline-date {
                     color: #495057;
+                    text-align: center;
+                }
+                
+                .baseline-action {
+                    text-align: center;
+                    padding: 8px;
                 }
                 
                 .no-baselines {
@@ -10318,63 +10327,67 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # Construir HTML da tabela (sem indentação extra)
-                        table_rows = ""
+                        # Construir linhas da tabela com botões integrados
+                        table_rows = []
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
                             baseline_info = emp_baselines[version_name]
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
                             version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            table_rows += f"""
-                                <tr>
-                                    <td class="baseline-date">{data_criacao}</td>
-                                    <td class="baseline-version">{version_display}</td>
-                                    <td class="baseline-email">{created_by}</td>
-                                </tr>"""
-                                                        
-                            table_html = f"""
-                                <table class="baseline-table">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 30%">Data</th>
-                                            <th style="width: 25%">Linha de Base</th>
-                                            <th style="width: 45%">Criado por</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>{table_rows}
-                                    </tbody>
-                                </table>"""
+                            # Criar uma linha com placeholder para o botão
+                            row_html = f"""
+<tr>
+    <td class="baseline-date">{data_criacao}</td>
+    <td class="baseline-version">{version_display}</td>
+    <td class="baseline-email">{created_by}</td>
+    <td class="baseline-action">BUTTON_PLACEHOLDER_{i}</td>
+</tr>"""
+                            table_rows.append((row_html, version_name, i))
+                        
+                        # Construir tabela HTML completa
+                        table_html = f"""
+<table class="baseline-table">
+    <thead>
+        <tr>
+            <th style="width: 25%; text-align: center;">Data</th>
+            <th style="width: 20%; text-align: center;">Linha de Base</th>
+            <th style="width: 40%; text-align: center;">Criado por</th>
+            <th style="width: 15%; text-align: center;">Apagar</th>
+        </tr>
+    </thead>
+    <tbody>
+        {''.join([row[0] for row in table_rows])}
+    </tbody>
+</table>"""
                         
                         # Renderizar tabela HTML
                         st.markdown(table_html, unsafe_allow_html=True)
                         
-                        # Renderizar botões de deletar abaixo da tabela
-                        st.markdown('<div style="margin-top: 15px;">', unsafe_allow_html=True)
+                        # Renderizar botões dentro das células (usando columns escondidas)
+                        st.markdown('<div style="margin-top: -10px;">', unsafe_allow_html=True)
                         
-                        # Criar colunas para os botões de deletar
-                        num_baselines = len(baseline_list)
-                        if num_baselines > 0:
-                            cols = st.columns(num_baselines)
+                        for idx, (_, version_name, i) in enumerate(table_rows):
+                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            for idx, ((_, version_name, _), col) in enumerate(zip(baseline_list, cols)):
-                                version_display = version_name.split('-')[0] if '-' in version_name else version_name
-                                
-                                with col:
-                                    if st.button(
-                                        f"🗑 {version_display}",
-                                        key=f"delete_{empreendimento}_{idx}",
-                                        help=f"Deletar {version_display}",
-                                        use_container_width=True
-                                    ):
-                                        if delete_baseline(empreendimento, version_name):
-                                            if 'unsent_baselines' in st.session_state:
-                                                if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
-                                                    st.session_state.unsent_baselines[empreendimento].remove(version_name)
-                                            st.success(f"✅ {version_display} excluída!")
-                                            st.rerun()
-                                        else:
-                                            st.error("Erro ao excluir")
+                            # Usar expander invisível ou container para posicionar botão
+                            col1, col2, col3, col4 = st.columns([0.25, 0.20, 0.40, 0.15])
+                            
+                            with col4:
+                                if st.button(
+                                    "🗑",
+                                    key=f"delete_{empreendimento}_{i}",
+                                    help=f"Deletar {version_display}",
+                                    use_container_width=True
+                                ):
+                                    if delete_baseline(empreendimento, version_name):
+                                        if 'unsent_baselines' in st.session_state:
+                                            if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
+                                                st.session_state.unsent_baselines[empreendimento].remove(version_name)
+                                        st.success(f"✅ {version_display} excluída!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Erro ao excluir")
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                         
