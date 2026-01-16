@@ -10243,13 +10243,16 @@ with st.spinner("Carregando e processando dados..."):
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
                             
+                            # Extrair apenas o número da versão (P1, P2, P3...) sem a data
+                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
+                            
                             col1, col2, col3, col4 = st.columns([2, 2, 2, 1])
                             
                             with col1:
                                 st.write(data_criacao)
                             
                             with col2:
-                                st.write(version_name)
+                                st.write(version_display)
                             
                             with col3:
                                 st.write(created_by)
