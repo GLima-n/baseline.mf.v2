@@ -2037,11 +2037,19 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                         align-items: center;
                         justify-content: center;
                         transition: background-color 0.2s, box-shadow 0.2s;
-                        padding: 8px;
+                        padding: 6px;
+                    }}
+                    .toolbar-btn span {{
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 100%;
+                        height: 100%;
                     }}
                     .toolbar-btn svg {{
                         width: 100%;
                         height: 100%;
+                        display: block;
                     }}
                     .toolbar-toggle-btn {{
                         /* Botão normal dentro da toolbar */
@@ -5026,11 +5034,19 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     align-items: center;
                     justify-content: center;
                     transition: background-color 0.2s, box-shadow 0.2s;
-                    padding: 8px;
+                    padding: 6px;
+                }}
+                .toolbar-btn span {{
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 100%;
+                    height: 100%;
                 }}
                 .toolbar-btn svg {{
                     width: 100%;
                     height: 100%;
+                    display: block;
                 }}
                 .toolbar-btn:hover {{
                     background-color: rgba(255, 255, 255, 0.1);
@@ -7282,11 +7298,19 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 align-items: center;
                 justify-content: center;
                 transition: background-color 0.2s, box-shadow 0.2s;
-                padding: 8px;
+                padding: 6px;
+            }}
+            .toolbar-btn span {{
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 100%;
+                height: 100%;
             }}
             .toolbar-btn svg {{
                 width: 100%;
                 height: 100%;
+                display: block;
             }}
             .toolbar-btn:hover {{
                 background-color: rgba(255, 255, 255, 0.1);
