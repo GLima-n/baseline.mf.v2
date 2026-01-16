@@ -10348,6 +10348,11 @@ with st.spinner("Carregando e processando dados..."):
                             padding: 0px !important;
                         }
                         
+                        /* Remover gap horizontal entre colunas */
+                        div[data-testid="stHorizontalBlock"] {
+                            gap: 0px !important;
+                        }
+                        
                         /* Estilo das células simuladas */
                         .sim-cell {
                             padding: 0px 10px; /* Reduzido padding vertical */
