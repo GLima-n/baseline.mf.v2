@@ -10333,7 +10333,7 @@ with st.spinner("Carregando e processando dados..."):
                                     <td class="baseline-email">{created_by}</td>
                                 </tr>"""
                                                         
-                                                        table_html = f"""
+                            table_html = f"""
                                 <table class="baseline-table">
                                     <thead>
                                         <tr>
