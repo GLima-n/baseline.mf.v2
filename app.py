@@ -2141,21 +2141,21 @@ def gerar_gantt_por_projeto(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
                         <button class="toolbar-btn toolbar-toggle-btn" id="toolbar-toggle-btn-{project["id"]}" title="Recolher Toolbar">
                              <span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="18 15 12 9 6 15"></polyline>
                                 </svg>
                             </span>
                         </button>
                         <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
                             <span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                                 </svg>
                             </span>
                         </button>
                         <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                             <span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                                 </svg>
                             </span>
@@ -5147,21 +5147,21 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
                         <button class="toolbar-btn toolbar-toggle-btn" id="toolbar-toggle-btn-{project["id"]}" title="Recolher Toolbar">
                              <span>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <polyline points="18 15 12 9 6 15"></polyline>
                                 </svg>
                             </span>
                         </button>
                         <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
                         <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                             </svg>
                         </span>
                     </button>
                     <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Linhas de Base">
                         <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                                 <line x1="3" y1="9" x2="21" y2="9"></line>
                                 <line x1="3" y1="15" x2="21" y2="15"></line>
@@ -5170,7 +5170,7 @@ def gerar_gantt_consolidado(df, tipo_visualizacao, df_original_para_ordenacao, p
                     </button>
                     <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                         <span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                             </svg>
                         </span>
@@ -7461,21 +7461,21 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
             <div class="gantt-toolbar" id="gantt-toolbar-{project["id"]}">
                 <button class="toolbar-btn toolbar-toggle-btn" id="toolbar-toggle-btn-{project["id"]}" title="Recolher Toolbar">
                      <span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="18 15 12 9 6 15"></polyline>
                         </svg>
                     </span>
                 </button>
                 <button class="toolbar-btn" id="filter-btn-{project["id"]}" title="Filtros">
                     <span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
                         </svg>
                     </span>
                 </button>
                 <button class="toolbar-btn" id="baseline-btn-{project["id"]}" title="Linhas de Base">
                     <span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                             <line x1="3" y1="9" x2="21" y2="9"></line>
                             <line x1="3" y1="15" x2="21" y2="15"></line>
@@ -7484,7 +7484,7 @@ def gerar_gantt_por_setor(df, tipo_visualizacao, df_original_para_ordenacao, pul
                 </button>
                 <button class="toolbar-btn" id="fullscreen-btn-{project["id"]}" title="Tela Cheia">
                     <span>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
                         </svg>
                     </span>
