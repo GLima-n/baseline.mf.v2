@@ -10318,100 +10318,63 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # Construir HTML da tabela
-                        table_html = """
-                        <table class="baseline-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 25%">Data</th>
-                                    <th style="width: 20%">Linha de Base</th>
-                                    <th style="width: 40%">Criado por</th>
-                                    <th style="width: 15%; text-align: center">Apagar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                        """
-                        
+                        # Construir HTML da tabela (sem indentação extra)
+                        table_rows = ""
                         for i, (_, version_name, data_criacao) in enumerate(baseline_list):
-                            # Obter informações
                             baseline_info = emp_baselines[version_name]
                             baseline_data = baseline_info.get('data', {})
                             created_by = baseline_data.get('created_by', 'N/A')
                             version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            table_html += f"""
+                            table_rows += f"""
                                 <tr>
                                     <td class="baseline-date">{data_criacao}</td>
                                     <td class="baseline-version">{version_display}</td>
                                     <td class="baseline-email">{created_by}</td>
-                                    <td class="delete-btn-container">
-                            """
-                            
-                            # Fechar HTML temporariamente para inserir botão Streamlit
-                            table_html += "</td></tr>"
-                        
-                        table_html += """
-                            </tbody>
-                        </table>
-                        """
+                                </tr>"""
+                                                        
+                                                        table_html = f"""
+                                <table class="baseline-table">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 30%">Data</th>
+                                            <th style="width: 25%">Linha de Base</th>
+                                            <th style="width: 45%">Criado por</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>{table_rows}
+                                    </tbody>
+                                </table>"""
                         
                         # Renderizar tabela HTML
                         st.markdown(table_html, unsafe_allow_html=True)
                         
-                        # Renderizar botões de deletar abaixo da tabela em grid
-                        st.markdown('<div style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">', unsafe_allow_html=True)
+                        # Renderizar botões de deletar abaixo da tabela
+                        st.markdown('<div style="margin-top: 15px;">', unsafe_allow_html=True)
                         
-                        for idx, (_, version_name, data_criacao) in enumerate(baseline_list):
-                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
+                        # Criar colunas para os botões de deletar
+                        num_baselines = len(baseline_list)
+                        if num_baselines > 0:
+                            cols = st.columns(num_baselines)
                             
-                            col_btn1, col_btn2 = st.columns([1, 4])
-                            with col_btn1:
-                                # Botão customizado com SVG
-                                delete_btn_html = f"""
-                                <style>
-                                .delete-btn-{empreendimento}-{idx} {{
-                                    background-color: white;
-                                    border: 1px solid #dee2e6;
-                                    border-radius: 4px;
-                                    padding: 8px 12px;
-                                    cursor: pointer;
-                                    transition: all 0.2s;
-                                    width: 100%;
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                }}
-                                .delete-btn-{empreendimento}-{idx}:hover {{
-                                    background-color: #fee;
-                                    border-color: #dc3545;
-                                }}
-                                </style>
-                                <button class="delete-btn-{empreendimento}-{idx}" title="Deletar {version_display}">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <polyline points="3 6 5 6 21 6"></polyline>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                        <line x1="10" y1="11" x2="10" y2="17"></line>
-                                        <line x1="14" y1="11" x2="14" y2="17"></line>
-                                    </svg>
-                                </button>
-                                """
+                            for idx, ((_, version_name, _), col) in enumerate(zip(baseline_list, cols)):
+                                version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                if st.button(
-                                    "Deletar",
-                                    key=f"delete_{empreendimento}_{idx}",
-                                    help=f"Deletar {version_display}",
-                                    use_container_width=True
-                                ):
-                                    if delete_baseline(empreendimento, version_name):
-                                        if 'unsent_baselines' in st.session_state:
-                                            if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
-                                                st.session_state.unsent_baselines[empreendimento].remove(version_name)
-                                        st.success(f"✅ {version_display} excluída!")
-                                        st.rerun()
-                                    else:
-                                        st.error("Erro ao excluir")
-                            with col_btn2:
-                                pass  # Espaçamento
+                                with col:
+                                    if st.button(
+                                        f"🗑 {version_display}",
+                                        key=f"delete_{empreendimento}_{idx}",
+                                        help=f"Deletar {version_display}",
+                                        use_container_width=True
+                                    ):
+                                        if delete_baseline(empreendimento, version_name):
+                                            if 'unsent_baselines' in st.session_state:
+                                                if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
+                                                    st.session_state.unsent_baselines[empreendimento].remove(version_name)
+                                            st.success(f"✅ {version_display} excluída!")
+                                            st.rerun()
+                                        else:
+                                            st.error("Erro ao excluir")
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                         
