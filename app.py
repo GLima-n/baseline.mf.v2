@@ -10372,32 +10372,46 @@ with st.spinner("Carregando e processando dados..."):
                             st.markdown(table_html, unsafe_allow_html=True)
                         
                         with col_buttons:
-                            # Cabeçalho para alinhar
-                            st.markdown('<div style="height: 44px; display: flex; align-items: center; justify-content: center; background-color: #f1f3f5; font-weight: 600; font-size: 13px; color: #495057; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #dee2e6;">APAGAR</div>', unsafe_allow_html=True)
-                            
-                            # CSS global para comprimir botões
+                            # CSS para remover gaps do Streamlit e alinhar alturas
                             st.markdown("""
                             <style>
+                            /* Remover gap vertical padrão das colunas */
+                            [data-testid="column"] [data-testid="stVerticalBlock"] {
+                                gap: 0px !important;
+                            }
+                            
+                            /* Forçar altura fixa nas linhas da tabela para sincronizar */
+                            .baseline-table td {
+                                height: 50px !important;
+                                padding: 0 10px !important;
+                                vertical-align: middle !important;
+                            }
+                            
+                            .baseline-table th {
+                                height: 45px !important;
+                                vertical-align: middle !important;
+                            }
+                            
+                            /* Estilo dos botões */
                             .stButton {
                                 margin: 0 !important;
-                                padding: 0 !important;
                             }
                             .stButton > button {
-                                margin: 0 !important;
-                                padding: 8px 12px !important;
-                            }
-                            div[data-testid="column"] {
-                                padding: 0 !important;
+                                border-color: #dee2e6 !important;
+                                margin-top: 5px !important; /* Ajuste fino vertical */
                             }
                             </style>
                             """, unsafe_allow_html=True)
                             
-                            # Botões alinhados com as linhas (altura = padding da tabela 12px top + 12px bottom + ~24px conteúdo = 48px)
+                            # Cabeçalho para alinhar (altura exata do TH = 45px)
+                            st.markdown('<div style="height: 45px; display: flex; align-items: center; justify-content: center; background-color: #f1f3f5; font-weight: 600; font-size: 13px; color: #495057; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #dee2e6; margin-top: 10px;">APAGAR</div>', unsafe_allow_html=True)
+                            
+                            # Botões alinhados com as linhas
                             for i, (_, version_name, _) in enumerate(baseline_list):
                                 version_display = version_name.split('-')[0] if '-' in version_name else version_name
                                 
-                                # Container com altura exata da linha da tabela (48px total)
-                                st.markdown('<div style="height: 48px; display: flex; align-items: center; padding: 0; margin: 0; border-bottom: 1px solid #e9ecef;">', unsafe_allow_html=True)
+                                # Container com altura exata da linha da tabela (50px)
+                                st.markdown('<div style="height: 50px; display: flex; align-items: center; justify-content: center; border-bottom: 1px solid #e9ecef; box-sizing: border-box;">', unsafe_allow_html=True)
                                 
                                 if st.button(
                                     "🗑",
