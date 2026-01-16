@@ -10383,15 +10383,19 @@ with st.spinner("Carregando e processando dados..."):
                             display: flex !important;
                             align-items: center !important;
                             justify-content: center !important;
-                            border-bottom: 1px solid #e9ecef;
+                            /* border-bottom removido daqui pois o background já tem */
                         }
                         
                         .stButton button {
                             border-color: #dee2e6 !important;
-                            padding: 4px 10px !important;
+                            padding: 0px 10px !important; /* Padding vertical 0 para alinhar melhor */
                             min-height: 0px !important;
-                            height: 32px !important;
-                            line-height: 1 !important;
+                            height: 30px !important; /* Altura levemente menor */
+                            line-height: normal !important;
+                            margin: 0 !important; /* Garantir margem zero */
+                            display: flex;
+                            align-items: center;
+                            padding-bottom: 2px !important; /* Ajuste fino visual do ícone */
                         }
                         </style>
                         """, unsafe_allow_html=True)
@@ -10401,6 +10405,7 @@ with st.spinner("Carregando e processando dados..."):
                         with h_col1: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">DATA</div>', unsafe_allow_html=True)
                         with h_col2: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">LINHA DE BASE</div>', unsafe_allow_html=True)
                         with h_col3: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">CRIADO POR</div>', unsafe_allow_html=True)
+                        # Removemos o border-bottom do header aqui se ele já estiver sendo aplicado pela classe, mas a classe aplica.
                         with h_col4: st.markdown('<div class="sim-header">APAGAR</div>', unsafe_allow_html=True)
                         
                         # --- LINHAS ---
