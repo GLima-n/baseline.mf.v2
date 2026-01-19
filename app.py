@@ -10289,13 +10289,9 @@ with st.spinner("Carregando e processando dados..."):
                     # Container do empreendimento
                     st.markdown(f'<div class="baseline-container">', unsafe_allow_html=True)
                     
-                    # Cabeçalho com nome e botão
-                    # Cabeçalho com nome e botão
                     # Cabeçalho apenas com título
-                    st.markdown(f'<h3 class="baseline-title" style="margin-bottom: 10px;">{empreendimento}</h3>', unsafe_allow_html=True)
+                    st.markdown(f'<h3 class="baseline-title" style="margin-bottom: 5px;">{empreendimento}</h3>', unsafe_allow_html=True)
                     
-                    st.divider() # Separador visual elegante
-
                     # Carregar baselines do empreendimento
                     baselines = load_baselines()
                     emp_baselines = baselines.get(empreendimento, {})
@@ -10412,7 +10408,7 @@ with st.spinner("Carregando e processando dados..."):
                              if st.button(
                                 "Nova Baseline",
                                 key=f"create_baseline_footer_{empreendimento}",
-                                type="primary",
+                                type="secondary",
                                 use_container_width=True,
                                 help="Salva o estado atual como nova linha de base."
                             ):
