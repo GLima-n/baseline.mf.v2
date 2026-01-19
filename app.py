@@ -10406,7 +10406,7 @@ with st.spinner("Carregando e processando dados..."):
 
                     # Botão Direita: Criar Nova (SEMPRE VISÍVEL)
                     with col_new:
-                            if st.button(
+                        if st.button(
                             "Nova Baseline",
                             key=f"create_baseline_footer_{empreendimento}",
                             type="secondary",
