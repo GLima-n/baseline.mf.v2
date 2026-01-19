@@ -10291,30 +10291,8 @@ with st.spinner("Carregando e processando dados..."):
                     
                     # Cabeçalho com nome e botão
                     # Cabeçalho com nome e botão
-                    col_header1, col_header2 = st.columns([0.8, 0.2])
-                    
-                    with col_header1:
-                        st.markdown(f'<h3 class="baseline-title" style="margin-bottom: 0px;">{empreendimento}</h3>', unsafe_allow_html=True)
-                    
-                    with col_header2:
-                        if st.button(
-                            "Nova Baseline",
-                            key=f"create_baseline_{empreendimento}",
-                            type="primary", # Botão de ação principal em destaque
-                            use_container_width=True,
-                            help="Salva o estado atual do cronograma como uma nova linha de base."
-                        ):
-                            try:
-                                version_name = take_gantt_baseline(
-                                    df_data,
-                                    empreendimento,
-                                    tipo_visualizacao,
-                                    created_by=user_email if user_email else "usuario"
-                                )
-                                st.success(f"✅ Baseline {version_name} criada!")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro: {e}")
+                    # Cabeçalho apenas com título
+                    st.markdown(f'<h3 class="baseline-title" style="margin-bottom: 10px;">{empreendimento}</h3>', unsafe_allow_html=True)
                     
                     st.divider() # Separador visual elegante
 
@@ -10368,7 +10346,7 @@ with st.spinner("Carregando e processando dados..."):
                         column_config = {
                             "Selecionar": st.column_config.CheckboxColumn(
                                 "Selecionar",
-                                default=False,
+                                default=False, 
                                 width="small"
                             ),
                             "Data": st.column_config.TextColumn(
@@ -10401,9 +10379,12 @@ with st.spinner("Carregando e processando dados..."):
                             disabled=["Data", "Linha de Base", "Criado por"] # Garantir imutabilidade
                         )
                         
-                        # Botão de Ação em Baixo - Alinhado à Direita para fluxo "Z" de leitura
-                        _, col_actions = st.columns([0.75, 0.25])
-                        with col_actions:
+                        # Botões de Ação em Baixo
+                        # Layout: [Excluir (Esq)] --- Espaço --- [Nova (Dir)]
+                        col_del, _, col_new = st.columns([0.25, 0.50, 0.25])
+                        
+                        # Botão Esquerda: Excluir
+                        with col_del:
                             if st.button("Excluir Selecionados", type="secondary", use_container_width=True, key=f"btn_del_{empreendimento}"):
                                 rows_to_delete = edited_df[edited_df["Selecionar"] == True]
                                 
@@ -10412,19 +10393,40 @@ with st.spinner("Carregando e processando dados..."):
                                     for _, row in rows_to_delete.iterrows():
                                         v_name = row["version_full_name"]
                                         if delete_baseline(empreendimento, v_name):
-                                            # Limpar cache de não enviados se necessário
+                                            # Limpar cache
                                             if 'unsent_baselines' in st.session_state:
                                                 if v_name in st.session_state.unsent_baselines.get(empreendimento, []):
                                                     st.session_state.unsent_baselines[empreendimento].remove(v_name)
                                             deleted_count += 1
                                     
                                     if deleted_count > 0:
-                                        st.success(f"✅ {deleted_count} linha(s) de base apagada(s) com sucesso!")
+                                        st.success(f"✅ {deleted_count} apagadas!")
                                         st.rerun()
                                     else:
-                                        st.error("Erro ao tentar apagar as linhas selecionadas.")
+                                        st.error("Erro ao apagar.")
                                 else:
-                                    st.warning("⚠️ Selecione pelo menos uma linha para apagar.")
+                                    st.warning("Selecione linhas para apagar.")
+
+                        # Botão Direita: Criar Nova (Movido do cabeçalho)
+                        with col_new:
+                             if st.button(
+                                "Nova Baseline",
+                                key=f"create_baseline_footer_{empreendimento}",
+                                type="primary",
+                                use_container_width=True,
+                                help="Salva o estado atual como nova linha de base."
+                            ):
+                                try:
+                                    version_name = take_gantt_baseline(
+                                        df_data,
+                                        empreendimento,
+                                        tipo_visualizacao,
+                                        created_by=user_email if user_email else "usuario"
+                                    )
+                                    st.success(f"✅ Baseline {version_name} criada!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"Erro: {e}")
                         
                     else:
                         st.markdown('<div class="no-baselines">Nenhuma baseline criada ainda</div>', unsafe_allow_html=True)
