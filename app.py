@@ -10338,124 +10338,89 @@ with st.spinner("Carregando e processando dados..."):
                         # Ordenar por número da versão
                         baseline_list.sort(key=lambda x: x[0])
                         
-                        # CSS para simular tabela usando colunas
-                        st.markdown("""
-                        <style>
-                        /* Remover gap vertical padrão das colunas APENAS dentro do wrapper da tabela se possível, 
-                           mas como é global, vamos aplicar e assumir que é o desejado para tabelas densas */
-                        [data-testid="column"] [data-testid="stVerticalBlock"] {
-                            gap: 0px !important;
-                            padding: 0px !important;
-                        }
-                        
-                        /* Remover gap horizontal entre colunas */
-                        div[data-testid="stHorizontalBlock"] {
-                            gap: 0px !important;
-                        }
-                        
-                        /* Estilo das células simuladas */
-                        .sim-cell {
-                            padding: 0px 10px; /* Reduzido padding vertical */
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            height: 50px;
-                            border-bottom: 1px solid #e9ecef;
-                            font-size: 14px;
-                            color: #495057;
-                            background-color: transparent; /* Transparente para pegar a cor da linha */
-                        }
-                        
-                        .sim-header {
-                            background-color: #f1f3f5;
-                            font-weight: 600;
-                            font-size: 13px;
-                            color: #495057;
-                            text-transform: uppercase;
-                            letter-spacing: 0.5px;
-                            border-bottom: 2px solid #dee2e6;
-                            padding: 10px;
-                            text-align: center;
-                            height: 45px;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                        }
-                        
-                        /* Ajuste do botão */
-                        .stButton {
-                            height: 50px !important;
-                            display: flex !important;
-                            align-items: center !important;
-                            justify-content: center !important;
-                            /* border-bottom removido */
-                        }
-                        
-                        .stButton button {
-                            border-color: #dee2e6 !important;
-                            padding: 0px 10px !important;
-                            min-height: 0px !important;
-                            height: 30px !important;
-                            line-height: normal !important;
-                            margin: 0 !important;
-                        }
-                        </style>
-                        """, unsafe_allow_html=True)
+                        # --- IMPLEMENTAÇÃO NATIVA COM ST.DATA_EDITOR ---
+                        import pandas as pd
 
-                        # Container wrapper para aplicar o gap: 0 do CSS acima
-                        table_container = st.columns([1])[0]
-                        with table_container:
-                            # --- CABEÇALHO ---
-                            h_col1, h_col2, h_col3, h_col4 = st.columns([0.25, 0.20, 0.40, 0.15])
-                            with h_col1: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">DATA</div>', unsafe_allow_html=True)
-                            with h_col2: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">LINHA DE BASE</div>', unsafe_allow_html=True)
-                            with h_col3: st.markdown('<div class="sim-header" style="border-right: 1px solid #dee2e6;">CRIADO POR</div>', unsafe_allow_html=True)
-                            with h_col4: st.markdown('<div class="sim-header">APAGAR</div>', unsafe_allow_html=True)
+                        # Preparar dados para o DataFrame
+                        data_for_df = []
+                        for _, version_name, data_criacao in baseline_list:
+                            baseline_info = emp_baselines[version_name]
+                            baseline_data = baseline_info.get('data', {})
+                            created_by = baseline_data.get('created_by', 'N/A')
+                            version_display = version_name.split('-')[0] if '-' in version_name else version_name
                             
-                            # --- LINHAS ---
-                            for i, (_, version_name, data_criacao) in enumerate(baseline_list):
-                                baseline_info = emp_baselines[version_name]
-                                baseline_data = baseline_info.get('data', {})
-                                created_by = baseline_data.get('created_by', 'N/A')
-                                version_display = version_name.split('-')[0] if '-' in version_name else version_name
+                            data_for_df.append({
+                                "Selecionar": False, # Coluna de Checkbox
+                                "Data": data_criacao,
+                                "Linha de Base": version_display,
+                                "Criado por": created_by,
+                                "version_full_name": version_name # Oculto para lógica
+                            })
+                        
+                        df_baselines = pd.DataFrame(data_for_df)
+                        
+                        # Configuração de Colunas do Data Editor
+                        column_config = {
+                            "Selecionar": st.column_config.CheckboxColumn(
+                                "Apagar",
+                                help="Marque para excluir esta linha de base",
+                                default=False,
+                                width="small"
+                            ),
+                            "Data": st.column_config.TextColumn(
+                                "Data",
+                                width="medium",
+                                disabled=True
+                            ),
+                            "Linha de Base": st.column_config.TextColumn(
+                                "Linha de Base",
+                                width="medium",
+                                disabled=True
+                            ),
+                            "Criado por": st.column_config.TextColumn(
+                                "Criado por",
+                                width="large",
+                                disabled=True
+                            ),
+                            "version_full_name": None # Coluna Oculta
+                        }
+                        
+                        st.caption("Gerencie suas linhas de base abaixo. Selecione as linhas e clique em apagar.")
+                        
+                        # Exibição da Tabela Editável
+                        edited_df = st.data_editor(
+                            df_baselines,
+                            hide_index=True,
+                            column_config=column_config,
+                            use_container_width=True,
+                            key=f"editor_baselines_{empreendimento}",
+                            disabled=["Data", "Linha de Base", "Criado por"] # Garantir imutabilidade
+                        )
+                        
+                        # Botão de Ação em Baixo
+                        col_actions, _ = st.columns([0.3, 0.7])
+                        with col_actions:
+                            if st.button("🗑 Apagar Selecionados", type="primary", use_container_width=True, key=f"btn_del_{empreendimento}"):
+                                rows_to_delete = edited_df[edited_df["Selecionar"] == True]
                                 
-                                # Cor de fundo alternada
-                                bg_color = "#f8f9fa" if i % 2 != 0 else "#ffffff"
-                                
-                                # Container da Linha (fundo)
-                                row_container = st.container()
-                                with row_container:
-                                    # Aplicar background na linha inteira via CSS se possível, ou nas células.
-                                    # Como st.columns não tem background, aplicamos nas células.
-                                    bg_style = f'background-color: {bg_color};'
+                                if not rows_to_delete.empty:
+                                    deleted_count = 0
+                                    for _, row in rows_to_delete.iterrows():
+                                        v_name = row["version_full_name"]
+                                        if delete_baseline(empreendimento, v_name):
+                                            # Limpar cache de não enviados se necessário
+                                            if 'unsent_baselines' in st.session_state:
+                                                if v_name in st.session_state.unsent_baselines.get(empreendimento, []):
+                                                    st.session_state.unsent_baselines[empreendimento].remove(v_name)
+                                            deleted_count += 1
                                     
-                                    col1, col2, col3, col4 = st.columns([0.25, 0.20, 0.40, 0.15])
-                                    
-                                    with col1:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef;">{data_criacao}</div>', unsafe_allow_html=True)
-                                    
-                                    with col2:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef; font-weight: 600; color: #0066cc;">{version_display}</div>', unsafe_allow_html=True)
-                                        
-                                    with col3:
-                                        st.markdown(f'<div class="sim-cell" style="{bg_style} border-right: 1px solid #e9ecef; font-size: 13px; color: #6c757d;">{created_by}</div>', unsafe_allow_html=True)
-                                        
-                                    with col4:
-                                        # Background div absoluto para cobrir a coluna do botão
-                                        st.markdown(f'<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; {bg_style} z-index: 0; pointer-events: none; border-bottom: 1px solid #e9ecef;"></div>', unsafe_allow_html=True)
-                                        
-                                        if st.button(
-                                            "🗑",
-                                            key=f"delete_{empreendimento}_{i}",
-                                            help=f"Deletar {version_display}",
-                                            use_container_width=True
-                                        ):
-                                            if delete_baseline(empreendimento, version_name):
-                                                if 'unsent_baselines' in st.session_state:
-                                                    if version_name in st.session_state.unsent_baselines.get(empreendimento, []):
-                                                        st.session_state.unsent_baselines[empreendimento].remove(version_name)
-                                                st.success(f"✅")
-                                                st.rerun()
+                                    if deleted_count > 0:
+                                        st.success(f"✅ {deleted_count} linha(s) de base apagada(s) com sucesso!")
+                                        st.rerun()
+                                    else:
+                                        st.error("Erro ao tentar apagar as linhas selecionadas.")
+                                else:
+                                    st.warning("⚠️ Selecione pelo menos uma linha para apagar.")
                         
                     else:
                         st.markdown('<div class="no-baselines">Nenhuma baseline criada ainda</div>', unsafe_allow_html=True)
