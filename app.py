@@ -10290,16 +10290,19 @@ with st.spinner("Carregando e processando dados..."):
                     st.markdown(f'<div class="baseline-container">', unsafe_allow_html=True)
                     
                     # Cabeçalho com nome e botão
-                    col_header1, col_header2 = st.columns([3, 1])
+                    # Cabeçalho com nome e botão
+                    col_header1, col_header2 = st.columns([0.8, 0.2])
                     
                     with col_header1:
-                        st.markdown(f'<h3 class="baseline-title">{empreendimento}</h3>', unsafe_allow_html=True)
+                        st.markdown(f'<h3 class="baseline-title" style="margin-bottom: 0px;">{empreendimento}</h3>', unsafe_allow_html=True)
                     
                     with col_header2:
                         if st.button(
-                            "➕ Criar Nova", 
+                            "Nova Baseline",
                             key=f"create_baseline_{empreendimento}",
-                            use_container_width=True
+                            type="primary", # Botão de ação principal em destaque
+                            use_container_width=True,
+                            help="Salva o estado atual do cronograma como uma nova linha de base."
                         ):
                             try:
                                 version_name = take_gantt_baseline(
@@ -10313,6 +10316,8 @@ with st.spinner("Carregando e processando dados..."):
                             except Exception as e:
                                 st.error(f"Erro: {e}")
                     
+                    st.divider() # Separador visual elegante
+
                     # Carregar baselines do empreendimento
                     baselines = load_baselines()
                     emp_baselines = baselines.get(empreendimento, {})
@@ -10362,8 +10367,7 @@ with st.spinner("Carregando e processando dados..."):
                         # Configuração de Colunas do Data Editor
                         column_config = {
                             "Selecionar": st.column_config.CheckboxColumn(
-                                "Apagar",
-                                help="Marque para excluir esta linha de base",
+                                "Selecionar",
                                 default=False,
                                 width="small"
                             ),
@@ -10385,7 +10389,7 @@ with st.spinner("Carregando e processando dados..."):
                             "version_full_name": None # Coluna Oculta
                         }
                         
-                        st.caption("Gerencie suas linhas de base abaixo. Selecione as linhas e clique em apagar.")
+                        # st.caption("Selecione as linhas que deseja excluir.") # Caption removida para visual mais limpo
                         
                         # Exibição da Tabela Editável
                         edited_df = st.data_editor(
@@ -10397,10 +10401,10 @@ with st.spinner("Carregando e processando dados..."):
                             disabled=["Data", "Linha de Base", "Criado por"] # Garantir imutabilidade
                         )
                         
-                        # Botão de Ação em Baixo
-                        col_actions, _ = st.columns([0.3, 0.7])
+                        # Botão de Ação em Baixo - Alinhado à Direita para fluxo "Z" de leitura
+                        _, col_actions = st.columns([0.75, 0.25])
                         with col_actions:
-                            if st.button("🗑 Apagar Selecionados", type="primary", use_container_width=True, key=f"btn_del_{empreendimento}"):
+                            if st.button("Excluir Selecionados", type="secondary", use_container_width=True, key=f"btn_del_{empreendimento}"):
                                 rows_to_delete = edited_df[edited_df["Selecionar"] == True]
                                 
                                 if not rows_to_delete.empty:
