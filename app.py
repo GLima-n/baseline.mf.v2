@@ -9347,7 +9347,7 @@ with st.spinner("Carregando e processando dados..."):
             # WIDGET COLAPSÁVEL FIXO NO RODAPÉ (EXPANSÃO PARA CIMA)
             # ============================================
             
-            # CSS para fixar no rodapé e expandir para cima
+            # CSS para fixar no rodapé e expandir para cima com estilo minimalista
             st.markdown("""
 <style>
     /* Container fixo no rodapé da sidebar */
@@ -9381,16 +9381,38 @@ with st.spinner("Carregando e processando dados..."):
         margin-bottom: 0.5rem !important;
     }
     
-    /* Ícone de engrenagem mais sutil */
+    /* Ícone minimalista */
     [data-testid="stSidebar"] details summary {
-        color: #999 !important;
-        font-size: 1.2em !important;
+        color: #888 !important;
+        font-size: 1.1em !important;
         cursor: pointer !important;
         list-style: none !important;
+        padding: 0 !important;
+        line-height: 1 !important;
     }
     
     [data-testid="stSidebar"] details summary:hover {
         color: #333 !important;
+    }
+    
+    /* Remover seta padrão do details */
+    [data-testid="stSidebar"] details summary::-webkit-details-marker {
+        display: none;
+    }
+    
+    /* Estilo do botão dentro do expander */
+    [data-testid="stSidebar"] .stButton button {
+        border-color: #ddd !important;
+        color: #555 !important;
+        font-size: 0.8em !important;
+        padding: 0.2rem 0.5rem !important;
+        height: auto !important;
+        min-height: 0 !important;
+    }
+    [data-testid="stSidebar"] .stButton button:hover {
+        border-color: #999 !important;
+        color: #333 !important;
+        background-color: #f9f9f9 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -9399,20 +9421,27 @@ with st.spinner("Carregando e processando dados..."):
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
             
-            # Expander com ícone de engrenagem (colapsado por padrão)
-            with st.expander("⚙️", expanded=False):
-                loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
+            # Expander com ícone de engrenagem minimalista (⚙ sem cor/emoji)
+            with st.expander("⚙", expanded=False):
+                loaded_time = st.session_state.data_loaded_at.strftime("%d/%m %H:%M")
                 next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
                 
-                # Informações em layout compacto
-                st.caption("**Última Atualização:**")
-                st.text(loaded_time)
-                
-                st.caption("**Próxima Atualização:**")
-                st.text(next_refresh_time)
+                # Layout compacto com HTML
+                st.markdown(f"""
+                <div style="font-size: 0.8em; color: #555; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span>Última:</span>
+                        <span style="font-weight: 500; color: #333;">{loaded_time}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span>Próxima:</span>
+                        <span style="font-weight: 500; color: #333;">{next_refresh_time}</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
                 
                 # Botão de refresh
-                if st.button("Atualizar Dados", type="secondary", use_container_width=True, key="refresh_footer_final"):
+                if st.button("↻ Atualizar", type="secondary", use_container_width=True, key="refresh_footer_final"):
                     st.cache_data.clear()
                     st.cache_resource.clear()
                     st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
