@@ -9200,47 +9200,6 @@ with st.spinner("Carregando e processando dados..."):
                 except:
                     pass
         
-            # ============================================
-            # WIDGET DE STATUS DE AUTO-REFRESH
-            # ============================================
-            
-            # Inicializar timestamp de carregamento
-            if 'data_loaded_at' not in st.session_state:
-                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
-            
-            st.markdown("---")
-            st.markdown("### 📊 Status dos Dados")
-            
-            loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
-            next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
-            
-            st.markdown(f"""
-            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 0.85em;">
-                <b>🕐 Última Atualização:</b><br>
-                {loaded_time}<br><br>
-                <b>🔄 Próxima Atualização:</b><br>
-                ~{next_refresh_time}<br><br>
-                <b>⚙️ Sistema:</b> Auto-refresh ativo (3h)
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Barra de progresso até próxima atualização
-            now = datetime.now(pytz.timezone('America/Sao_Paulo'))
-            elapsed = (now - st.session_state.data_loaded_at).total_seconds()
-            progress = min(1.0, elapsed / TTL_SECONDS)
-            
-            st.progress(progress, text=f"Até próximo refresh: {int((1-progress)*100)}%")
-            
-            # Botão de refresh manual
-            if st.button("🔄 Forçar Atualização Agora", use_container_width=True, help="Atualiza os dados imediatamente sem aguardar o timer"):
-                st.cache_data.clear()
-                st.cache_resource.clear()
-                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
-                st.toast("✅ Dados atualizados com sucesso!", icon="🔄")
-                st.rerun()
-            
-            # ============================================
-            
             st.markdown("---")
             
             # Filtro UGB centralizado
@@ -9324,6 +9283,43 @@ with st.spinner("Carregando e processando dados..."):
                 setores_disponiveis = sorted(list(SETOR.keys()))
                 setor_para_exibir = setores_disponiveis[0] if setores_disponiveis else "Todos"
                 st.session_state.selected_setor_nome = setor_para_exibir
+
+            # ============================================
+            # WIDGET MINIMALISTA DE AUTO-REFRESH (RODAPÉ)
+            # ============================================
+            
+            # Inicializar timestamp
+            if 'data_loaded_at' not in st.session_state:
+                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
+            
+            # Espaçamento
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Widget sutil
+            loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
+            next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
+            
+            st.markdown(f"""
+            <div style="background-color: #fafafa; border-left: 3px solid #e0e0e0; padding: 8px 10px; font-size: 0.75em; color: #666; line-height: 1.4;">
+                <div style="margin-bottom: 4px;">
+                    <span style="color: #999;">Última Atualização:</span><br>
+                    <span style="color: #333;">{loaded_time}</span>
+                </div>
+                <div>
+                    <span style="color: #999;">Próxima Atualização:</span><br>
+                    <span style="color: #333;">{next_refresh_time}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Botão de refresh manual (minimalista)
+            if st.button("Atualizar Dados", type="secondary", use_container_width=True):
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
+                st.rerun()
+            
+            # ============================================
 
             # --- TRÊS BOTÕES SEPARADOS PARA NAVEGAÇÃO ---
             st.markdown("Gráficos Gantt:")
