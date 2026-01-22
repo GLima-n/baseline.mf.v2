@@ -9347,7 +9347,7 @@ with st.spinner("Carregando e processando dados..."):
             # WIDGET COLAPSÁVEL FIXO NO RODAPÉ (EXPANSÃO PARA CIMA)
             # ============================================
             
-            # CSS para fixar no rodapé e expandir para cima com estilo minimalista
+            # CSS para fixar no rodapé
             st.markdown("""
 <style>
     /* Container fixo no rodapé da sidebar */
@@ -9355,136 +9355,70 @@ with st.spinner("Carregando e processando dados..."):
         position: relative;
     }
     
-    /* Última seção da sidebar (onde está o expander) */
+    /* Última seção da sidebar (onde está o popover) */
     [data-testid="stSidebar"] > div:last-child {
         position: fixed !important;
         bottom: 0 !important;
         left: 0 !important;
         width: 100% !important;
         max-width: 244px !important;
-        background: transparent !important; /* Transparente para remover quadrado branco */
+        background: transparent !important;
         z-index: 9999 !important;
         padding: 0.5rem 1rem !important;
-        border: none !important; /* Sem bordas */
-        box-shadow: none !important; /* Sem sombra no container fechado */
+        border: none !important;
+        box-shadow: none !important;
         margin-bottom: 0 !important;
     }
     
-    /* Fazer o menu abrir para cima (Dropup) */
-    [data-testid="stSidebar"] details {
-        position: relative;
-        display: block;
-    }
-    
-    /* Conteúdo do expander (o menu que abre) */
-    [data-testid="stSidebar"] details[open] > div {
-        position: absolute !important;
-        bottom: 100% !important; /* Move para cima do ícone */
-        left: 0 !important;
-        min-width: 200px !important; /* Largura mínima para o popup */
-        margin-bottom: 5px !important; /* Espaço entre ícone e menu */
-        background: white !important;
-        border: 1px solid #eee !important;
-        border-radius: 8px !important;
-        box-shadow: 0 -4px 12px rgba(0,0,0,0.1) !important;
-        padding: 15px !important;
-        z-index: 10000 !important;
-    }
-    
-    /* Esconder a seta padrão do Streamlit (svg) */
-    [data-testid="stSidebar"] details summary svg {
-        display: none !important;
-    }
-
-    /* Ícone minimalista (Engrenagem) */
-    [data-testid="stSidebar"] details summary {
-        color: #888 !important;
-        font-size: 1.2em !important; 
-        cursor: pointer !important;
-        list-style: none !important;
-        padding: 0 !important;
-        padding-left: 5px !important;
-        line-height: 1 !important;
-        display: flex !important;
-        align-items: center !important;
-        width: fit-content !important;
-    }
-    
-    [data-testid="stSidebar"] details summary:hover {
-        color: #333 !important;
-    }
-    
-    /* Remover seta padrão do details (webkit) */
-    [data-testid="stSidebar"] details summary::-webkit-details-marker {
-        display: none;
-    }
-    
-    /* Remover bordas e backgrounds padrão do Streamlit dentro do details */
-    [data-testid="stSidebar"] details {
+    /* Estilizar o botão do popover para parecer apenas o ícone */
+    [data-testid="stSidebar"] > div:last-child button[kind="secondary"] {
         border: none !important;
         background: transparent !important;
-    }
-</style>
-<script>
-    // Função para gerenciar o comportamento de "click outside" e toggle
-    function setupMenuBehavior() {
-        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
-        if (!sidebar) return;
-        
-        const details = sidebar.querySelector('div:last-child details');
-        if (!details) return;
-        
-        // Listener global para fechar ao clicar fora
-        window.parent.document.addEventListener('click', function(e) {
-            if (details.open) {
-                // Se o clique não for dentro do details (menu ou summary), fecha
-                if (!details.contains(e.target)) {
-                    details.removeAttribute('open');
-                }
-            }
-        });
-        
-        // Listener para o summary prevenir comportamento padrão se necessário
-        const summary = details.querySelector('summary');
-        if (summary) {
-            summary.addEventListener('click', function(e) {
-                // O comportamento padrão do details já faz o toggle
-                // Isso apenas garante que cliques rápidos não quebrem
-            });
-        }
+        color: #888 !important;
+        padding: 0 !important;
+        font-size: 1.2rem !important;
     }
     
-    // Tenta configurar imediatamente e também após um pequeno delay para garantir carregamento
-    setupMenuBehavior();
-    setTimeout(setupMenuBehavior, 500);
-</script>
+    [data-testid="stSidebar"] > div:last-child button[kind="secondary"]:hover {
+        color: #333 !important;
+        background: transparent !important;
+    }
+    
+    /* Remover foco/borda ao clicar */
+    [data-testid="stSidebar"] > div:last-child button[kind="secondary"]:focus {
+        box-shadow: none !important;
+        outline: none !important;
+    }
+</style>
 """, unsafe_allow_html=True)
             
             # Inicializar timestamp
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
             
-            # Expander com ícone de engrenagem minimalista
-            with st.expander("⚙", expanded=False):
+            # Popover nativo (resolvendo problemas de click-outside e toggle)
+            with st.popover("⚙", use_container_width=False):
                 loaded_time = st.session_state.data_loaded_at.strftime("%d/%m %H:%M")
                 next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
                 
-                # Layout compacto com HTML e mais padding
+                # Layout compacto
                 st.markdown(f"""
-                <div style="font-size: 0.8em; color: #555; margin-bottom: 10px; padding: 0 8px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                        <span>Última:</span>
-                        <span style="font-weight: 500; color: #333;">{loaded_time}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span>Próxima:</span>
-                        <span style="font-weight: 500; color: #333;">{next_refresh_time}</span>
+                <div style="min-width: 180px;">
+                    <div style="font-size: 0.8em; color: #555; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span>Última Atualização:</span>
+                            <span style="font-weight: 500; color: #333;">{loaded_time}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Próxima:</span>
+                            <span style="font-weight: 500; color: #333;">{next_refresh_time}</span>
+                        </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 # Botão de refresh
-                if st.button("↻ Atualizar", type="secondary", use_container_width=True, key="refresh_footer_final"):
+                if st.button("↻ Tentar Atualizar", type="primary", use_container_width=True, key="refresh_popover"):
                     st.cache_data.clear()
                     st.cache_resource.clear()
                     st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
