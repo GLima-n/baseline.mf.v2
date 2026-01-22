@@ -9215,18 +9215,11 @@ with st.spinner("Carregando e processando dados..."):
             next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
             
             st.markdown(f"""
-            <div style="
-                background-color: #f0f2f6;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 0.85em;
-            ">
+            <div style="background-color: #f0f2f6; padding: 10px; border-radius: 5px; font-size: 0.85em;">
                 <b>🕐 Última Atualização:</b><br>
                 {loaded_time}<br><br>
-                
                 <b>🔄 Próxima Atualização:</b><br>
                 ~{next_refresh_time}<br><br>
-                
                 <b>⚙️ Sistema:</b> Auto-refresh ativo (3h)
             </div>
             """, unsafe_allow_html=True)
