@@ -9398,27 +9398,27 @@ with st.spinner("Carregando e processando dados..."):
             
             # Popover nativo (resolvendo problemas de click-outside e toggle)
             with st.popover("⚙", use_container_width=False):
-                loaded_time = st.session_state.data_loaded_at.strftime("%d/%m • %H:%M")
+                loaded_time = st.session_state.data_loaded_at.strftime("%d/%m %H:%M")
                 next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
                 
-                # Layout profissional e minimalista
+                # Layout simples e limpo (Estilo anterior solicitado)
                 st.markdown(f"""
-                <div style="min-width: 200px; padding: 5px 2px;">
-                    <div style="margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; font-weight: 600;">Última </span>
-                            <span style="font-size: 0.85rem; font-family: monospace; color: #333; background: #f7f7f7; padding: 2px 6px; border-radius: 4px;">{loaded_time}</span>
+                <div style="min-width: 180px; padding: 0 5px;">
+                    <div style="font-size: 0.8em; color: #555; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span>Última:</span>
+                            <span style="font-weight: 500; color: #333;">{loaded_time}</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; color: #888; font-weight: 600;">Próxima</span>
-                            <span style="font-size: 0.85rem; font-family: monospace; color: #333; background: #f7f7f7; padding: 2px 6px; border-radius: 4px;">{next_refresh_time}</span>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span>Próxima:</span>
+                            <span style="font-weight: 500; color: #333;">{next_refresh_time}</span>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Botão de refresh minimalista (outline)
-                if st.button("↻ Atualizar Agora", type="secondary", use_container_width=True, key="refresh_popover"):
+                # Botão de refresh (Estilo simples)
+                if st.button("↻ Atualizar", type="secondary", use_container_width=True, key="refresh_popover"):
                     st.cache_data.clear()
                     st.cache_resource.clear()
                     st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
