@@ -9285,15 +9285,59 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.selected_setor_nome = setor_para_exibir
 
             # ============================================
-            # WIDGET COLAPSÁVEL DE AUTO-REFRESH (RODAPÉ)
+            # WIDGET COLAPSÁVEL FIXO NO RODAPÉ (EXPANSÃO PARA CIMA)
             # ============================================
+            
+            # CSS para fixar no rodapé e expandir para cima
+            st.markdown("""
+<style>
+    /* Container fixo no rodapé da sidebar */
+    [data-testid="stSidebar"] {
+        position: relative;
+    }
+    
+    /* Última seção da sidebar (onde está o expander) */
+    [data-testid="stSidebar"] > div:last-child {
+        position: fixed !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        max-width: 244px !important;
+        background: white !important;
+        z-index: 999 !important;
+        padding: 0.5rem 1rem !important;
+        border-top: 1px solid #e6e6e6 !important;
+        box-shadow: 0 -2px 8px rgba(0,0,0,0.05) !important;
+    }
+    
+    /* Fazer o expander expandir para cima */
+    [data-testid="stSidebar"] details {
+        display: flex !important;
+        flex-direction: column-reverse !important;
+    }
+    
+    /* Conteúdo do expander */
+    [data-testid="stSidebar"] details[open] > div {
+        margin-bottom: 0.5rem !important;
+    }
+    
+    /* Ícone de engrenagem mais sutil */
+    [data-testid="stSidebar"] details summary {
+        color: #999 !important;
+        font-size: 1.2em !important;
+        cursor: pointer !important;
+        list-style: none !important;
+    }
+    
+    [data-testid="stSidebar"] details summary:hover {
+        color: #333 !important;
+    }
+</style>
+""", unsafe_allow_html=True)
             
             # Inicializar timestamp
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
-            
-            # Espaçamento antes do widget
-            st.markdown("<br><br>", unsafe_allow_html=True)
             
             # Expander com ícone de engrenagem (colapsado por padrão)
             with st.expander("⚙️", expanded=False):
