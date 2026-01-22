@@ -9425,6 +9425,39 @@ with st.spinner("Carregando e processando dados..."):
         background: transparent !important;
     }
 </style>
+<script>
+    // Função para gerenciar o comportamento de "click outside" e toggle
+    function setupMenuBehavior() {
+        const sidebar = window.parent.document.querySelector('[data-testid="stSidebar"]');
+        if (!sidebar) return;
+        
+        const details = sidebar.querySelector('div:last-child details');
+        if (!details) return;
+        
+        // Listener global para fechar ao clicar fora
+        window.parent.document.addEventListener('click', function(e) {
+            if (details.open) {
+                // Se o clique não for dentro do details (menu ou summary), fecha
+                if (!details.contains(e.target)) {
+                    details.removeAttribute('open');
+                }
+            }
+        });
+        
+        // Listener para o summary prevenir comportamento padrão se necessário
+        const summary = details.querySelector('summary');
+        if (summary) {
+            summary.addEventListener('click', function(e) {
+                // O comportamento padrão do details já faz o toggle
+                // Isso apenas garante que cliques rápidos não quebrem
+            });
+        }
+    }
+    
+    // Tenta configurar imediatamente e também após um pequeno delay para garantir carregamento
+    setupMenuBehavior();
+    setTimeout(setupMenuBehavior, 500);
+</script>
 """, unsafe_allow_html=True)
             
             # Inicializar timestamp
