@@ -36,6 +36,24 @@ except ImportError:
             return None
         return np.busday_count(pd.to_datetime(start).date(), pd.to_datetime(end).date())
 
+# ============================================
+# CONFIGURAÇÃO DE AUTO-REFRESH (3 HORAS)
+# ============================================
+import logging
+import pytz
+
+# Constante de TTL para cache (3 horas)
+TTL_HOURS = 3
+TTL_SECONDS = TTL_HOURS * 60 * 60  # 10800 segundos
+
+# Logging para monitoramento de refresh
+logging.basicConfig(
+    format='%(asctime)s [AUTO-REFRESH] %(message)s',
+    level=logging.INFO
+)
+
+# ============================================
+
 # --- Bloco de Importação de Dados ---
 try:
     from tratamento_dados_reais import buscar_e_processar_dados_completos
@@ -490,7 +508,7 @@ def create_baselines_table():
         if 'mock_baselines' not in st.session_state:
             st.session_state.mock_baselines = {}
 
-@st.cache_resource(ttl=3600) # Cache por 1 hora, ou até ser invalidado
+@st.cache_resource(ttl=TTL_SECONDS) # Cache por 3 horas (sincronizado com load_data)
 def load_baselines():
     return _fetch_baselines_from_db()
 
@@ -8868,7 +8886,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-@st.cache_data
+@st.cache_data(ttl=TTL_SECONDS, show_spinner="🔄 Atualizando dados do Macrofluxo...")
 def load_data():
     df_real = pd.DataFrame()
     df_previsto = pd.DataFrame()
@@ -9182,6 +9200,54 @@ with st.spinner("Carregando e processando dados..."):
                 except:
                     pass
         
+            # ============================================
+            # WIDGET DE STATUS DE AUTO-REFRESH
+            # ============================================
+            
+            # Inicializar timestamp de carregamento
+            if 'data_loaded_at' not in st.session_state:
+                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
+            
+            st.markdown("---")
+            st.markdown("### 📊 Status dos Dados")
+            
+            loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
+            next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
+            
+            st.markdown(f"""
+            <div style="
+                background-color: #f0f2f6;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 0.85em;
+            ">
+                <b>🕐 Última Atualização:</b><br>
+                {loaded_time}<br><br>
+                
+                <b>🔄 Próxima Atualização:</b><br>
+                ~{next_refresh_time}<br><br>
+                
+                <b>⚙️ Sistema:</b> Auto-refresh ativo (3h)
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Barra de progresso até próxima atualização
+            now = datetime.now(pytz.timezone('America/Sao_Paulo'))
+            elapsed = (now - st.session_state.data_loaded_at).total_seconds()
+            progress = min(1.0, elapsed / TTL_SECONDS)
+            
+            st.progress(progress, text=f"Até próximo refresh: {int((1-progress)*100)}%")
+            
+            # Botão de refresh manual
+            if st.button("🔄 Forçar Atualização Agora", use_container_width=True, help="Atualiza os dados imediatamente sem aguardar o timer"):
+                st.cache_data.clear()
+                st.cache_resource.clear()
+                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
+                st.toast("✅ Dados atualizados com sucesso!", icon="🔄")
+                st.rerun()
+            
+            # ============================================
+            
             st.markdown("---")
             
             # Filtro UGB centralizado
