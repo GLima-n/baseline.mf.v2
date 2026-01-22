@@ -9379,7 +9379,8 @@ with st.spinner("Carregando e processando dados..."):
     /* Conteúdo do expander */
     [data-testid="stSidebar"] details[open] > div {
         margin-bottom: 1rem !important; /* Mais espaço entre botão e ícone */
-        padding: 0 5px !important; /* Padding lateral extra */
+        padding: 5px 5px !important; /* Padding lateral extra */
+        margin-top: 15px !important; /* Afastar dados da borda superior */
     }
     
     /* Ícone minimalista */
@@ -9389,6 +9390,7 @@ with st.spinner("Carregando e processando dados..."):
         cursor: pointer !important;
         list-style: none !important;
         padding: 0 !important;
+        padding-left: 10px !important; /* Afastar da borda esquerda */
         line-height: 1 !important;
     }
     
@@ -9399,22 +9401,6 @@ with st.spinner("Carregando e processando dados..."):
     /* Remover seta padrão do details */
     [data-testid="stSidebar"] details summary::-webkit-details-marker {
         display: none;
-    }
-    
-    /* Estilo do botão dentro do expander */
-    [data-testid="stSidebar"] .stButton button {
-        border-color: #eee !important;
-        color: #666 !important;
-        font-size: 0.8em !important;
-        padding: 0.2rem 0.5rem !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin-top: 5px !important;
-    }
-    [data-testid="stSidebar"] .stButton button:hover {
-        border-color: #ccc !important;
-        color: #333 !important;
-        background-color: #f5f5f5 !important;
     }
 </style>
 """, unsafe_allow_html=True)
