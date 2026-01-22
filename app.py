@@ -9350,47 +9350,47 @@ with st.spinner("Carregando e processando dados..."):
             # CSS para fixar no topo esquerdo da sidebar
             st.markdown("""
 <style>
-    /* Container fixo no topo da sidebar */
-    [data-testid="stSidebar"] {
-        position: relative;
-    }
-    
-    /* Última seção da sidebar (onde está o popover) */
-    [data-testid="stSidebar"] > div:last-child {
+    /* 
+       Estratégia de Posicionamento:
+       O st.popover cria um elemento dentro do fluxo normal.
+       Como adicionamos ele por último, ele é o último elemento do stVerticalBlock principal.
+       Vamos targetear o container do botão usando seletores estruturais.
+    */
+
+    /* Alvo: O div que contém o botão do popover (assumindo que é o último elemento da sidebar) */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child {
         position: fixed !important;
-        top: 0 !important; /* Fixar no topo */
-        left: 0 !important;
-        bottom: auto !important; /* Remover fixação do rodapé */
-        width: auto !important; /* Largura automática para caber só o ícone */
-        max-width: none !important;
+        top: 3.5rem !important; /* Altura aproximada abaixo do header padrão do Streamlit */
+        left: 0.5rem !important;
+        width: auto !important;
+        z-index: 999999 !important;
         background: transparent !important;
-        z-index: 99999 !important; /* Z-index altíssimo para ficar sobre tudo */
-        padding: 0.8rem 1rem !important; /* Espaçamento para alinhar visualmente */
-        border: none !important;
-        box-shadow: none !important;
-        margin-bottom: 0 !important;
-        height: auto !important;
     }
     
-    /* Estilizar o botão do popover para parecer apenas o ícone */
-    [data-testid="stSidebar"] > div:last-child button[kind="secondary"] {
+    /* Alternativa para telas mobile ou layouts diferentes: targetear via aria-label se possível, ou classe genérica */
+    /* Streamlit não põe classes fáceis, então confiamos na ordem (last-child) */
+
+    /* Estilizar o botão do popover (engrenagem) */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"] {
         border: none !important;
         background: transparent !important;
         color: #888 !important;
         padding: 0 !important;
         font-size: 1.2rem !important;
+        box-shadow: none !important;
+        min-height: 0 !important;
+        height: auto !important;
+        line-height: 1 !important;
     }
     
-    [data-testid="stSidebar"] > div:last-child button[kind="secondary"]:hover {
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"]:hover {
         color: #333 !important;
         background: transparent !important;
     }
-    
-    /* Remover foco/borda ao clicar */
-    [data-testid="stSidebar"] > div:last-child button[kind="secondary"]:focus {
-        box-shadow: none !important;
-        outline: none !important;
-    }
+
+    /* Caso o seletor acima falhe por aninhamento extra, tentar um mais genérico para o botão específico */
+    /* Isso ajuda se o popover não for o 'absoluto' último devido a fragments, etc. */
+    button[key="popover_trigger"] { /* Isso não funciona diretamente pois key não vira atributo HTML */ }
 </style>
 """, unsafe_allow_html=True)
             
