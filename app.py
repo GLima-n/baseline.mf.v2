@@ -9370,17 +9370,25 @@ with st.spinner("Carregando e processando dados..."):
         margin-bottom: 0 !important;
     }
     
-    /* Fazer o expander expandir para cima */
+    /* Fazer o menu abrir para cima (Dropup) */
     [data-testid="stSidebar"] details {
-        display: flex !important;
-        flex-direction: column-reverse !important;
+        position: relative;
+        display: block;
     }
     
-    /* Conteúdo do expander */
+    /* Conteúdo do expander (o menu que abre) */
     [data-testid="stSidebar"] details[open] > div {
-        margin-bottom: 1rem !important; /* Mais espaço entre botão e ícone */
-        padding: 5px 5px !important; /* Padding lateral extra */
-        margin-top: 15px !important; /* Afastar dados da borda superior */
+        position: absolute !important;
+        bottom: 100% !important; /* Move para cima do ícone */
+        left: 0 !important;
+        right: 0 !important;
+        margin-bottom: 10px !important; /* Espaço entre ícone e menu */
+        background: white !important;
+        border: 1px solid #eee !important;
+        border-radius: 8px !important;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.1) !important;
+        padding: 15px !important;
+        z-index: 10000 !important;
     }
     
     /* Ícone minimalista */
@@ -9392,15 +9400,18 @@ with st.spinner("Carregando e processando dados..."):
         padding: 0 !important;
         padding-left: 10px !important; /* Afastar da borda esquerda */
         line-height: 1 !important;
-    }
-    
-    [data-testid="stSidebar"] details summary:hover {
-        color: #333 !important;
+        margin-top: 5px !important;
     }
     
     /* Remover seta padrão do details */
     [data-testid="stSidebar"] details summary::-webkit-details-marker {
         display: none;
+    }
+    
+    /* Remover bordas e backgrounds padrão do Streamlit dentro do details */
+    [data-testid="stSidebar"] details {
+        border: none !important;
+        background: transparent !important;
     }
 </style>
 """, unsafe_allow_html=True)
