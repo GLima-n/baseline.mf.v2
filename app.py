@@ -9362,11 +9362,11 @@ with st.spinner("Carregando e processando dados..."):
         left: 0 !important;
         width: 100% !important;
         max-width: 244px !important;
-        background: white !important;
+        background: transparent !important; /* Transparente para remover quadrado branco */
         z-index: 9999 !important;
-        padding: 0.8rem 1.2rem !important; /* Aumentado padding do container */
-        border-top: 1px solid #e6e6e6 !important;
-        box-shadow: 0 -2px 8px rgba(0,0,0,0.05) !important;
+        padding: 0.5rem 1rem !important;
+        border: none !important; /* Sem bordas */
+        box-shadow: none !important; /* Sem sombra no container fechado */
         margin-bottom: 0 !important;
     }
     
@@ -9381,8 +9381,8 @@ with st.spinner("Carregando e processando dados..."):
         position: absolute !important;
         bottom: 100% !important; /* Move para cima do ícone */
         left: 0 !important;
-        right: 0 !important;
-        margin-bottom: 10px !important; /* Espaço entre ícone e menu */
+        min-width: 200px !important; /* Largura mínima para o popup */
+        margin-bottom: 5px !important; /* Espaço entre ícone e menu */
         background: white !important;
         border: 1px solid #eee !important;
         border-radius: 8px !important;
@@ -9391,19 +9391,30 @@ with st.spinner("Carregando e processando dados..."):
         z-index: 10000 !important;
     }
     
-    /* Ícone minimalista */
+    /* Esconder a seta padrão do Streamlit (svg) */
+    [data-testid="stSidebar"] details summary svg {
+        display: none !important;
+    }
+
+    /* Ícone minimalista (Engrenagem) */
     [data-testid="stSidebar"] details summary {
         color: #888 !important;
-        font-size: 1.1em !important;
+        font-size: 1.2em !important; 
         cursor: pointer !important;
         list-style: none !important;
         padding: 0 !important;
-        padding-left: 10px !important; /* Afastar da borda esquerda */
+        padding-left: 5px !important;
         line-height: 1 !important;
-        margin-top: 5px !important;
+        display: flex !important;
+        align-items: center !important;
+        width: fit-content !important;
     }
     
-    /* Remover seta padrão do details */
+    [data-testid="stSidebar"] details summary:hover {
+        color: #333 !important;
+    }
+    
+    /* Remover seta padrão do details (webkit) */
     [data-testid="stSidebar"] details summary::-webkit-details-marker {
         display: none;
     }
