@@ -9201,19 +9201,21 @@ with st.spinner("Carregando e processando dados..."):
                 if 'data_loaded_at' not in st.session_state:
                     st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
                 
-                # CSS para tornar o widget STICKY (Fixo mas no fluxo)
+                # CSS para fixar o botão no CABEÇALHO da sidebar (Visualmente fora do fluxo)
                 st.markdown("""
                 <style>
-                    /* Fazer a coluna 1 se comportar como container sticky */
+                    /* Fazer a coluna 1 servir de âncora mas o botão sair do fluxo */
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div:first-child {
-                        position: sticky !important;
-                        top: 0 !important;
-                        z-index: 999;
-                        align-self: flex-start;
+                        /* Não precisamos de estilo na coluna em si se o botão for fixed */
                     }
 
-                    /* Ajuste fino para o botão */
+                    /* Botão com position FIXED para ir ao topo absoluto */
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"] {
+                        position: fixed !important;
+                        top: 3.5rem !important; /* Altura padrão logo abaixo do 'X' do header */
+                        left: 1rem !important;
+                        z-index: 999999 !important;
+                        
                         border: none !important;
                         background: transparent !important;
                         padding: 0 !important;
@@ -9222,7 +9224,7 @@ with st.spinner("Carregando e processando dados..."):
                         box-shadow: none !important;
                         line-height: 1 !important;
                         min-height: 0 !important;
-                        margin-top: 5px !important;
+                        width: auto !important;
                     }
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
                         color: #000 !important;
