@@ -9353,18 +9353,14 @@ with st.spinner("Carregando e processando dados..."):
     /* 
        Estratégia de Posicionamento:
        Fixar o container do widget no topo esquerdo.
-       E empurrar o conteúdo da sidebar para baixo para não sobrepor a logo.
+       O widget ficará sobre a coluna vazia da esquerda, sem empurrar a logo.
     */
-    
-    /* Empurrar o conteúdo da sidebar para baixo */
-    [data-testid="stSidebarContent"] {
-        padding-top: 3.5rem !important; /* Espaço para o botão e para a logo respirar */
-    }
 
+    /* Alvo: O div que contém o botão do popover (assumindo que é o último elemento da sidebar) */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child {
         position: fixed !important;
-        top: 0.8rem !important; /* Alinhado com a altura do botão de fechar (aprox) */
-        left: 0.8rem !important;
+        top: 0.8rem !important; /* Alinhado com o topo */
+        left: 0.8rem !important; /* Canto esquerdo */
         width: auto !important;
         z-index: 999999 !important;
         background: transparent !important;
