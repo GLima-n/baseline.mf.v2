@@ -9352,45 +9352,50 @@ with st.spinner("Carregando e processando dados..."):
 <style>
     /* 
        Estratégia de Posicionamento:
-       O st.popover cria um elemento dentro do fluxo normal.
-       Como adicionamos ele por último, ele é o último elemento do stVerticalBlock principal.
-       Vamos targetear o container do botão usando seletores estruturais.
+       Fixar o container do widget no topo esquerdo.
     */
-
-    /* Alvo: O div que contém o botão do popover (assumindo que é o último elemento da sidebar) */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child {
         position: fixed !important;
-        top: 3.5rem !important; /* Altura aproximada abaixo do header padrão do Streamlit */
-        left: 0.5rem !important;
+        top: 0.8rem !important; /* Alinhado com a altura do botão de fechar (aprox) */
+        left: 0.8rem !important;
         width: auto !important;
         z-index: 999999 !important;
         background: transparent !important;
+        min-width: 0 !important;
     }
-    
-    /* Alternativa para telas mobile ou layouts diferentes: targetear via aria-label se possível, ou classe genérica */
-    /* Streamlit não põe classes fáceis, então confiamos na ordem (last-child) */
 
     /* Estilizar o botão do popover (engrenagem) */
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"] {
         border: none !important;
         background: transparent !important;
-        color: #888 !important;
+        color: #666 !important; /* Cor mais suave */
         padding: 0 !important;
-        font-size: 1.2rem !important;
+        font-size: 1.5rem !important; /* Ícone maior */
         box-shadow: none !important;
         min-height: 0 !important;
         height: auto !important;
         line-height: 1 !important;
+        width: 30px !important; /* Largura fixa para evitar distorção */
     }
     
     [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"]:hover {
-        color: #333 !important;
+        color: #000 !important;
         background: transparent !important;
     }
+    
+    /* REMOVER SETA (CARET) DO POPOVER - CRÍTICO PARA REMOVER DISTORÇÃO */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"] svg {
+        display: none !important;
+    }
+    /* Caso a seta seja um elemento ::after ou outro span */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"] > span > span {
+        display: none !important; 
+    }
+    /* Garantir que o texto (emoji) apareça */
+    [data-testid="stSidebarContent"] [data-testid="stVerticalBlock"] > div:last-child button[kind="secondary"] > span:first-child {
+        display: block !important;
+    }
 
-    /* Caso o seletor acima falhe por aninhamento extra, tentar um mais genérico para o botão específico */
-    /* Isso ajuda se o popover não for o 'absoluto' último devido a fragments, etc. */
-    button[key="popover_trigger"] { /* Isso não funciona diretamente pois key não vira atributo HTML */ }
 </style>
 """, unsafe_allow_html=True)
             
