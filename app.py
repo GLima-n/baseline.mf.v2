@@ -9344,13 +9344,13 @@ with st.spinner("Carregando e processando dados..."):
             tipo_visualizacao = "Ambos"
 
             # ============================================
-            # WIDGET COLAPSÁVEL FIXO NO RODAPÉ (EXPANSÃO PARA CIMA)
+            # WIDGET DE ATUALIZAÇÃO RECORRENTE (TOPO DA SIDEBAR)
             # ============================================
             
-            # CSS para fixar no rodapé
+            # CSS para fixar no topo esquerdo da sidebar
             st.markdown("""
 <style>
-    /* Container fixo no rodapé da sidebar */
+    /* Container fixo no topo da sidebar */
     [data-testid="stSidebar"] {
         position: relative;
     }
@@ -9358,16 +9358,18 @@ with st.spinner("Carregando e processando dados..."):
     /* Última seção da sidebar (onde está o popover) */
     [data-testid="stSidebar"] > div:last-child {
         position: fixed !important;
-        bottom: 0 !important;
+        top: 0 !important; /* Fixar no topo */
         left: 0 !important;
-        width: 100% !important;
-        max-width: 244px !important;
+        bottom: auto !important; /* Remover fixação do rodapé */
+        width: auto !important; /* Largura automática para caber só o ícone */
+        max-width: none !important;
         background: transparent !important;
-        z-index: 9999 !important;
-        padding: 0.5rem 1rem !important;
+        z-index: 99999 !important; /* Z-index altíssimo para ficar sobre tudo */
+        padding: 0.8rem 1rem !important; /* Espaçamento para alinhar visualmente */
         border: none !important;
         box-shadow: none !important;
         margin-bottom: 0 !important;
+        height: auto !important;
     }
     
     /* Estilizar o botão do popover para parecer apenas o ícone */
@@ -9396,12 +9398,12 @@ with st.spinner("Carregando e processando dados..."):
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
             
-            # Popover nativo (resolvendo problemas de click-outside e toggle)
+            # Popover nativo
             with st.popover("⚙", use_container_width=False):
                 loaded_time = st.session_state.data_loaded_at.strftime("%d/%m %H:%M")
                 next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
                 
-                # Layout simples e limpo (Estilo anterior solicitado)
+                # Layout simples e limpo
                 st.markdown(f"""
                 <div style="min-width: 150px; padding: 0 5px;">
                     <div style="font-size: 0.8em; color: #555; margin-bottom: 12px;">
@@ -9417,7 +9419,7 @@ with st.spinner("Carregando e processando dados..."):
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Botão de refresh (Estilo simples)
+                # Botão de refresh
                 if st.button("↻ Atualizar", type="secondary", use_container_width=True, key="refresh_popover"):
                     st.cache_data.clear()
                     st.cache_resource.clear()
