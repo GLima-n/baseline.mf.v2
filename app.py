@@ -9364,7 +9364,7 @@ with st.spinner("Carregando e processando dados..."):
         max-width: 244px !important;
         background: white !important;
         z-index: 9999 !important;
-        padding: 0.5rem 1rem !important;
+        padding: 0.8rem 1.2rem !important; /* Aumentado padding do container */
         border-top: 1px solid #e6e6e6 !important;
         box-shadow: 0 -2px 8px rgba(0,0,0,0.05) !important;
         margin-bottom: 0 !important;
@@ -9378,7 +9378,8 @@ with st.spinner("Carregando e processando dados..."):
     
     /* Conteúdo do expander */
     [data-testid="stSidebar"] details[open] > div {
-        margin-bottom: 0.5rem !important;
+        margin-bottom: 1rem !important; /* Mais espaço entre botão e ícone */
+        padding: 0 5px !important; /* Padding lateral extra */
     }
     
     /* Ícone minimalista */
@@ -9402,17 +9403,18 @@ with st.spinner("Carregando e processando dados..."):
     
     /* Estilo do botão dentro do expander */
     [data-testid="stSidebar"] .stButton button {
-        border-color: #ddd !important;
-        color: #555 !important;
+        border-color: #eee !important;
+        color: #666 !important;
         font-size: 0.8em !important;
         padding: 0.2rem 0.5rem !important;
         height: auto !important;
         min-height: 0 !important;
+        margin-top: 5px !important;
     }
     [data-testid="stSidebar"] .stButton button:hover {
-        border-color: #999 !important;
+        border-color: #ccc !important;
         color: #333 !important;
-        background-color: #f9f9f9 !important;
+        background-color: #f5f5f5 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -9421,15 +9423,15 @@ with st.spinner("Carregando e processando dados..."):
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
             
-            # Expander com ícone de engrenagem minimalista (⚙ sem cor/emoji)
+            # Expander com ícone de engrenagem minimalista
             with st.expander("⚙", expanded=False):
                 loaded_time = st.session_state.data_loaded_at.strftime("%d/%m %H:%M")
                 next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
                 
-                # Layout compacto com HTML
+                # Layout compacto com HTML e mais padding
                 st.markdown(f"""
-                <div style="font-size: 0.8em; color: #555; margin-bottom: 8px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <div style="font-size: 0.8em; color: #555; margin-bottom: 10px; padding: 0 8px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                         <span>Última:</span>
                         <span style="font-weight: 500; color: #333;">{loaded_time}</span>
                     </div>
