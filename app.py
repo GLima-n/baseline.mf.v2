@@ -9285,39 +9285,34 @@ with st.spinner("Carregando e processando dados..."):
                 st.session_state.selected_setor_nome = setor_para_exibir
 
             # ============================================
-            # WIDGET MINIMALISTA DE AUTO-REFRESH (RODAPÉ)
+            # WIDGET COLAPSÁVEL DE AUTO-REFRESH (RODAPÉ)
             # ============================================
             
             # Inicializar timestamp
             if 'data_loaded_at' not in st.session_state:
                 st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
             
-            # Espaçamento
-            st.markdown("<br>", unsafe_allow_html=True)
+            # Espaçamento antes do widget
+            st.markdown("<br><br>", unsafe_allow_html=True)
             
-            # Widget sutil
-            loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
-            next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
-            
-            st.markdown(f"""
-            <div style="background-color: #fafafa; border-left: 3px solid #e0e0e0; padding: 8px 10px; font-size: 0.75em; color: #666; line-height: 1.4;">
-                <div style="margin-bottom: 4px;">
-                    <span style="color: #999;">Última Atualização:</span><br>
-                    <span style="color: #333;">{loaded_time}</span>
-                </div>
-                <div>
-                    <span style="color: #999;">Próxima Atualização:</span><br>
-                    <span style="color: #333;">{next_refresh_time}</span>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Botão de refresh manual (minimalista)
-            if st.button("Atualizar Dados", type="secondary", use_container_width=True):
-                st.cache_data.clear()
-                st.cache_resource.clear()
-                st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
-                st.rerun()
+            # Expander com ícone de engrenagem (colapsado por padrão)
+            with st.expander("⚙️", expanded=False):
+                loaded_time = st.session_state.data_loaded_at.strftime("%d/%m/%Y %H:%M")
+                next_refresh_time = (st.session_state.data_loaded_at + timedelta(hours=TTL_HOURS)).strftime("%H:%M")
+                
+                # Informações em layout compacto
+                st.caption("**Última Atualização:**")
+                st.text(loaded_time)
+                
+                st.caption("**Próxima Atualização:**")
+                st.text(next_refresh_time)
+                
+                # Botão de refresh
+                if st.button("Atualizar Dados", type="secondary", use_container_width=True, key="refresh_footer"):
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                    st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
+                    st.rerun()
             
             # ============================================
 
