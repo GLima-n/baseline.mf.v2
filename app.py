@@ -9201,10 +9201,18 @@ with st.spinner("Carregando e processando dados..."):
                 if 'data_loaded_at' not in st.session_state:
                     st.session_state.data_loaded_at = datetime.now(pytz.timezone('America/Sao_Paulo'))
                 
-                # CSS local para ajustar o botão APENAS aqui
+                # CSS para tornar o widget STICKY (Fixo mas no fluxo)
                 st.markdown("""
                 <style>
-                    /* Ajuste para o botão ficar mais clean dentro da coluna */
+                    /* Fazer a coluna 1 se comportar como container sticky */
+                    [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] > div:first-child {
+                        position: sticky !important;
+                        top: 0 !important;
+                        z-index: 999;
+                        align-self: flex-start;
+                    }
+
+                    /* Ajuste fino para o botão */
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"] {
                         border: none !important;
                         background: transparent !important;
@@ -9214,12 +9222,12 @@ with st.spinner("Carregando e processando dados..."):
                         box-shadow: none !important;
                         line-height: 1 !important;
                         min-height: 0 !important;
-                        margin-top: -5px !important; /* Ajuste fino vertical */
+                        margin-top: 5px !important;
                     }
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
                         color: #000 !important;
                     }
-                    /* Remover seta do popover especificamente aqui */
+                    /* Remover seta */
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"] svg {
                         display: none !important;
                     }
