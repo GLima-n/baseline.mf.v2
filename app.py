@@ -9403,7 +9403,7 @@ with st.spinner("Carregando e processando dados..."):
                 
                 # Layout simples e limpo (Estilo anterior solicitado)
                 st.markdown(f"""
-                <div style="min-width: 180px; padding: 0 5px;">
+                <div style="min-width: 150px; padding: 0 5px;">
                     <div style="font-size: 0.8em; color: #555; margin-bottom: 12px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
                             <span>Última:</span>
