@@ -9212,7 +9212,7 @@ with st.spinner("Carregando e processando dados..."):
                     /* Botão com position FIXED para ir ao topo absoluto */
                     [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] button[kind="secondary"] {
                         position: fixed !important;
-                        top: 0.5rem !important; /* Mesma altura do botão de fechar/expandir */
+                        top: 1rem !important; /* Teste visual solicitado pelo usuário (antes 0.5rem) */
                         left: 1rem !important;
                         z-index: 999999 !important;
                         
